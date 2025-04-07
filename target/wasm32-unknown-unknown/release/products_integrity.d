@@ -1,0 +1,1 @@
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/products_integrity.wasm: /home/bur1/Holochain/summon/dnas/grocery/zomes/integrity/product_catalog/src/lib.rs /home/bur1/Holochain/summon/dnas/grocery/zomes/integrity/product_catalog/src/product.rs

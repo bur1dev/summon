@@ -1,0 +1,11 @@
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/deps/libcargo_metadata-9f8a34db15e05463.rmeta: /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/lib.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/dependency.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/diagnostic.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/errors.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/messages.rs
+
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/deps/libcargo_metadata-9f8a34db15e05463.rlib: /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/lib.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/dependency.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/diagnostic.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/errors.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/messages.rs
+
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/deps/cargo_metadata-9f8a34db15e05463.d: /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/lib.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/dependency.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/diagnostic.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/errors.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/messages.rs
+
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/lib.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/dependency.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/diagnostic.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/errors.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cargo_metadata-0.18.1/src/messages.rs:

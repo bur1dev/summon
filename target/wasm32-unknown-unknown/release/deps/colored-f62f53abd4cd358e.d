@@ -1,0 +1,12 @@
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/deps/libcolored-f62f53abd4cd358e.rmeta: /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/lib.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/color.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/control.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/error.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/style.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/customcolors.rs
+
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/deps/libcolored-f62f53abd4cd358e.rlib: /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/lib.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/color.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/control.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/error.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/style.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/customcolors.rs
+
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/deps/colored-f62f53abd4cd358e.d: /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/lib.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/color.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/control.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/error.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/style.rs /home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/customcolors.rs
+
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/lib.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/color.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/control.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/error.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/style.rs:
+/home/bur1/.cargo/registry/src/index.crates.io-6f17d22bba15001f/colored-2.1.0/src/customcolors.rs:

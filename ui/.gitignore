@@ -23,3 +23,12 @@
 storybook-static
 .rollup.cache
 *.tsbuildinfo
+
+# Environment variables
+.env
+*/.env
+
+# Python environment
+/env/
+*/env/
+/product-categorization/env/

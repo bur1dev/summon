@@ -212,13 +212,6 @@ export class SimpleCartService {
                 });
 
                 console.log("Loaded checked out carts:", result);
-                console.log("Checked out carts with status details:",
-                    result.data ? result.data.map(cart => ({
-                        id: cart.id,
-                        cartHash: cart.cartHash,
-                        status: cart.status,
-                        productCount: cart.products.length
-                    })) : []);
 
                 // Process the results to make them easier to use in the UI
                 const processedCarts = await this.processCheckedOutCarts(result);
@@ -236,7 +229,7 @@ export class SimpleCartService {
 
     // Process checked out carts to add product details
     private async processCheckedOutCarts(carts) {
-        console.log("Raw checked out carts from Holochain:", carts);
+        console.log("Processing checked out carts from Holochain:", carts);
 
         if (!this.productStore) {
             return carts;
@@ -286,28 +279,9 @@ export class SimpleCartService {
                 total: calculatedTotal > 0 ? calculatedTotal : total,
                 createdAt: formattedDate,
                 status,
-                productIds: productsWithDetails.map(p => p.id),
-                // Include raw state for CheckedOutCarts.svelte compatibility
-                state: {
-                    products: productsWithDetails.map(p => ({
-                        id: p.id,
-                        props: {
-                            text: this.formatProductText(p.details, p.quantity),
-                            color: "white"
-                        }
-                    }))
-                }
+                productIds: productsWithDetails.map(p => p.id)
             };
         }));
-    }
-
-    // Helper to format product text for compatibility with old code
-    private formatProductText(product, quantity) {
-        if (!product) {
-            return "Unknown Product";
-        }
-
-        return `NAME:${product.name}\nSIZE:${product.size || 'Standard'}\nPRICE:${product.price || 0}\nQUANTITY:${quantity}\nIMAGE:${product.image_url || ''}`;
     }
 
     // Return a checked out cart to shopping
@@ -334,26 +308,6 @@ export class SimpleCartService {
             console.error('Error returning cart to shopping:', error);
             return { success: false, message: error.toString() };
         }
-    }
-
-    // Calculate total for a specific group of stickies (for compatibility)
-    public calculateGroupTotal(stickyIds, stickies) {
-        let total = 0;
-        for (const id of stickyIds) {
-            const sticky = stickies.find(s => s.id === id);
-            if (sticky && sticky.props && sticky.props.text) {
-                // Extract price and quantity from sticky text
-                const priceMatch = sticky.props.text.match(/PRICE:(\d+(\.\d+)?)/);
-                const quantityMatch = sticky.props.text.match(/QUANTITY:(\d+)/);
-
-                if (priceMatch && quantityMatch) {
-                    const price = parseFloat(priceMatch[1]);
-                    const quantity = parseInt(quantityMatch[1]);
-                    total += price * quantity;
-                }
-            }
-        }
-        return total;
     }
 
     // Get current cart items

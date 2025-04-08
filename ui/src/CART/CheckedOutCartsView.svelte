@@ -25,20 +25,11 @@
       isLoading = true;
       errorMessage = "";
 
-      // Use CartStore's loadCheckedOutCarts method
+      // Use SimpleCartService's loadCheckedOutCarts method
       const result = await $cartService.loadCheckedOutCarts();
 
       if (result.success) {
         checkedOutCarts = result.data || [];
-        console.log(
-          "Final carts to render:",
-          checkedOutCarts.map((cart) => ({
-            id: cart.id,
-            cartHash: cart.cartHash,
-            status: cart.status,
-            productsCount: cart.products.length,
-          })),
-        );
         console.log("Loaded checked out carts:", checkedOutCarts.length);
       } else {
         console.error("Error loading checked out carts:", result.message);
@@ -60,7 +51,7 @@
     try {
       console.log("Returning cart to shopping:", item.id);
 
-      // Use CartStore's returnToShopping method
+      // Use SimpleCartService's returnToShopping method
       const result = await $cartService.returnToShopping(item.cartHash);
 
       if (result.success) {
@@ -107,41 +98,34 @@
 
             <div class="cart-items">
               {#each item.products as product}
-                {#if !product.details?.name?.includes("Note")}
-                  <div class="cart-product">
-                    <div class="product-image">
-                      {#if product.details?.image_url}
-                        <img
-                          src={product.details.image_url}
-                          alt={product.details.name}
-                        />
-                      {/if}
+                <div class="cart-product">
+                  <div class="product-image">
+                    {#if product.details?.image_url}
+                      <img
+                        src={product.details.image_url}
+                        alt={product.details.name}
+                      />
+                    {/if}
+                  </div>
+                  <div class="product-details">
+                    <div class="product-name">
+                      {product.details?.name || "Unknown Product"}
                     </div>
-                    <div class="product-details">
-                      <div class="product-name">
-                        {product.details?.name || "Unknown Product"}
-                      </div>
-                      <div class="product-size">
-                        {product.details?.size || "Standard"}
-                      </div>
-                      <div class="product-quantity">
-                        {product.quantity} × ${(
-                          product.details?.price || 0
-                        ).toFixed(2)}
-                      </div>
+                    <div class="product-size">
+                      {product.details?.size || "Standard"}
                     </div>
-                    <div class="product-price">
-                      ${(
-                        (product.details?.price || 0) * product.quantity
+                    <div class="product-quantity">
+                      {product.quantity} × ${(
+                        product.details?.price || 0
                       ).toFixed(2)}
                     </div>
                   </div>
-                {:else}
-                  <div class="cart-note skyblue">
-                    <div class="note-icon">📝</div>
-                    <div class="note-content">{product.details?.name}</div>
+                  <div class="product-price">
+                    ${(
+                      (product.details?.price || 0) * product.quantity
+                    ).toFixed(2)}
                   </div>
-                {/if}
+                </div>
               {/each}
             </div>
 
@@ -324,26 +308,6 @@
     margin-left: 12px;
   }
 
-  .cart-note {
-    display: flex;
-    padding: 12px;
-    border-radius: 8px;
-    margin: 8px 0;
-    align-items: flex-start;
-  }
-
-  .note-icon {
-    margin-right: 12px;
-    font-size: 18px;
-  }
-
-  .note-content {
-    flex: 1;
-    white-space: pre-wrap;
-    font-size: 14px;
-    line-height: 1.4;
-  }
-
   .return-button {
     margin: 16px;
     padding: 10px 16px;
@@ -371,31 +335,5 @@
     padding: 40px;
     font-size: 18px;
     color: #666;
-  }
-
-  /* Color classes for sticky notes */
-  .white {
-    background: #f9f9f9;
-  }
-  .yellow {
-    background: #fffde7;
-  }
-  .green {
-    background: #e8f5e9;
-  }
-  .skyblue {
-    background: #e3f2fd;
-  }
-  .deepblue {
-    background: #e8eaf6;
-  }
-  .purple {
-    background: #f3e5f5;
-  }
-  .red {
-    background: #ffebee;
-  }
-  .grey {
-    background: #f5f5f5;
   }
 </style>

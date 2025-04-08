@@ -170,9 +170,9 @@
   <div class="cart-container" class:open={isOpen} on:click|stopPropagation>
     <CartHeader {onClose} />
 
-    <div class="carts-container">
-      <div class="cart-group">
-        <div class="cart-group-header">
+    <div class="cart-content">
+      <div class="cart-main">
+        <div class="cart-main-header">
           <div class="cart-title">
             Cart (Total: ${cartTotal.toFixed(2)})
           </div>
@@ -260,13 +260,13 @@
     right: 0;
   }
 
-  .carts-container {
+  .cart-content {
     flex: 1;
     overflow-y: auto;
     padding: 0;
   }
 
-  .cart-group {
+  .cart-main {
     position: relative;
     border: none;
     margin: 0;
@@ -278,7 +278,7 @@
     flex-direction: column;
   }
 
-  .cart-group-header {
+  .cart-main-header {
     padding: 15px 20px;
     position: sticky;
     top: 0;

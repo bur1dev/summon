@@ -1,13 +1,11 @@
 <script lang="ts">
     import { getContext, onMount, onDestroy } from "svelte";
-    import ProductSticky from "./ProductSticky.svelte";
-    import type { Board } from "./board";
+    import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
 
     export let selectedCategory: string;
     export let selectedSubcategory: string | null = null;
     export let selectedProductType: string | null = null;
-    export let board: Board;
     export let products = [];
     export let allProductsTotal: number = 0;
 
@@ -218,9 +216,8 @@
                                         columnsPerRow)}px; width: calc({100 /
                                 columnsPerRow}%);"
                         >
-                            <ProductSticky
+                            <ProductCard
                                 product={products[index]}
-                                {board}
                                 on:reportCategory={(event) =>
                                     dispatch("reportCategory", event.detail)}
                             />

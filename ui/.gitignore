@@ -32,3 +32,7 @@ storybook-static
 /env/
 */env/
 /product-categorization/env/
+
+# Holochain development files
+.hc
+.hc_live*

@@ -1,13 +1,13 @@
 <script lang="ts">
   import { getContext } from "svelte";
-  import type { TalkingStickiesStore } from "./store";
+  import type { ShopStore } from "./store";
   import { createEventDispatcher } from "svelte";
   import { mainCategories } from "./categoryData";
 
   const dispatch = createEventDispatcher();
 
   const { getStore }: any = getContext("store");
-  let store: TalkingStickiesStore = getStore();
+  let store: ShopStore = getStore();
 
   let currentPage = 0;
   let hasMore = false;

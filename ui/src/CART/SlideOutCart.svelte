@@ -26,28 +26,12 @@
     productStore ? "AVAILABLE" : "MISSING",
   );
 
-  // Log detailed method info
-  if (productStore) {
-    console.log(
-      "ProductStore methods:",
-      Object.getOwnPropertyNames(Object.getPrototypeOf(productStore)),
-    );
-    console.log(
-      "ProductStore hasOwnProperty getProductByHash:",
-      productStore.hasOwnProperty("getProductByHash"),
-    );
-    console.log(
-      "ProductStore direct check typeof:",
-      typeof productStore.getProductByHash,
-    );
-  }
-
-  console.log("SlideOutCart - store keys:", store ? Object.keys(store) : "N/A");
-
   // State
   let cartItems = [];
   let productDetails = {};
   let isLoading = true;
+  let isCheckingOut = false;
+  let checkoutError = "";
 
   // Subscribe to cart changes
   let unsubscribe;
@@ -155,6 +139,31 @@
       console.error("Error clearing cart:", error);
     }
   }
+
+  // Checkout cart
+  async function checkoutCart() {
+    if (!$cartService || cartItems.length === 0) return;
+
+    isCheckingOut = true;
+    checkoutError = "";
+
+    try {
+      const result = await $cartService.checkoutCart();
+
+      if (result.success) {
+        console.log("Checkout successful:", result);
+        onClose();
+      } else {
+        console.error("Checkout failed:", result.message);
+        checkoutError = result.message || "Checkout failed";
+      }
+    } catch (error) {
+      console.error("Error during checkout:", error);
+      checkoutError = error.toString();
+    } finally {
+      isCheckingOut = false;
+    }
+  }
 </script>
 
 <div class="overlay" class:visible={isOpen} on:click={onClose}>
@@ -188,18 +197,25 @@
               {/if}
             {/each}
           {/if}
+
+          {#if checkoutError}
+            <div class="error-message">
+              {checkoutError}
+            </div>
+          {/if}
         </div>
 
         <div class="checkout-button-container">
           <button
             class="checkout-button"
-            on:click={() => {
-              alert(
-                "Checkout functionality will be implemented in the next phase",
-              );
-            }}
+            disabled={isCheckingOut || cartItems.length === 0}
+            on:click={checkoutCart}
           >
-            Checkout all items
+            {#if isCheckingOut}
+              Processing...
+            {:else}
+              Checkout all items
+            {/if}
           </button>
         </div>
       </div>
@@ -295,17 +311,27 @@
     min-height: 0;
   }
 
-  .add-note {
-    padding: 15px 20px;
-    border-top: 1px solid #e0e0e0;
-    color: #0066c0;
-    cursor: pointer;
+  .error-message {
+    margin: 15px 0;
+    padding: 10px;
+    background-color: #ffebee;
+    color: #c62828;
+    border-radius: 4px;
     font-size: 14px;
-    text-align: center;
   }
 
-  .add-note:hover {
-    background: #f5f5f5;
+  .empty-cart {
+    padding: 30px 0;
+    text-align: center;
+    color: #888;
+    font-size: 16px;
+  }
+
+  .loading {
+    padding: 30px 0;
+    text-align: center;
+    color: #888;
+    font-size: 16px;
   }
 
   .checkout-button-container {
@@ -329,14 +355,14 @@
     transition: background-color 0.2s;
   }
 
-  .checkout-button:hover {
-    background: #1a8b51;
-    border: 2px solid rgb(32, 200, 51);
+  .checkout-button:hover:not([disabled]) {
+    background: #156e40;
   }
 
-  .glowing {
-    outline: none;
-    border-color: #9ecaed;
-    box-shadow: 0 0 10px #9ecaed;
+  .checkout-button[disabled] {
+    background: #cccccc;
+    border-color: #bbbbbb;
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 </style>

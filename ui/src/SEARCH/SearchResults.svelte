@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
-    import ProductSticky from "../ProductSticky.svelte";
+    import ProductCard from "../ProductCard.svelte";
     import {
         ProductSelectionStrategy,
         DirectSearchStrategy,
@@ -10,7 +10,6 @@
     import type { Product } from "./search-types";
 
     export let store;
-    export let board;
     export let query = "";
     export let selectedProductHash = null;
     export let productName = "";
@@ -114,9 +113,8 @@
     {:else}
         <div class="products-grid">
             {#each searchResults as product (product.hash)}
-                <ProductSticky
+                <ProductCard
                     {product}
-                    {board}
                     on:reportCategory={(event) =>
                         dispatch("reportCategory", event.detail)}
                 />

@@ -8,7 +8,7 @@ import {
 import { writable, type Writable } from "svelte/store";
 import { ProductStore } from "./ProductStore";
 
-export class TalkingStickiesService {
+export class ShopService {
   constructor(public client: AppClient, public roleName, public zomeName = 'products') { }
   private callZome(fnName: string, payload: any) {
     return this.client.callZome({
@@ -21,9 +21,6 @@ export class TalkingStickiesService {
 }
 
 export interface UIProps {
-  showArchived: { [key: string]: boolean },
-  showMenu: boolean,
-  recent: Array<string>
   bgUrl: string,
   searchMode?: boolean,
   searchQuery?: string,
@@ -33,15 +30,12 @@ export interface UIProps {
   isViewAll?: boolean
 }
 
-export class TalkingStickiesStore {
+export class ShopStore {
   myAgentPubKeyB64: AgentPubKeyB64;
-  service: TalkingStickiesService;
+  service: ShopService;
   productStore: ProductStore;
   client: AppClient;
   uiProps: Writable<UIProps> = writable({
-    showArchived: {},
-    showMenu: true,
-    recent: [],
     bgUrl: "",
   });
   dnaHash: DnaHash;
@@ -63,14 +57,13 @@ export class TalkingStickiesStore {
     public roleName: RoleName,
     public zomeName: string = 'products'
   ) {
-    console.log("[TalkingStickiesStore] Constructor initialized");
+    console.log("[ShopStore] Constructor initialized");
     this.client = clientIn;
-    // DNA hash is no longer fetched from profiles zome
     this.dnaHash = null;
-    console.log("[TalkingStickiesStore] DNA hash not set (profiles dependency removed)");
+    console.log("[ShopStore] DNA hash not set (profiles dependency removed)");
 
     this.myAgentPubKeyB64 = encodeHashToBase64(this.client.myPubKey);
-    this.service = new TalkingStickiesService(
+    this.service = new ShopService(
       this.client,
       this.roleName,
       this.zomeName

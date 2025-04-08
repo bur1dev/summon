@@ -1,6 +1,6 @@
 <script lang="ts">
     import NavigationArrows from "./NavigationArrows.svelte";
-    import ProductSticky from "./ProductSticky.svelte";
+    import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
 
     // Required props
@@ -14,7 +14,6 @@
     export let selectedCategory;
     export let selectedSubcategory;
     export let mainGridContainer;
-    export let board;
     export let isProductType = false;
     export let onViewMore = () => {};
     export let action;
@@ -26,22 +25,22 @@
         dispatch("dataLoaded", event.detail);
     }
 
-    // Forward report events from ProductSticky
+    // Forward report events from ProductCard
     function handleReportCategory(event) {
         dispatch("reportCategory", event.detail);
     }
 </script>
 
-<div class="group" id={identifier} use:action>
+<div class="product-row" id={identifier} use:action>
     <div class="section-header">
-        <div class="group-title">
+        <div class="product-row-title">
             <b>{title}</b>
         </div>
         <span class="view-all-link" on:click|stopPropagation={onViewMore}>
             View More
         </span>
     </div>
-    <div class="stickies" data-subcategory={identifier} use:action>
+    <div class="product-row-items" data-subcategory={identifier} use:action>
         <NavigationArrows
             direction="left"
             disabled={currentRanges[identifier]?.start === 0}
@@ -58,7 +57,7 @@
 
         {#if products && products.length > 0}
             {#each products as product (product.hash)}
-                <ProductSticky {product} {board} on:reportCategory />
+                <ProductCard {product} on:reportCategory />
             {/each}
         {/if}
 
@@ -81,7 +80,7 @@
 </div>
 
 <style>
-    .group {
+    .product-row {
         position: relative;
         display: block;
         flex-direction: column;
@@ -96,7 +95,7 @@
         width: 100%;
     }
 
-    .group-title {
+    .product-row-title {
         font-size: 30px;
         font-weight: bold;
         text-align: left;
@@ -105,7 +104,7 @@
         color: #343538;
     }
 
-    .group-title b {
+    .product-row-title b {
         color: #343538;
     }
 
@@ -139,7 +138,7 @@
         font-size: 16px;
     }
 
-    .stickies {
+    .product-row-items {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
         grid-template-rows: 420px;

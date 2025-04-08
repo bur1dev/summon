@@ -14,8 +14,7 @@
   export let currentView: "active" | "checked-out" = "active";
   export let isCartOpen = false;
   export let standAlone = false;
-  export let activeBoard = undefined; // Keep for interface compatibility
-  export let cartTotal = 0; // This prop is passed from TalkingStickiesPane
+  export let cartTotal = 0; // This prop is passed from ShopView
 
   $: uiProps = store.uiProps;
 
@@ -32,7 +31,7 @@
       <button
         class="menu-btn menu-close"
         on:click={() => store.setUIprops({ showMenu: false })}
-        title="Hide Board Menu"
+        title="Hide Menu"
       >
         <span>✕</span>
       </button>
@@ -40,14 +39,14 @@
       <button
         class="menu-btn menu-open"
         on:click={() => store.setUIprops({ showMenu: true })}
-        title="Show Board Menu"
+        title="Show Menu"
       >
         <span>≡</span>
       </button>
     {/if}
 
-    {#if standAlone && activeBoard}
-      <h2 class="board-title">{activeBoard.name}</h2>
+    {#if standAlone}
+      <!-- Removed board title display -->
     {/if}
   </div>
 
@@ -117,7 +116,7 @@
     </button>
 
     <a
-      href="https://github.com/holochain-apps/talking-stickies/issues"
+      href="https://github.com/bur1dev/summon/issues"
       class="tool-button"
       title="Report a problem in our GitHub repo"
       target="_blank"
@@ -275,13 +274,6 @@
 
   .admin-btn {
     background-color: #f8f8f8;
-  }
-
-  .board-title {
-    margin: 0;
-    font-size: 16px;
-    color: #333;
-    white-space: nowrap;
   }
 
   .admin-overlay {

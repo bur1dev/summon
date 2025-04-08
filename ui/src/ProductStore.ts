@@ -1,8 +1,7 @@
 import { writable, type Writable } from "svelte/store";
-import { SynStore } from "@holochain-syn/core";
 import { type AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
-import { TalkingStickiesStore } from "./store";
+import { ShopStore } from "./store";
 import { get } from 'svelte/store';
 
 interface StoreState {
@@ -16,13 +15,13 @@ interface StoreState {
 
 export class ProductStore {
   private state: Writable<StoreState>;
-  private store: TalkingStickiesStore;
+  private store: ShopStore;
   private selectedLocationId: string = "70300168";
 
   constructor(
-    private synStore: SynStore,
+    private client: any,
     private myAgentKey: AgentPubKeyB64,
-    store: TalkingStickiesStore
+    store: ShopStore
   ) {
     this.store = store;
     this.selectedLocationId = "70300168";

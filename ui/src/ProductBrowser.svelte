@@ -3,7 +3,6 @@
     import AllProductsGrid from "./AllProductsGrid.svelte";
     import ProductRow from "./ProductRow.svelte";
     import { mainCategories } from "./categoryData";
-    import type { Board } from "./board";
     import type { ProductDataService } from "./ProductDataService";
     import type { ProductCacheStore } from "./ProductCacheStore";
     import { tick } from "svelte";
@@ -13,7 +12,6 @@
     export let selectedSubcategory: string | null = null;
     export let selectedProductType: string = "All";
     export let searchMode: boolean = false;
-    export let board: Board;
     export let productDataService: ProductDataService;
     export let productCache: ProductCacheStore;
     export let store: any;
@@ -342,8 +340,8 @@
     }
 
     async function registerResizeObservers() {
-        const stickyNodes = document.querySelectorAll(".stickies");
-        stickyNodes.forEach((node) => {
+        const productRowNodes = document.querySelectorAll(".product-row-items");
+        productRowNodes.forEach((node) => {
             const subcatName = node.getAttribute("data-subcategory");
             if (subcatName && !loadedSubcategoriesSet.has(subcatName)) {
                 gridContainer[subcatName] = node;
@@ -409,7 +407,6 @@
                 {selectedCategory}
                 selectedSubcategory={subcategory.name}
                 {mainGridContainer}
-                {board}
                 {action}
                 bind:this={gridContainer[subcategory.name]}
                 onViewMore={() =>
@@ -428,7 +425,6 @@
             {selectedProductType}
             products={allCategoryProducts}
             {allProductsTotal}
-            {board}
             on:reportCategory={handleReportCategory}
         />
     {:else if selectedCategory && selectedSubcategory}
@@ -442,7 +438,6 @@
                 {selectedProductType}
                 products={allCategoryProducts}
                 {allProductsTotal}
-                {board}
                 on:reportCategory={handleReportCategory}
             />
         {:else if selectedProductType === "All"}
@@ -461,7 +456,6 @@
                     {selectedCategory}
                     {selectedSubcategory}
                     {mainGridContainer}
-                    {board}
                     {action}
                     bind:this={gridContainer[productType]}
                     isProductType={true}

@@ -1,36 +1,21 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import type { TalkingStickiesStore } from "../store";
-  import type { Board } from "../board";
   import { ShoppingCart, ArrowLeft } from "lucide-svelte";
-  import { encodeHashToBase64 } from "@holochain/client";
-  import {
-    getProductName,
-    getProductQuantity,
-    getProductSize,
-    getProductPrice,
-    getProductImage,
-    isNoteSticky,
-  } from "./CartUtils";
-  import { toPromise } from "@holochain-open-dev/stores";
-  import { BoardType } from "../boardList";
+  import { writable, type Writable } from "svelte/store";
 
-  // Get the store from context
-  const { getStore }: any = getContext("store");
-  const store: TalkingStickiesStore = getStore();
-  const cartStore = store.cartStore;
-
-  // Make activeBoard optional since we're not using it
-  export let activeBoard: Board = undefined;
+  // Get cart service directly from the context
+  const cartService = getContext("cartService") as Writable<any>;
 
   let isLoading = true;
   let checkedOutCarts = [];
+  let errorMessage = "";
 
   onMount(async () => {
     try {
       await loadCheckedOutCarts();
     } catch (error) {
       console.error("Error in onMount:", error);
+      errorMessage = "Failed to load checked out carts: " + error.toString();
       isLoading = false;
     }
   });
@@ -38,38 +23,37 @@
   async function loadCheckedOutCarts() {
     try {
       isLoading = true;
+      errorMessage = "";
 
       // Use CartStore's loadCheckedOutCarts method
-      const result = await cartStore.loadCheckedOutCarts();
+      const result = await $cartService.loadCheckedOutCarts();
 
       if (result.success) {
         checkedOutCarts = result.data || [];
+        console.log(
+          "Final carts to render:",
+          checkedOutCarts.map((cart) => ({
+            id: cart.id,
+            cartHash: cart.cartHash,
+            status: cart.status,
+            productsCount: cart.products.length,
+          })),
+        );
         console.log("Loaded checked out carts:", checkedOutCarts.length);
       } else {
         console.error("Error loading checked out carts:", result.message);
+        errorMessage = "Error loading checked out carts: " + result.message;
         checkedOutCarts = [];
       }
 
       isLoading = false;
     } catch (error) {
       console.error("Error loading checked out carts:", error);
+      errorMessage = "Error loading checked out carts: " + error.toString();
       isLoading = false;
       checkedOutCarts = [];
     }
   }
-
-  // Calculate total for a cart
-  const calculateGroupTotal = (item) => {
-    return item.stickyIds.reduce((total, stickyId) => {
-      const sticky = item.state.stickies.find((s) => s.id === stickyId);
-      if (sticky) {
-        const price = getProductPrice(sticky.props.text);
-        const quantity = getProductQuantity(sticky.props.text);
-        return total + price * quantity;
-      }
-      return total;
-    }, 0);
-  };
 
   // Function to return a cart to shopping
   async function returnToShopping(item) {
@@ -77,7 +61,7 @@
       console.log("Returning cart to shopping:", item.id);
 
       // Use CartStore's returnToShopping method
-      const result = await cartStore.returnToShopping(item.boardHash);
+      const result = await $cartService.returnToShopping(item.cartHash);
 
       if (result.success) {
         // Refresh the list of checked-out carts
@@ -85,9 +69,11 @@
         console.log("Cart returned to shopping:", item.id);
       } else {
         console.error("Error returning cart to shopping:", result.message);
+        errorMessage = "Error returning cart to shopping: " + result.message;
       }
     } catch (error) {
       console.error("Error returning cart to shopping:", error);
+      errorMessage = "Error returning cart to shopping: " + error.toString();
     }
   }
 </script>
@@ -101,6 +87,8 @@
   <div class="scrollable-content">
     {#if isLoading}
       <div class="loading">Loading checked out carts...</div>
+    {:else if errorMessage}
+      <div class="error-message">{errorMessage}</div>
     {:else if checkedOutCarts.length === 0}
       <div class="empty-state">
         <ShoppingCart size={64} color="#cccccc" />
@@ -112,52 +100,47 @@
         {#each checkedOutCarts as item}
           <div class="cart-card">
             <div class="cart-header">
-              <h2>Cart ${calculateGroupTotal(item).toFixed(2)}</h2>
+              <h2>Cart ${item.total.toFixed(2)}</h2>
               <div class="cart-date">{item.createdAt}</div>
+              <div class="cart-status">Status: {item.status}</div>
             </div>
 
             <div class="cart-items">
-              {#each item.stickyIds as stickyId}
-                {#if item.state.stickies.find((s) => s.id === stickyId)}
-                  {@const sticky = item.state.stickies.find(
-                    (s) => s.id === stickyId,
-                  )}
-                  {#if isNoteSticky(sticky.props.text)}
-                    <div class="cart-note {sticky.props.color || 'skyblue'}">
-                      <div class="note-icon">📝</div>
-                      <div class="note-content">{sticky.props.text}</div>
+              {#each item.products as product}
+                {#if !product.details?.name?.includes("Note")}
+                  <div class="cart-product">
+                    <div class="product-image">
+                      {#if product.details?.image_url}
+                        <img
+                          src={product.details.image_url}
+                          alt={product.details.name}
+                        />
+                      {/if}
                     </div>
-                  {:else}
-                    <div class="cart-product">
-                      <div class="product-image">
-                        {#if getProductImage(sticky.props.text)}
-                          <img
-                            src={getProductImage(sticky.props.text)}
-                            alt={getProductName(sticky.props.text)}
-                          />
-                        {/if}
+                    <div class="product-details">
+                      <div class="product-name">
+                        {product.details?.name || "Unknown Product"}
                       </div>
-                      <div class="product-details">
-                        <div class="product-name">
-                          {getProductName(sticky.props.text)}
-                        </div>
-                        <div class="product-size">
-                          {getProductSize(sticky.props.text)}
-                        </div>
-                        <div class="product-quantity">
-                          {getProductQuantity(sticky.props.text)} × ${getProductPrice(
-                            sticky.props.text,
-                          ).toFixed(2)}
-                        </div>
+                      <div class="product-size">
+                        {product.details?.size || "Standard"}
                       </div>
-                      <div class="product-price">
-                        ${(
-                          getProductPrice(sticky.props.text) *
-                          getProductQuantity(sticky.props.text)
+                      <div class="product-quantity">
+                        {product.quantity} × ${(
+                          product.details?.price || 0
                         ).toFixed(2)}
                       </div>
                     </div>
-                  {/if}
+                    <div class="product-price">
+                      ${(
+                        (product.details?.price || 0) * product.quantity
+                      ).toFixed(2)}
+                    </div>
+                  </div>
+                {:else}
+                  <div class="cart-note skyblue">
+                    <div class="note-icon">📝</div>
+                    <div class="note-content">{product.details?.name}</div>
+                  </div>
                 {/if}
               {/each}
             </div>
@@ -233,6 +216,16 @@
     margin: 0;
   }
 
+  .error-message {
+    margin: 20px;
+    padding: 15px;
+    background-color: #ffebee;
+    color: #c62828;
+    border-radius: 4px;
+    font-size: 14px;
+    text-align: center;
+  }
+
   .carts-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
@@ -267,6 +260,13 @@
     font-size: 14px;
     color: #666;
     margin-top: 4px;
+  }
+
+  .cart-status {
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 4px;
+    color: #1a8b51;
   }
 
   .cart-items {
@@ -362,8 +362,15 @@
   }
 
   .return-button:hover {
-    background: #1a8b51;
-    border: 2px solid rgb(32, 200, 51);
+    background: #156e40;
+  }
+
+  .loading {
+    display: flex;
+    justify-content: center;
+    padding: 40px;
+    font-size: 18px;
+    color: #666;
   }
 
   /* Color classes for sticky notes */
@@ -390,13 +397,5 @@
   }
   .grey {
     background: #f5f5f5;
-  }
-
-  .loading {
-    display: flex;
-    justify-content: center;
-    padding: 40px;
-    font-size: 18px;
-    color: #666;
   }
 </style>

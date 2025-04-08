@@ -1,13 +1,13 @@
 <script lang="ts">
-  import TalkingStickiesPane from "./TalkingStickiesPane.svelte";
-  import { TalkingStickiesStore } from "./store";
+  import ShopView from "./ShopView.svelte";
+  import { ShopStore } from "./store";
   import { setContext, onMount, getContext } from "svelte";
   import type { AppClient } from "@holochain/client";
 
   export let roleName = "";
   export let client: AppClient;
 
-  let store: TalkingStickiesStore = new TalkingStickiesStore(client, roleName);
+  let store: ShopStore = new ShopStore(client, roleName);
 
   // Get cart service from context
   const cartService = getContext("cartService");
@@ -37,12 +37,8 @@
       <div class="wrapper">
         <div class="header"></div>
         <div class="workspace" style="display:flex">
-          <!-- Always hide the board menu -->
-          <div class="board-menu slideOut"></div>
-          <div class="board-menu-pad slideOut"></div>
-
-          <!-- Render TalkingStickiesPane -->
-          <TalkingStickiesPane />
+          <!-- Render ShopView -->
+          <ShopView />
         </div>
       </div>
 
@@ -58,14 +54,6 @@
 </div>
 
 <style>
-  .error-msg {
-    margin: auto;
-    display: flex;
-    width: 50%;
-    border-radius: 10px;
-    border: 2px solid red;
-    padding: 20px;
-  }
   .app {
     margin: 0;
     padding-bottom: 10px;
@@ -75,60 +63,6 @@
     min-height: 0;
     background-color: #fff;
     position: relative;
-  }
-
-  .board-menu,
-  .board-menu-pad {
-    animation-duration: 0.3s;
-    animation-name: slideIn;
-    animation-iteration-count: 1;
-    animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1.1);
-    z-index: 199;
-    --margin-end-position: 0px;
-    --margin-start-position: -330px;
-    margin-left: 0;
-  }
-
-  .board-menu {
-    position: fixed;
-    top: 80px;
-  }
-
-  .board-menu:hover {
-    z-index: 200;
-  }
-
-  .board-menu.slideOut,
-  .board-menu-pad.slideOut {
-    animation-duration: 0.3s;
-    animation-name: slideOut;
-    --margin-end-position: -343px;
-    animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1.1);
-    --margin-start-position: 0px;
-    margin-left: -343px;
-  }
-
-  .board-menu-pad {
-    visibility: hidden;
-  }
-
-  @keyframes slideIn {
-    from {
-      margin-left: var(--margin-start-position);
-    }
-
-    to {
-      margin-left: var(--margin-end-position);
-    }
-  }
-  @keyframes slideOut {
-    from {
-      margin-left: var(--margin-start-position);
-    }
-
-    to {
-      margin-left: var(--margin-end-position);
-    }
   }
 
   .background {

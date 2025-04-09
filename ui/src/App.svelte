@@ -7,6 +7,7 @@
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
   import { SimpleCartService } from "./CART/SimpleCartService";
+  import { AddressService } from "./CART/AddressService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
 
@@ -27,9 +28,14 @@
   const cartService = writable(null);
   setContext("cartService", cartService);
 
+  // Create a writable for the address service
+  const addressService = writable(null);
+  setContext("addressService", addressService);
+
   // Create a store object with references that can be updated later
   const storeObj = {
     simpleCartService: null,
+    addressService: null,
   };
 
   // Provide the store context
@@ -74,14 +80,21 @@
     const simpleCartService = new SimpleCartService(client);
     console.log("SimpleCartService created with client:", !!client);
 
-    // Update the store with the actual cart service
+    // Initialize the address service
+    const addressServiceInstance = new AddressService(client);
+    console.log("AddressService created with client:", !!client);
+
+    // Update the store with the actual services
     cartService.set(simpleCartService);
+    addressService.set(addressServiceInstance);
 
     // Update the store object reference directly
     storeObj.simpleCartService = simpleCartService;
+    storeObj.addressService = addressServiceInstance;
 
     console.log("App.svelte - storeObj updated:", {
       hasSimpleCartService: !!storeObj.simpleCartService,
+      hasAddressService: !!storeObj.addressService,
       storeObjectKeys: Object.keys(storeObj),
     });
 

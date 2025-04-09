@@ -2,6 +2,7 @@
   import { getContext, onMount } from "svelte";
   import CartHeader from "./CartHeader.svelte";
   import ProductCartItem from "./ProductCartItem.svelte";
+  import CheckoutFlow from "./CheckoutFlow.svelte";
   import { decodeHashFromBase64 } from "@holochain/client";
 
   // Props
@@ -31,6 +32,7 @@
   let productDetails = {};
   let isLoading = true;
   let isCheckingOut = false;
+  let isShowingCheckoutFlow = false;
   let checkoutError = "";
 
   // Subscribe to cart changes
@@ -140,86 +142,88 @@
     }
   }
 
-  // Checkout cart
-  async function checkoutCart() {
-    if (!$cartService || cartItems.length === 0) return;
-
-    isCheckingOut = true;
-    checkoutError = "";
-
-    try {
-      const result = await $cartService.checkoutCart();
-
-      if (result.success) {
-        console.log("Checkout successful:", result);
-        onClose();
-      } else {
-        console.error("Checkout failed:", result.message);
-        checkoutError = result.message || "Checkout failed";
-      }
-    } catch (error) {
-      console.error("Error during checkout:", error);
-      checkoutError = error.toString();
-    } finally {
-      isCheckingOut = false;
-    }
+  // Start checkout flow
+  function startCheckout() {
+    isShowingCheckoutFlow = true;
   }
+
+  // Handle checkout success
+  function handleCheckoutSuccess(event) {
+    console.log("Checkout success:", event.detail);
+    onClose();
+  }
+
+  // Close checkout flow
+  function closeCheckoutFlow() {
+    isShowingCheckoutFlow = false;
+  }
+
+  // Get the client for checkout component
+  $: client = $cartService ? $cartService.client : null;
 </script>
 
 <div class="overlay" class:visible={isOpen} on:click={onClose}>
   <div class="cart-container" class:open={isOpen} on:click|stopPropagation>
-    <CartHeader {onClose} />
+    {#if isShowingCheckoutFlow}
+      <CheckoutFlow
+        {client}
+        cartService={$cartService}
+        {cartItems}
+        {productDetails}
+        {cartTotal}
+        onClose={closeCheckoutFlow}
+        on:checkout-success={handleCheckoutSuccess}
+      />
+    {:else}
+      <CartHeader {onClose} />
 
-    <div class="cart-content">
-      <div class="cart-main">
-        <div class="cart-main-header">
-          <div class="cart-title">
-            Cart (Total: ${cartTotal.toFixed(2)})
-          </div>
-          <button class="delete-cart-btn" on:click={clearCart}>×</button>
-        </div>
-
-        <div class="cart-items">
-          {#if isLoading}
-            <div class="loading">Loading cart items...</div>
-          {:else if cartItems.length === 0}
-            <div class="empty-cart">Your cart is empty</div>
-          {:else}
-            <!-- Sort items by productHash to maintain consistent order -->
-            {#each [...cartItems].sort( (a, b) => a.productHash.localeCompare(b.productHash), ) as item (item.productHash)}
-              {#if productDetails[item.productHash]}
-                <ProductCartItem
-                  product={productDetails[item.productHash]}
-                  quantity={item.quantity}
-                  productHash={item.productHash}
-                  isUpdating={false}
-                />
-              {/if}
-            {/each}
-          {/if}
-
-          {#if checkoutError}
-            <div class="error-message">
-              {checkoutError}
+      <div class="cart-content">
+        <div class="cart-main">
+          <div class="cart-main-header">
+            <div class="cart-title">
+              Cart (Total: ${cartTotal.toFixed(2)})
             </div>
-          {/if}
-        </div>
+            <button class="delete-cart-btn" on:click={clearCart}>×</button>
+          </div>
 
-        <div class="checkout-button-container">
-          <button
-            class="checkout-button"
-            disabled={isCheckingOut || cartItems.length === 0}
-            on:click={checkoutCart}
-          >
-            {#if isCheckingOut}
-              Processing...
+          <div class="cart-items">
+            {#if isLoading}
+              <div class="loading">Loading cart items...</div>
+            {:else if cartItems.length === 0}
+              <div class="empty-cart">Your cart is empty</div>
             {:else}
-              Checkout all items
+              <!-- Sort items by productHash to maintain consistent order -->
+              {#each [...cartItems].sort( (a, b) => a.productHash.localeCompare(b.productHash), ) as item (item.productHash)}
+                {#if productDetails[item.productHash]}
+                  <ProductCartItem
+                    product={productDetails[item.productHash]}
+                    quantity={item.quantity}
+                    productHash={item.productHash}
+                    isUpdating={false}
+                  />
+                {/if}
+              {/each}
             {/if}
-          </button>
+
+            {#if checkoutError}
+              <div class="error-message">
+                {checkoutError}
+              </div>
+            {/if}
+          </div>
+
+          <div class="checkout-button-container">
+            <button
+              class="checkout-button"
+              disabled={cartItems.length === 0}
+              on:click={startCheckout}
+            >
+              Proceed to Checkout
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    {/if}
   </div>
 </div>
 

@@ -1,0 +1,425 @@
+<script lang="ts">
+    import { createEventDispatcher, onMount } from "svelte";
+    import { encodeHashToBase64 } from "@holochain/client";
+    import { AddressService, type Address } from "./AddressService";
+    import type {
+        DeliveryTimeSlot,
+        CheckoutDetails,
+    } from "./SimpleCartService";
+    import AddressSelector from "./AddressSelector.svelte";
+    import DeliveryTimeSelector from "./DeliveryTimeSelector.svelte";
+    import CheckoutSummary from "./CheckoutSummary.svelte";
+
+    // Props
+    export let client: any;
+    export let cartService: any;
+    export let cartItems = [];
+    export let productDetails = {};
+    export let cartTotal = 0;
+    export let onClose: () => void;
+
+    // Event dispatcher
+    const dispatch = createEventDispatcher();
+
+    // State
+    let currentStep = 1;
+    let checkoutDetails: CheckoutDetails = {};
+    let deliveryTimeSlots = [];
+    let formattedDeliveryTime = null;
+    let address = null;
+    let isCheckingOut = false;
+    let checkoutError = "";
+    let addressService = null;
+    let localCartItems = [];
+    let unsubscribe: any;
+
+    // Subscribe to cart service for real-time updates
+    onMount(() => {
+        if (cartService && typeof cartService.subscribe === "function") {
+            unsubscribe = cartService.subscribe((items) => {
+                localCartItems = items || [];
+                console.log(
+                    "Cart items updated in CheckoutFlow:",
+                    localCartItems.length,
+                );
+            });
+        } else {
+            localCartItems = cartItems;
+        }
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    });
+
+    // Computed properties for items with details
+    $: effectiveCartItems =
+        localCartItems.length > 0 ? localCartItems : cartItems;
+    $: itemsWithDetails = effectiveCartItems.map((item) => ({
+        ...item,
+        productDetails: productDetails[item.productHash] || {
+            name: "Unknown Product",
+            price: 0,
+        },
+    }));
+
+    // Load address from hash
+    async function loadAddress(addressHash) {
+        if (!addressService || !addressHash) return null;
+
+        console.log("Loading address from hash:", addressHash);
+        try {
+            // Get addresses from the service
+            const addresses = addressService.getAddresses();
+            // Subscribe to the store to get the latest value
+            return new Promise((resolve) => {
+                const unsubscribe = addresses.subscribe((addressMap) => {
+                    if (addressMap.has(addressHash)) {
+                        unsubscribe();
+                        resolve(addressMap.get(addressHash));
+                    }
+                });
+
+                // Add a timeout to prevent hanging
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve(null);
+                }, 2000);
+            });
+        } catch (error) {
+            console.error("Error loading address:", error);
+            return null;
+        }
+    }
+
+    // Initialize with saved data and delivery time slots
+    onMount(async () => {
+        if (cartService) {
+            // Generate delivery time slots
+            deliveryTimeSlots = cartService.generateDeliveryTimeSlots();
+
+            // Initialize address service
+            if (client) {
+                addressService = new AddressService(client);
+            }
+
+            // Load saved delivery details if available
+            const savedDetails = cartService.getSavedDeliveryDetails();
+            console.log("Loaded saved delivery details:", savedDetails);
+
+            if (savedDetails) {
+                // Set checkout details from saved data
+                checkoutDetails = { ...savedDetails };
+
+                // If we have a saved delivery time, format it for display
+                if (savedDetails.deliveryTime) {
+                    const dateObj = new Date(savedDetails.deliveryTime.date);
+                    formattedDeliveryTime = {
+                        date: dateObj,
+                        display: savedDetails.deliveryTime.time_slot,
+                    };
+                    console.log(
+                        "Restored delivery time:",
+                        formattedDeliveryTime,
+                    );
+                }
+
+                // If we have a saved address hash, load the address details
+                if (savedDetails.addressHash && addressService) {
+                    address = await loadAddress(savedDetails.addressHash);
+                    console.log("Loaded address:", address);
+                }
+            }
+        }
+    });
+
+    // Handle address selection
+    function handleAddressSelect({ detail }) {
+        checkoutDetails.addressHash = detail.addressHash;
+        address = detail.address;
+    }
+
+    // Handle delivery instructions change
+    function handleInstructionsChange({ detail }) {
+        checkoutDetails.deliveryInstructions = detail.instructions;
+    }
+
+    // Handle delivery time selection
+    function handleTimeSelect({ detail }) {
+        checkoutDetails.deliveryTime = detail.deliveryTime;
+
+        // Format for display
+        const dateObj = new Date(detail.deliveryTime.date);
+        formattedDeliveryTime = {
+            date: dateObj,
+            display: detail.deliveryTime.time_slot,
+        };
+    }
+
+    // Validate the current state before proceeding to the next step
+    function validateStep(currentStep) {
+        if (currentStep === 1) {
+            return !!checkoutDetails.addressHash && !!address;
+        }
+
+        if (currentStep === 2) {
+            return !!checkoutDetails.deliveryTime && !!formattedDeliveryTime;
+        }
+
+        return true;
+    }
+
+    // Navigation between steps
+    function goToStep(step: number) {
+        // Validate the current step before proceeding
+        if (step > currentStep && !validateStep(currentStep)) {
+            console.error(
+                `Cannot proceed to step ${step}, current step ${currentStep} is not valid`,
+            );
+            return;
+        }
+
+        currentStep = step;
+    }
+
+    // Continue to next step
+    function continueToNextStep() {
+        goToStep(currentStep + 1);
+    }
+
+    // Go back to previous step
+    function goBack() {
+        goToStep(currentStep - 1);
+    }
+
+    // Place the order
+    async function placeOrder() {
+        if (!checkoutDetails.addressHash || !checkoutDetails.deliveryTime) {
+            checkoutError = "Please complete all required information";
+            return;
+        }
+
+        isCheckingOut = true;
+        checkoutError = "";
+
+        try {
+            console.log("Placing order with details:", checkoutDetails);
+
+            const result = await cartService.checkoutCart(checkoutDetails);
+
+            if (result.success) {
+                // Dispatch success event
+                dispatch("checkout-success", {
+                    cartHash: encodeHashToBase64(result.data),
+                    details: checkoutDetails,
+                });
+
+                // Close the checkout flow
+                onClose();
+            } else {
+                console.error("Checkout failed:", result.message);
+                checkoutError =
+                    result.message || "Checkout failed. Please try again.";
+            }
+        } catch (error) {
+            console.error("Error during checkout:", error);
+            checkoutError = error.toString();
+        } finally {
+            isCheckingOut = false;
+        }
+    }
+</script>
+
+<div class="checkout-flow">
+    <div class="checkout-header">
+        <button
+            class="back-button"
+            on:click={currentStep > 1 ? goBack : onClose}
+        >
+            ←
+        </button>
+        <h2>
+            {#if currentStep === 1}
+                Delivery Address
+            {:else if currentStep === 2}
+                Delivery Time
+            {:else}
+                Review & Place Order
+            {/if}
+        </h2>
+        <div class="steps-indicator">
+            Step {currentStep} of 3
+        </div>
+    </div>
+
+    <div class="checkout-content">
+        {#if currentStep === 1}
+            <AddressSelector
+                {client}
+                selectedAddressHash={checkoutDetails.addressHash}
+                deliveryInstructions={checkoutDetails.deliveryInstructions ||
+                    ""}
+                on:select={handleAddressSelect}
+                on:instructionsChange={handleInstructionsChange}
+            />
+
+            <div class="nav-buttons">
+                <button
+                    class="continue-btn"
+                    on:click={continueToNextStep}
+                    disabled={!checkoutDetails.addressHash}
+                >
+                    Continue to Delivery Time
+                </button>
+            </div>
+        {:else if currentStep === 2}
+            <DeliveryTimeSelector
+                timeSlots={deliveryTimeSlots}
+                selectedTimeSlot={checkoutDetails.deliveryTime?.time_slot}
+                selectedDate={checkoutDetails.deliveryTime
+                    ? new Date(checkoutDetails.deliveryTime.date)
+                    : null}
+                on:select={handleTimeSelect}
+            />
+
+            <div class="nav-buttons">
+                <button
+                    class="continue-btn"
+                    on:click={continueToNextStep}
+                    disabled={!checkoutDetails.deliveryTime}
+                >
+                    Continue to Review
+                </button>
+            </div>
+        {:else if currentStep === 3}
+            {#if address && formattedDeliveryTime}
+                <CheckoutSummary
+                    cartItems={itemsWithDetails}
+                    {cartTotal}
+                    {address}
+                    deliveryInstructions={checkoutDetails.deliveryInstructions ||
+                        ""}
+                    deliveryTime={formattedDeliveryTime}
+                    {isCheckingOut}
+                    {cartService}
+                    on:placeOrder={placeOrder}
+                    on:editAddress={() => goToStep(1)}
+                    on:editTime={() => goToStep(2)}
+                />
+
+                {#if checkoutError}
+                    <div class="checkout-error">
+                        {checkoutError}
+                    </div>
+                {/if}
+            {:else}
+                <div class="missing-info">
+                    <p>
+                        Missing required information. Please go back and
+                        complete all steps.
+                    </p>
+                    <button class="back-btn" on:click={goBack}>Go Back</button>
+                </div>
+            {/if}
+        {/if}
+    </div>
+</div>
+
+<style>
+    .checkout-flow {
+        background: white;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .checkout-header {
+        padding: 16px;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        position: relative;
+    }
+
+    .checkout-header h2 {
+        flex-grow: 1;
+        text-align: center;
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .back-button {
+        background: transparent;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 4px 8px;
+        color: #333;
+    }
+
+    .steps-indicator {
+        font-size: 14px;
+        color: #666;
+    }
+
+    .checkout-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .nav-buttons {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #f0f0f0;
+        margin-top: auto;
+    }
+
+    .continue-btn {
+        width: 100%;
+        padding: 14px;
+        background: #1a8b51;
+        border: 2px solid rgb(32, 200, 51);
+        color: white;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .continue-btn:hover:not(:disabled) {
+        background: #156e40;
+    }
+
+    .continue-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .checkout-error {
+        margin: 16px;
+        padding: 12px;
+        background-color: #ffebee;
+        color: #c62828;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .missing-info {
+        padding: 30px;
+        text-align: center;
+    }
+
+    .back-btn {
+        padding: 10px 18px;
+        background: #f5f5f5;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        margin-top: 16px;
+        cursor: pointer;
+    }
+</style>

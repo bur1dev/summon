@@ -1,17 +1,39 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import { ShoppingCart, ArrowLeft } from "lucide-svelte";
+  import { ShoppingCart, ArrowLeft, MapPin, Clock } from "lucide-svelte";
   import { writable, type Writable } from "svelte/store";
+  import { AddressService } from "./AddressService";
 
   // Get cart service directly from the context
   const cartService = getContext("cartService") as Writable<any>;
 
+  // Get the store for the client
+  const { getStore } = getContext("store");
+  const store = getStore();
+
+  // Services
+  let addressService;
+
+  // State
   let isLoading = true;
   let checkedOutCarts = [];
   let errorMessage = "";
+  let addressCache = new Map();
 
   onMount(async () => {
     try {
+      // Initialize address service to fetch address details
+      if (store && store.client) {
+        addressService = new AddressService(store.client);
+
+        // Subscribe to addresses to populate cache
+        const unsubscribe = addressService
+          .getAddresses()
+          .subscribe((addresses) => {
+            addressCache = addresses;
+          });
+      }
+
       await loadCheckedOutCarts();
     } catch (error) {
       console.error("Error in onMount:", error);
@@ -30,7 +52,7 @@
 
       if (result.success) {
         checkedOutCarts = result.data || [];
-        console.log("Loaded checked out carts:", checkedOutCarts.length);
+        console.log("Loaded checked out carts:", checkedOutCarts);
       } else {
         console.error("Error loading checked out carts:", result.message);
         errorMessage = "Error loading checked out carts: " + result.message;
@@ -67,34 +89,114 @@
       errorMessage = "Error returning cart to shopping: " + error.toString();
     }
   }
+
+  // Format status for display
+  function formatStatus(status) {
+    switch (status) {
+      case "processing":
+        return "Processing";
+      case "completed":
+        return "Completed";
+      case "returned":
+        return "Returned to Cart";
+      default:
+        return status;
+    }
+  }
+
+  // Get address from cache
+  function getAddressFromCache(addressHash) {
+    if (!addressHash) return null;
+    return addressCache.get(addressHash);
+  }
 </script>
 
 <div class="checkout-view">
   <div class="fixed-header">
-    <h1>Checked Out Carts</h1>
-    <p>These carts have been checked out and are in processing</p>
+    <h1>Checked Out Orders</h1>
+    <p>View the status of your checked out orders</p>
   </div>
 
   <div class="scrollable-content">
     {#if isLoading}
-      <div class="loading">Loading checked out carts...</div>
+      <div class="loading">Loading checked out orders...</div>
     {:else if errorMessage}
       <div class="error-message">{errorMessage}</div>
     {:else if checkedOutCarts.length === 0}
       <div class="empty-state">
         <ShoppingCart size={64} color="#cccccc" />
-        <h2>No Checked Out Carts</h2>
-        <p>Your checked out carts will appear here.</p>
+        <h2>No Checked Out Orders</h2>
+        <p>Your checked out orders will appear here.</p>
       </div>
     {:else}
       <div class="carts-grid">
         {#each checkedOutCarts as item}
           <div class="cart-card">
             <div class="cart-header">
-              <h2>Cart ${item.total.toFixed(2)}</h2>
+              {#if item.total}
+                {@const estimatedTax =
+                  Math.round(item.total * 0.0775 * 100) / 100}
+                {@const orderTotal = item.total + estimatedTax}
+                <h2>Order ${orderTotal.toFixed(2)}</h2>
+                <div class="cart-pricing">
+                  <span class="subtotal">Items: ${item.total.toFixed(2)}</span>
+                  <span class="tax">Tax: ${estimatedTax.toFixed(2)}</span>
+                </div>
+              {:else}
+                <h2>Order</h2>
+              {/if}
               <div class="cart-date">{item.createdAt}</div>
-              <div class="cart-status">Status: {item.status}</div>
+              <div class="cart-status status-{item.status}">
+                Status: {formatStatus(item.status)}
+              </div>
             </div>
+
+            {#if item.addressHash || item.deliveryTime}
+              <div class="delivery-details">
+                {#if item.addressHash && addressCache.has(item.addressHash)}
+                  {@const address = addressCache.get(item.addressHash)}
+                  <div class="delivery-address">
+                    <div class="delivery-icon">
+                      <MapPin size={16} />
+                    </div>
+                    <div class="delivery-content">
+                      <div class="delivery-label">Delivery Address:</div>
+                      <div class="address-line">
+                        {address.street}
+                        {#if address.unit}
+                          <span class="unit">{address.unit}</span>
+                        {/if}
+                      </div>
+                      <div class="address-line">
+                        {address.city}, {address.state}
+                        {address.zip}
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+
+                {#if item.deliveryTime}
+                  <div class="delivery-time">
+                    <div class="delivery-icon">
+                      <Clock size={16} />
+                    </div>
+                    <div class="delivery-content">
+                      <div class="delivery-label">Delivery Time:</div>
+                      <div>
+                        {item.deliveryTime.date} at {item.deliveryTime.time}
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+
+                {#if item.deliveryInstructions}
+                  <div class="delivery-instructions">
+                    <div class="delivery-label">Instructions:</div>
+                    <div>{item.deliveryInstructions}</div>
+                  </div>
+                {/if}
+              </div>
+            {/if}
 
             <div class="cart-items">
               {#each item.products as product}
@@ -250,7 +352,57 @@
     font-size: 14px;
     font-weight: 500;
     margin-top: 4px;
+  }
+
+  .status-processing {
+    color: #f57c00;
+  }
+
+  .status-completed {
     color: #1a8b51;
+  }
+
+  .status-returned {
+    color: #666;
+  }
+
+  .delivery-details {
+    padding: 16px;
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .delivery-address,
+  .delivery-time {
+    display: flex;
+    margin-bottom: 12px;
+  }
+
+  .delivery-icon {
+    margin-right: 12px;
+    color: #666;
+  }
+
+  .delivery-content {
+    flex: 1;
+  }
+
+  .delivery-label {
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+
+  .address-line {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.4;
+  }
+
+  .delivery-instructions {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #555;
   }
 
   .cart-items {
@@ -335,5 +487,13 @@
     padding: 40px;
     font-size: 18px;
     color: #666;
+  }
+
+  .cart-pricing {
+    display: flex;
+    font-size: 13px;
+    color: #666;
+    gap: 12px;
+    margin-top: 4px;
   }
 </style>

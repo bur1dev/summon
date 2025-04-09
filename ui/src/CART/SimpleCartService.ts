@@ -1,6 +1,19 @@
 import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
 import { writable, derived, get } from 'svelte/store';
 
+// Type for delivery time
+export interface DeliveryTimeSlot {
+    date: number; // Unix timestamp
+    time_slot: string; // e.g. "2pm-4pm"
+}
+
+// Type for checkout details
+export interface CheckoutDetails {
+    addressHash?: string;
+    deliveryInstructions?: string;
+    deliveryTime?: DeliveryTimeSlot;
+}
+
 // Type alias for base64-encoded action hash
 type ActionHashB64 = string;
 
@@ -11,6 +24,9 @@ export class SimpleCartService {
         quantity: number,
         timestamp: number
     }>>([]);
+
+    // New store for saved delivery details
+    private savedDeliveryDetails = writable<CheckoutDetails>({});
 
     // Derived stores for UI
     public readonly itemCount = derived(this.cartItems, items =>
@@ -170,23 +186,43 @@ export class SimpleCartService {
         }
     }
 
-    // Checkout the current cart
-    public async checkoutCart() {
+    // Checkout the current cart with delivery details
+    public async checkoutCart(details: CheckoutDetails) {
         try {
             if (this.client) {
+                // Prepare the input for checkout with delivery details
+                const payload: any = {
+                    address_hash: null,
+                    delivery_instructions: details.deliveryInstructions || null,
+                    delivery_time: details.deliveryTime || null
+                };
+
+                // Convert address hash if provided
+                if (details.addressHash) {
+                    try {
+                        payload.address_hash = decodeHashFromBase64(details.addressHash);
+                    } catch (e) {
+                        console.error('Invalid address hash format:', e);
+                        return { success: false, error: 'Invalid address hash format' };
+                    }
+                }
+
                 // Call Holochain checkout function
-                console.log("Checking out cart...");
+                console.log("Checking out cart with details:", payload);
                 const result = await this.client.callZome({
                     role_name: 'grocery',
                     zome_name: 'cart',
                     fn_name: 'checkout_cart',
-                    payload: null
+                    payload
                 });
 
                 console.log("Checkout result:", result);
 
                 // Clear local cart after successful checkout
                 await this.loadCart();
+
+                // Clear saved delivery details after successful checkout
+                this.savedDeliveryDetails.set({});
 
                 return { success: true, data: result };
             } else {
@@ -227,7 +263,7 @@ export class SimpleCartService {
         }
     }
 
-    // Process checked out carts to add product details
+    // Process checked out carts to add product details and delivery info
     private async processCheckedOutCarts(carts) {
         console.log("Processing checked out carts from Holochain:", carts);
 
@@ -238,7 +274,16 @@ export class SimpleCartService {
         // For each cart, enrich products with details
         return Promise.all(carts.map(async (cart) => {
             const cartHash = encodeHashToBase64(cart.cart_hash);
-            const { id, products, total, created_at, status } = cart.cart;
+            const {
+                id,
+                products,
+                total,
+                created_at,
+                status,
+                address_hash,
+                delivery_instructions,
+                delivery_time
+            } = cart.cart;
 
             // Get product details for each product
             const productsWithDetails = await Promise.all(products.map(async (product) => {
@@ -272,6 +317,28 @@ export class SimpleCartService {
             const creationDate = new Date(created_at / 1000);
             const formattedDate = creationDate.toLocaleString();
 
+            // Add delivery info
+            let addressHashString = null;
+            if (address_hash) {
+                addressHashString = encodeHashToBase64(address_hash);
+            }
+
+            // Format delivery time if available
+            let formattedDeliveryTime = null;
+            if (delivery_time) {
+                const deliveryDate = new Date(delivery_time.date);
+                formattedDeliveryTime = {
+                    date: deliveryDate.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }),
+                    time: delivery_time.time_slot,
+                    raw: delivery_time
+                };
+            }
+
             return {
                 id,
                 cartHash,
@@ -279,7 +346,10 @@ export class SimpleCartService {
                 total: calculatedTotal > 0 ? calculatedTotal : total,
                 createdAt: formattedDate,
                 status,
-                productIds: productsWithDetails.map(p => p.id)
+                productIds: productsWithDetails.map(p => p.id),
+                addressHash: addressHashString,
+                deliveryInstructions: delivery_instructions,
+                deliveryTime: formattedDeliveryTime
             };
         }));
     }
@@ -288,6 +358,24 @@ export class SimpleCartService {
     public async returnToShopping(cartHash: ActionHashB64) {
         try {
             if (this.client) {
+                // Get the cart details before returning to shopping
+                const cartsResult = await this.loadCheckedOutCarts();
+
+                if (cartsResult.success && Array.isArray(cartsResult.data)) {
+                    const cart = cartsResult.data.find(c => c.cartHash === cartHash);
+
+                    if (cart) {
+                        // Save delivery details before returning to shopping
+                        this.savedDeliveryDetails.set({
+                            addressHash: cart.addressHash,
+                            deliveryInstructions: cart.deliveryInstructions,
+                            deliveryTime: cart.deliveryTime?.raw
+                        });
+
+                        console.log("Saved delivery details:", get(this.savedDeliveryDetails));
+                    }
+                }
+
                 console.log("Returning cart to shopping:", cartHash);
                 await this.client.callZome({
                     role_name: 'grocery',
@@ -318,6 +406,26 @@ export class SimpleCartService {
     // Subscribe to cart changes
     public subscribe(callback: (items: any[]) => void) {
         return this.cartItems.subscribe(callback);
+    }
+
+    // Get saved delivery details
+    public getSavedDeliveryDetails() {
+        return get(this.savedDeliveryDetails);
+    }
+
+    // Subscribe to saved delivery details changes
+    public subscribeSavedDeliveryDetails(callback: (details: CheckoutDetails) => void) {
+        return this.savedDeliveryDetails.subscribe(callback);
+    }
+
+    // Set saved delivery details
+    public setSavedDeliveryDetails(details: CheckoutDetails) {
+        this.savedDeliveryDetails.set(details);
+    }
+
+    // Clear saved delivery details
+    public clearSavedDeliveryDetails() {
+        this.savedDeliveryDetails.set({});
     }
 
     // Update cart item in memory
@@ -356,5 +464,95 @@ export class SimpleCartService {
         if (this.productStore) {
             this.recalculateCartTotal();
         }
+    }
+
+    // Generate available delivery time slots
+    public generateDeliveryTimeSlots(startDate = new Date()): {
+        date: Date,
+        dateFormatted: string,
+        dayOfWeek: string,
+        timeSlots: {
+            id: string,
+            display: string,
+            timestamp: number,
+            slot: string
+        }[]
+    }[] {
+        const days = [];
+        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const currentDate = new Date();
+        const currentHour = currentDate.getHours();
+
+        // Generate slots for the next 9 days
+        for (let i = 0; i < 9; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+
+            // Reset time
+            date.setHours(0, 0, 0, 0);
+
+            const dateFormatted = date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+            });
+
+            const dayOfWeek = daysOfWeek[date.getDay()];
+
+            // Time slots for this day
+            const timeSlots = [];
+
+            // Add time slots
+            const slotTimes = [
+                { start: '7am', end: '9am', hour: 7 },
+                { start: '8am', end: '10am', hour: 8 },
+                { start: '7am', end: '10am', hour: 7 },
+                { start: '9am', end: '11am', hour: 9 },
+                { start: '8am', end: '11am', hour: 8 },
+                { start: '10am', end: 'Noon', hour: 10 },
+                { start: '11am', end: '1pm', hour: 11 },
+                { start: 'Noon', end: '2pm', hour: 12 },
+                { start: '1pm', end: '3pm', hour: 13 },
+                { start: '2pm', end: '4pm', hour: 14 },
+                { start: '3pm', end: '5pm', hour: 15 },
+                { start: '4pm', end: '6pm', hour: 16 },
+                { start: '5pm', end: '7pm', hour: 17 },
+                { start: '6pm', end: '8pm', hour: 18 }
+            ];
+
+            slotTimes.forEach((slot, index) => {
+                // For today, skip time slots that have already passed
+                const isToday = date.getDate() === currentDate.getDate() &&
+                    date.getMonth() === currentDate.getMonth() &&
+                    date.getFullYear() === currentDate.getFullYear();
+
+                // Skip if it's today and the slot has passed (add 2 hours buffer)
+                if (isToday && slot.hour <= currentHour + 1) {
+                    return;
+                }
+
+                // Create a timestamp for the slot
+                const slotDate = new Date(date);
+                slotDate.setHours(slot.hour, 0, 0, 0);
+
+                timeSlots.push({
+                    id: `${i}-${index}`,
+                    display: `${slot.start}–${slot.end}`,
+                    timestamp: slotDate.getTime(),
+                    slot: `${slot.start}–${slot.end}`
+                });
+            });
+
+            // Only add days with available time slots
+            if (timeSlots.length > 0) {
+                days.push({
+                    date,
+                    dateFormatted,
+                    dayOfWeek,
+                    timeSlots
+                });
+            }
+        }
+
+        return days;
     }
 }

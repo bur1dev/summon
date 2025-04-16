@@ -1,8 +1,28 @@
-# TalkingStickies!
+# SUMMON
 
-Holochain hApp for collaborative stickies boards.
+Features
 
-Real-time colloaboration delivered by [syn](https://github.com/holochain/syn).
+Browse products by categories, subcategories and product types
+Product search with categorization
+Shopping cart with real-time updates
+User profiles with avatar support
+Address management for deliveries
+Delivery scheduling and instructions
+Order history tracking and management
+
+### Summon currently uses a hybrid architecture:
+
+- **Frontend**: Svelte-based UI components
+- **Backend**: Express.js server (index.js) for product fetching and AI-powered categorization
+- **Data Storage**: Holochain DHT for user profiles, cart management, and orders
+
+### Future Plans
+
+The Express.js backend is temporary. Future plans include:
+
+1. Migrating product fetching logic to Holochain zomes
+2. Implementing decentralized product categorization
+3. Removing dependency on centralized servers
 
 ## Environment Setup
 
@@ -38,12 +58,6 @@ npm run dev
 
 This will not launch a UI, you will have to open a browser window and navigate to the Local address provided by VITE. It can take a moment for the UI to come up after visiting the URL, let it load. 
 
-## Running the backend tests
-
-```bash
-npm test
-```
-
 ## Bootstrapping a network
 
 Create a custom network of nodes connected to each other and their respective UIs with:
@@ -65,22 +79,3 @@ npm run package
 You'll have the `talking-stickies.webhapp` in `workdir`. This is what you should distribute so that the Holochain Launcher can install it.
 You will also have its subcomponent `talking-stickies.happ` in the same folder`.
 
-## Documentation
-
-This repository is using these tools:
-- [NPM Workspaces](https://docs.npmjs.com/cli/v7/using-npm/workspaces/): npm v7's built-in monorepo capabilities.
-- [hc](https://github.com/holochain/holochain/tree/develop/crates/hc): Holochain CLI to easily manage Holochain development instances.
-- [@holochain/tryorama](https://www.npmjs.com/package/@holochain/tryorama): test framework.
-- [@holochain/client](https://www.npmjs.com/package/@holochain/client): client library to connect to Holochain from the UI.
-- [@holochain-playground/cli](https://www.npmjs.com/package/@holochain-playground/cli): introspection tooling to understand what's going on in the Holochain nodes.
-
-
-## License
-
-[![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
-
-Copyright (C) 2023, Holochain Foundation
-
-This program is free software: you can redistribute it and/or modify it under the terms of the license
-provided in the LICENSE file (MIT). This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

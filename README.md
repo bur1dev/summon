@@ -10,11 +10,13 @@
 - Delivery scheduling and instructions
 - Order history tracking and management
 
-### Summon currently uses a hybrid architecture:
+### Current state
 
 - **Frontend**: Svelte-based UI components
 - **Backend**: Express.js server (index.js) for product fetching and FAISS/LLM powered categorization
 - **Data Storage**: Holochain DHT for user categorized product data, profiles, cart management, and orders
+
+There are also two test buttons (fetch products and load saved data) in the header container for testing purposes. 
 
 ### Future Plans
 

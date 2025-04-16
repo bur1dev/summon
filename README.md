@@ -1,6 +1,6 @@
 # SUMMON
 
-Features
+# Features
 
 Browse products by categories, subcategories and product types
 Product search with categorization

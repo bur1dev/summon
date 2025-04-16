@@ -1,34 +1,99 @@
-## editors
-/.idea
-/.vscode
-
-## system files
+# --- General ---
+## System Files (macOS, Windows)
 .DS_Store
+Thumbs.db
 
-## npm
-node_modules/
-/npm-debug.log
+## Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-## testing
-/coverage/
-
-## temp folders
-/.tmp/
-
-# build
-/_site/
-/dist/
-/out-tsc/
-
-storybook-static
-.rollup.cache
-*.tsbuildinfo
-
-# Environment variables
+## Environment variables
 .env
 */.env
+.env.*
+!.env.example
 
-# Python environment
-/env/
+# --- Editors ---
+## VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+## JetBrains (IntelliJ, WebStorm, etc.)
+.idea/
+
+# --- Node.js / npm / Yarn ---
+## Dependencies
+node_modules/
+## Debug logs (already covered in General Logs)
+# npm-debug.log*
+# yarn-debug.log*
+# yarn-error.log*
+## Lock files (usually committed, but uncomment if desired)
+# package-lock.json
+# yarn.lock
+## Build Outputs / Temp
+dist/
+out-tsc/
+.rollup.cache
+*.tsbuildinfo
+coverage/
+.tmp/
+
+# --- Frontend Specific (Svelte/Storybook) ---
+## SvelteKit build / temp
+.svelte-kit/
+## Storybook build
+storybook-static
+
+# --- Python ---
+## Virtual Environments
+env/
+venv/
 */env/
-/product-categorization/env/
+*/venv/
+/product-categorization/env/ # Your specific one
+## Cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+## Distribution / packaging
+*.egg-info/
+.eggs/
+dist/ # Also used by Node, ensure it's listed
+build/
+*.tar.gz
+*.whl
+
+# --- Rust / Cargo ---
+## Build artifacts
+target/
+/target/ # Explicitly ignore root target
+*/target/ # Ignore target in direct subdirectories
+*/*/target/ # Ignore target two levels deep (common for workspaces/zomes)
+**/target/ # Alternative: Ignore target in any subdirectory
+## Cargo lock file (often causes merge conflicts)
+Cargo.lock
+## Rust backup files
+**/*.rs.bk
+## Wasm build temp
+wasm-build/
+## Cargo local registry/index cache
+.cargo/
+
+# --- Holochain ---
+## Build artifacts
+*.happ
+*.webhapp
+*.dna
+*.zip # Often used for packaging releases
+## Holochain conductor storage / temp
+.hc*
+.hc/
+.running/
+

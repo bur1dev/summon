@@ -13,7 +13,7 @@
 ### Summon currently uses a hybrid architecture:
 
 - **Frontend**: Svelte-based UI components
-- **Backend**: Express.js server (index.js) for product fetching and AI-powered categorization
+- **Backend**: Express.js server (index.js) for product fetching and FAISS/LLM powered categorization
 - **Data Storage**: Holochain DHT for user profiles, cart management, and orders
 
 ### Future Plans

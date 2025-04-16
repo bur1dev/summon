@@ -1,6 +1,6 @@
+pub mod category_setup;
 pub mod product;
 pub mod products_by_category;
-pub mod category_setup;
 pub mod search;
 
 use hdk::prelude::*;

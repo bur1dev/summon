@@ -1,8 +1,24 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
+  import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart } from "lucide-svelte";
   import CategoryReportsAdmin from "./CategoryReportsAdmin.svelte";
   import SearchBar from "./SEARCH/SearchBar.svelte";
+  import ProfileEditor from "./ProfileEditor.svelte";
+  import {
+    currentViewStore,
+    isCartOpenStore,
+    searchModeStore,
+    searchQueryStore,
+    productNameStore,
+    selectedProductHashStore,
+    fuseResultsStore,
+    isViewAllStore,
+    setSearchState,
+  } from "./UiStateStore";
+
+  // Import components
+  import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
 
   // Get the store for UI props
   const { getStore } = getContext("store");
@@ -11,53 +27,64 @@
   // Get cart service directly from the context
   const cartService = getContext("cartService");
 
-  export let currentView: "active" | "checked-out" = "active";
-  export let isCartOpen = false;
+  // Get profiles store from context
+  const profilesStore = getContext("profiles-store");
+
+  // These now come from the UiStateStore
   export let standAlone = false;
-  export let cartTotal = 0; // This prop is passed from ShopView
+  export let cartTotal = 0; // This prop is passed from Controller
+
+  // Get current agent pubkey and encode it
+  let myAgentPubKey;
+  let myAgentPubKeyB64;
+  let avatarLoaded = false;
+
+  // Reference to profile editor component
+  let profileEditorComponent;
+
+  // State for showing profile editor
+  let showProfileEditor = false;
+
+  onMount(() => {
+    // Wait for client to be initialized
+    if (store && store.myAgentPubKey) {
+      myAgentPubKey = store.myAgentPubKey;
+      myAgentPubKeyB64 = encodeHashToBase64(myAgentPubKey);
+      avatarLoaded = true;
+      console.log("Agent pubkey loaded:", myAgentPubKeyB64);
+    }
+  });
 
   $: uiProps = store.uiProps;
 
   function toggleCart() {
-    isCartOpen = !isCartOpen;
+    $isCartOpenStore = !$isCartOpenStore;
   }
 
   let showCategoryAdmin = false;
+
+  // Handle profile update
+  function handleProfileUpdated(event) {
+    console.log("Profile updated event:", event);
+  }
 </script>
 
 <div class="header-container">
   <div class="left-section">
-    {#if $uiProps && $uiProps.showMenu}
-      <button
-        class="menu-btn menu-close"
-        on:click={() => store.setUIprops({ showMenu: false })}
-        title="Hide Menu"
-      >
-        <span>✕</span>
-      </button>
-    {:else}
-      <button
-        class="menu-btn menu-open"
-        on:click={() => store.setUIprops({ showMenu: true })}
-        title="Show Menu"
-      >
-        <span>≡</span>
-      </button>
-    {/if}
-
-    {#if standAlone}
-      <!-- Removed board title display -->
-    {/if}
+    <!-- Left section now empty -->
   </div>
 
   <div class="center-section">
     <button
       class="view-toggle"
       on:click={() => {
-        currentView = currentView === "active" ? "checked-out" : "active";
+        $currentViewStore =
+          $currentViewStore === "active" ? "checked-out" : "active";
       }}
     >
-      {currentView === "active" ? "View Checked Out Carts" : "Go Back To Store"}
+      {$currentViewStore === "active"
+        ? "View Checked Out Carts"
+        : "Go Back To Store"}
     </button>
 
     <div class="search-container">
@@ -65,7 +92,7 @@
         {store}
         productCache={store.productCache}
         on:select={({ detail }) =>
-          store.setUIprops({
+          setSearchState({
             searchMode: true,
             searchQuery: detail.originalQuery,
             productName: detail.productName,
@@ -74,7 +101,7 @@
             isViewAll: false,
           })}
         on:viewAll={({ detail }) =>
-          store.setUIprops({
+          setSearchState({
             searchMode: true,
             searchQuery: detail.query,
             fuseResults: detail.fuseResults || [],
@@ -123,6 +150,28 @@
     >
       <span>🐞</span>
     </a>
+
+    <!-- Profile Avatar - now clickable -->
+    {#if avatarLoaded && myAgentPubKeyB64}
+      <div
+        class="avatar-container"
+        on:click={() => {
+          showProfileEditor = true;
+          // Wait for component to render before calling open
+          setTimeout(() => {
+            if (profileEditorComponent) profileEditorComponent.open();
+          }, 0);
+        }}
+        title="Edit Your Profile"
+      >
+        <agent-avatar
+          size="36"
+          agent-pub-key={myAgentPubKeyB64}
+          disable-tooltip={true}
+          disable-copy={true}
+        ></agent-avatar>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -130,6 +179,14 @@
   <div class="admin-overlay">
     <CategoryReportsAdmin {store} onClose={() => (showCategoryAdmin = false)} />
   </div>
+{/if}
+
+<!-- Profile Editor Component -->
+{#if showProfileEditor}
+  <ProfileEditor
+    bind:this={profileEditorComponent}
+    on:profile-updated={handleProfileUpdated}
+  />
 {/if}
 
 <style>
@@ -152,6 +209,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 50px;
   }
 
   .center-section {
@@ -169,26 +227,26 @@
     gap: 12px;
   }
 
-  .menu-btn {
-    width: 36px;
-    height: 36px;
+  /* Avatar styles */
+  .avatar-container {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid #e0e0e0;
     cursor: pointer;
-    border: none;
-    background: transparent;
+    width: 40px;
+    height: 40px;
+    margin-left: 8px;
+    transition:
+      transform 0.2s,
+      border-color 0.2s;
   }
 
-  .menu-close {
-    background: rgb(77, 123, 214);
-    border: 1px solid rgb(76, 106, 167);
-  }
-
-  .menu-open {
-    background: #f5f5f5;
-    border: 1px solid #e0e0e0;
+  .avatar-container:hover {
+    border-color: #1a8b51;
+    transform: scale(1.05);
   }
 
   .view-toggle {

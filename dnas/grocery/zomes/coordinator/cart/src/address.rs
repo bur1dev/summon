@@ -1,22 +1,20 @@
-use hdk::prelude::*;
 use cart_integrity::*;
+use hdk::prelude::*;
 
 pub fn create_address_impl(address: Address) -> ExternResult<ActionHash> {
     let agent_pub_key = agent_info()?.agent_initial_pubkey;
-    
+
     // Create the address entry
     let address_hash = create_entry(EntryTypes::Address(address.clone()))?;
-    
+
     // If this is the default address, we need to update other addresses
     if address.is_default {
         // Find existing default addresses and remove their default status
         let links = get_links(
-            GetLinksInputBuilder::try_new(
-                agent_pub_key.clone(),
-                LinkTypes::AgentToAddress
-            )?.build()
+            GetLinksInputBuilder::try_new(agent_pub_key.clone(), LinkTypes::AgentToAddress)?
+                .build(),
         )?;
-        
+
         for link in links {
             if let Some(target_hash) = link.target.into_action_hash() {
                 if target_hash != address_hash {
@@ -26,9 +24,14 @@ pub fn create_address_impl(address: Address) -> ExternResult<ActionHash> {
                         let existing_address = match record.entry().to_app_option::<Address>() {
                             Ok(Some(addr)) => addr,
                             Ok(None) => continue,
-                            Err(e) => return Err(wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize: {}", e))))
+                            Err(e) => {
+                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                    "Failed to deserialize: {}",
+                                    e
+                                ))))
+                            }
                         };
-                        
+
                         if existing_address.is_default {
                             // Create a new non-default version
                             let mut updated = existing_address.clone();
@@ -40,31 +43,28 @@ pub fn create_address_impl(address: Address) -> ExternResult<ActionHash> {
             }
         }
     }
-    
+
     // Link the agent to this address
     create_link(
         agent_pub_key,
         address_hash.clone(),
         LinkTypes::AgentToAddress,
-        LinkTag::new("")
+        LinkTag::new(""),
     )?;
-    
+
     Ok(address_hash)
 }
 
 pub fn get_addresses_impl() -> ExternResult<Vec<(ActionHash, Address)>> {
     let agent_pub_key = agent_info()?.agent_initial_pubkey;
-    
+
     // Get all address links
     let links = get_links(
-        GetLinksInputBuilder::try_new(
-            agent_pub_key,
-            LinkTypes::AgentToAddress
-        )?.build()
+        GetLinksInputBuilder::try_new(agent_pub_key, LinkTypes::AgentToAddress)?.build(),
     )?;
-    
+
     let mut addresses = Vec::new();
-    
+
     for link in links {
         if let Some(target_hash) = link.target.into_action_hash() {
             // Get the address entry directly using must_get_valid_record
@@ -73,14 +73,19 @@ pub fn get_addresses_impl() -> ExternResult<Vec<(ActionHash, Address)>> {
                 let address = match record.entry().to_app_option::<Address>() {
                     Ok(Some(addr)) => addr,
                     Ok(None) => continue,
-                    Err(e) => return Err(wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize: {}", e))))
+                    Err(e) => {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Failed to deserialize: {}",
+                            e
+                        ))))
+                    }
                 };
-                
+
                 addresses.push((target_hash, address));
             }
         }
     }
-    
+
     Ok(addresses)
 }
 
@@ -91,9 +96,12 @@ pub fn get_address_impl(action_hash: ActionHash) -> ExternResult<Option<Address>
             // Manually handle the error conversion
             match record.entry().to_app_option::<Address>() {
                 Ok(maybe_address) => Ok(maybe_address),
-                Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize: {}", e))))
+                Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to deserialize: {}",
+                    e
+                )))),
             }
-        },
+        }
         None => Ok(None),
     }
 }

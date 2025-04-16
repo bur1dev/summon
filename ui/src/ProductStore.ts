@@ -50,11 +50,30 @@ export class ProductStore {
       // Add forceRefresh parameter to clear cache
       if (forceRefresh || !window.allProductsData) {
         const response = await fetch(`http://localhost:3000/api/all-products?locationId=${this.selectedLocationId}`);
-        window.allProductsData = await response.json();
+
+        if (!response.ok) {
+          throw new Error(`API returned status ${response.status}: ${response.statusText}`);
+        }
+
+        const responseData = await response.json();
+
+        // Check if the response is actually an array
+        if (!Array.isArray(responseData)) {
+          console.error("API did not return an array:", responseData);
+          throw new Error("Invalid data format: Expected an array of products");
+        }
+
+        window.allProductsData = responseData;
       }
 
       const data = window.allProductsData;
 
+      // Double-check that data is an array before proceeding
+      if (!Array.isArray(data)) {
+        throw new Error("Product data is not an array");
+      }
+
+      // Now you can safely use forEach
       const krogerCategories = new Set();
       const drinkBrands = {};
 

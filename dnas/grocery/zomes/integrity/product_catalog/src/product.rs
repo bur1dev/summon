@@ -10,7 +10,7 @@ pub struct Product {
     pub category: String,
     pub subcategory: Option<String>, // Add this
     pub product_type: Option<String>,
-    pub image_url: Option<String>
+    pub image_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -19,14 +19,14 @@ pub struct CreateProductInput {
     pub main_category: String,
     pub subcategory: Option<String>,
     pub product_type: Option<String>,
-    pub dual_categorization: Option<DualCategorization>
+    pub dual_categorization: Option<DualCategorization>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DualCategorization {
     pub main_category: String,
     pub subcategory: Option<String>,
-    pub product_type: Option<String>
+    pub product_type: Option<String>,
 }
 
 pub fn validate_create_product(
@@ -34,18 +34,22 @@ pub fn validate_create_product(
     product: Product,
 ) -> ExternResult<ValidateCallbackResult> {
     if product.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Product name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Product name cannot be empty".into(),
+        ));
     }
     if product.price < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Price cannot be negative".into(),
+        ));
     }
-    
+
     if let Some(url) = &product.image_url {
         if !url.contains("kroger.com") {
             return Ok(ValidateCallbackResult::Invalid("Invalid image URL".into()));
         }
     }
-    
+
     Ok(ValidateCallbackResult::Valid)
 }
 

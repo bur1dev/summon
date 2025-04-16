@@ -26,6 +26,11 @@
     let positionCache = new Map();
     let rowHeight = 420;
 
+    // Add zoom tracking
+    let currentZoom =
+        typeof window !== "undefined" ? window.devicePixelRatio : 1;
+    let zoomTimeout;
+
     let renderLoopActive = false;
     let targetVisibleIndices = [];
     let renderFrameId = null;
@@ -51,10 +56,36 @@
         renderFrameId = requestAnimationFrame(renderFrame);
     }
 
+    // Check if zoom level has changed
+    function checkZoom() {
+        if (typeof window === "undefined") return false;
+
+        const newZoom = window.devicePixelRatio;
+        if (newZoom !== currentZoom) {
+            currentZoom = newZoom;
+
+            // Debounce the recalculation
+            clearTimeout(zoomTimeout);
+            zoomTimeout = setTimeout(() => {
+                positionCache.clear();
+                recalculateGrid();
+                updatePositionCache();
+            }, 300);
+
+            return true;
+        }
+        return false;
+    }
+
     // Stop render loop when component is destroyed
     onDestroy(() => {
         renderLoopActive = false;
         if (renderFrameId) cancelAnimationFrame(renderFrameId);
+        if (zoomTimeout) clearTimeout(zoomTimeout);
+
+        // Remove zoom detection events
+        window.removeEventListener("mouseup", checkZoom);
+        window.removeEventListener("keyup", checkZoom);
     });
 
     // Calculate the columns per row and visible products
@@ -151,6 +182,9 @@
     }
 
     function handleResize() {
+        // Check if zoom level changed
+        checkZoom();
+
         if (productsGridRef) {
             gridWidth = productsGridRef.offsetWidth;
         }
@@ -181,6 +215,14 @@
         }
 
         window.addEventListener("resize", handleResize);
+
+        // Add zoom detection events - only triggers on user actions
+        window.addEventListener("mouseup", checkZoom);
+        window.addEventListener("keyup", checkZoom);
+
+        // Initialize current zoom
+        currentZoom = window.devicePixelRatio;
+
         recalculateGrid();
         updatePositionCache();
         startRenderLoop(); // Start the decoupled render loop
@@ -188,8 +230,11 @@
         return () => {
             parentScrollContainer?.removeEventListener("scroll", handleScroll);
             window.removeEventListener("resize", handleResize);
+            window.removeEventListener("mouseup", checkZoom);
+            window.removeEventListener("keyup", checkZoom);
             renderLoopActive = false; // Stop the render loop
             if (renderFrameId) cancelAnimationFrame(renderFrameId);
+            if (zoomTimeout) clearTimeout(zoomTimeout);
         };
     });
 </script>

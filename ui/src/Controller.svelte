@@ -1,8 +1,20 @@
 <script lang="ts">
   import ShopView from "./ShopView.svelte";
+  import HeaderContainer from "./HeaderContainer.svelte";
   import { ShopStore } from "./store";
   import { setContext, onMount, getContext } from "svelte";
   import type { AppClient } from "@holochain/client";
+  import { ProfilesStore } from "@holochain-open-dev/profiles";
+  import {
+    currentViewStore,
+    isCartOpenStore,
+    searchModeStore,
+    searchQueryStore,
+    productNameStore,
+    selectedProductHashStore,
+    fuseResultsStore,
+    isViewAllStore,
+  } from "./UiStateStore";
 
   export let roleName = "";
   export let client: AppClient;
@@ -11,6 +23,12 @@
 
   // Get cart service from context
   const cartService = getContext("cartService");
+
+  // Get profiles store from context (passed down from profiles-context)
+  const profilesStore = getContext("profiles-store");
+
+  // Cart total for header display
+  let cartTotalValue = 0;
 
   setContext("store", {
     getStore: () => store,
@@ -28,6 +46,15 @@
       console.log("Setting product store in cart service");
       $cartService.setProductStore(store.productStore);
     }
+
+    // Subscribe to the cartTotal from the cart service
+    const unsubscribe = $cartService?.cartTotal?.subscribe((value) => {
+      cartTotalValue = value || 0;
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   });
 </script>
 
@@ -36,7 +63,10 @@
     <div class="app">
       <div class="wrapper">
         <div class="header"></div>
-        <div class="workspace" style="display:flex">
+        <div class="workspace">
+          <!-- Header Container is now a sibling to ShopView -->
+          <HeaderContainer cartTotal={cartTotalValue} standAlone={false} />
+
           <!-- Render ShopView -->
           <ShopView />
         </div>
@@ -146,6 +176,6 @@
   }
 
   .workspace {
-    padding-top: 135px;
+    padding-top: 60px; /* Adjusted to account for HeaderContainer */
   }
 </style>

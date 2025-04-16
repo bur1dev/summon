@@ -91,7 +91,7 @@
     padding: 0;
     overflow-y: auto;
     position: fixed;
-    left: 5px;
+    left: 0; /* Change from 5px to 0 */
     box-sizing: border-box;
   }
 

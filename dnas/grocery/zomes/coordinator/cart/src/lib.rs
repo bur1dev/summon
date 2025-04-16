@@ -1,8 +1,8 @@
-use hdk::prelude::*;
 use cart_integrity::*;
+use hdk::prelude::*;
 
-mod cart;
 mod address;
+mod cart;
 
 // Input for adding product to cart
 #[derive(Serialize, Deserialize, Debug)]

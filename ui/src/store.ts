@@ -7,6 +7,7 @@ import {
 } from '@holochain/client';
 import { writable, type Writable } from "svelte/store";
 import { ProductStore } from "./ProductStore";
+import type { ProductCacheStore } from "./ProductCacheStore";
 
 export class ShopService {
   constructor(public client: AppClient, public roleName, public zomeName = 'products') { }
@@ -22,6 +23,7 @@ export class ShopService {
 
 export interface UIProps {
   bgUrl: string,
+  showMenu?: boolean,
   searchMode?: boolean,
   searchQuery?: string,
   productName?: string,
@@ -34,6 +36,7 @@ export class ShopStore {
   myAgentPubKeyB64: AgentPubKeyB64;
   service: ShopService;
   productStore: ProductStore;
+  productCache: ProductCacheStore;
   client: AppClient;
   uiProps: Writable<UIProps> = writable({
     bgUrl: "",

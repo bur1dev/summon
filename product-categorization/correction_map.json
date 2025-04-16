@@ -9798,5 +9798,15 @@
     "category": "Snacks & Candy",
     "subcategory": "Gum & Mints",
     "product_type": "Chewing Gum"
+  },
+  "Cotton Candy Grapes": {
+    "category": "Produce",
+    "subcategory": "Fresh Fruits",
+    "product_type": "Grapes"
+  },
+  "cotton candy grapes": {
+    "category": "Produce",
+    "subcategory": "Fresh Fruits",
+    "product_type": "Grapes"
   }
 }

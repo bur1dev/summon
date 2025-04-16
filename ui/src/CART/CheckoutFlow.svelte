@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { createEventDispatcher, onMount } from "svelte";
+    import { createEventDispatcher, onMount, getContext } from "svelte";
     import { encodeHashToBase64 } from "@holochain/client";
     import { AddressService, type Address } from "./AddressService";
     import type {
@@ -10,6 +10,9 @@
     import DeliveryTimeSelector from "./DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";
 
+    // Import agent-avatar component
+    import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
+
     // Props
     export let client: any;
     export let cartService: any;
@@ -17,6 +20,13 @@
     export let productDetails = {};
     export let cartTotal = 0;
     export let onClose: () => void;
+
+    // Get the store for the client
+    const { getStore } = getContext("store");
+    const store = getStore();
+
+    // Get profiles store from context
+    const profilesStore = getContext("profiles-store");
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
@@ -254,6 +264,17 @@
 
     <div class="checkout-content">
         {#if currentStep === 1}
+            <div class="avatar-overlay">
+                <div class="avatar-container">
+                    <agent-avatar
+                        size="40"
+                        agent-pub-key={store.myAgentPubKeyB64}
+                        disable-tooltip={true}
+                        disable-copy={true}
+                    ></agent-avatar>
+                </div>
+            </div>
+
             <AddressSelector
                 {client}
                 selectedAddressHash={checkoutDetails.addressHash}
@@ -273,6 +294,17 @@
                 </button>
             </div>
         {:else if currentStep === 2}
+            <div class="avatar-overlay">
+                <div class="avatar-container">
+                    <agent-avatar
+                        size="40"
+                        agent-pub-key={store.myAgentPubKeyB64}
+                        disable-tooltip={true}
+                        disable-copy={true}
+                    ></agent-avatar>
+                </div>
+            </div>
+
             <DeliveryTimeSelector
                 timeSlots={deliveryTimeSlots}
                 selectedTimeSlot={checkoutDetails.deliveryTime?.time_slot}
@@ -293,6 +325,17 @@
             </div>
         {:else if currentStep === 3}
             {#if address && formattedDeliveryTime}
+                <div class="avatar-overlay">
+                    <div class="avatar-container">
+                        <agent-avatar
+                            size="40"
+                            agent-pub-key={store.myAgentPubKeyB64}
+                            disable-tooltip={true}
+                            disable-copy={true}
+                        ></agent-avatar>
+                    </div>
+                </div>
+
                 <CheckoutSummary
                     cartItems={itemsWithDetails}
                     {cartTotal}
@@ -363,12 +406,29 @@
         color: #666;
     }
 
+    .avatar-overlay {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        z-index: 10;
+        display: flex;
+    }
+
+    .avatar-container {
+        border: 1px solid #e0e0e0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     .checkout-content {
         flex: 1;
         overflow-y: auto;
         padding: 0;
         display: flex;
         flex-direction: column;
+        position: relative;
     }
 
     .nav-buttons {

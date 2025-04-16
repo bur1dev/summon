@@ -17,6 +17,6 @@ pub struct Address {
 #[hdk_entry_helper]
 #[derive(Clone)]
 pub struct DeliveryTimeSlot {
-    pub date: u64, // Unix timestamp for the date
+    pub date: u64,         // Unix timestamp for the date
     pub time_slot: String, // e.g., "2pm-4pm"
 }

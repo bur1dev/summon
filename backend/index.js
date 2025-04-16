@@ -162,7 +162,7 @@ app.listen(PORT, () => {
 app.get('/api/all-products', async (req, res) => {
   const { locationId } = req.query;
   const allProducts = [];
-  const searchTerms = ['grapes'];
+  const searchTerms = ['grapes', 'produce', 'apples', 'eggs', 'milk', 'yogurt', 'bread', 'fruit', 'vegetables', 'basil', 'soda', 'sprite'];
 
 
 

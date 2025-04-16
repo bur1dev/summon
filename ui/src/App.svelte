@@ -4,12 +4,18 @@
     AppWebsocket,
     AdminWebsocket,
     type AppWebsocketConnectionOptions,
+    encodeHashToBase64,
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
   import { SimpleCartService } from "./CART/SimpleCartService";
   import { AddressService } from "./CART/AddressService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
+
+  // Import Profiles components
+  import { ProfilesStore, ProfilesClient } from "@holochain-open-dev/profiles";
+  import "@holochain-open-dev/profiles/dist/elements/profiles-context.js";
+  import "@holochain-open-dev/profiles/dist/elements/create-profile.js";
 
   const appId = import.meta.env.VITE_APP_ID
     ? import.meta.env.VITE_APP_ID
@@ -22,6 +28,7 @@
   const url = `ws://127.0.0.1:${appPort}`;
 
   let client: any;
+  let profilesStore: ProfilesStore;
 
   // Create a single cart service that all components can access
   // Start with a writable that we'll set once connected
@@ -98,13 +105,42 @@
       storeObjectKeys: Object.keys(storeObj),
     });
 
+    // Initialize ProfilesStore
+    profilesStore = new ProfilesStore(new ProfilesClient(client, "grocery"), {
+      avatarMode: "avatar-optional",
+      minNicknameLength: 2,
+      additionalFields: [],
+    });
+
     connected = true;
+  }
+
+  // Use Svelte's reactive statement to watch profilesStore
+  $: prof = profilesStore ? profilesStore.myProfile : undefined;
+
+  function handleProfileCreated(event) {
+    console.log("Profile created event:", event);
+    console.log("Event detail:", event.detail);
   }
 </script>
 
 <svelte:head></svelte:head>
+
 {#if connected}
-  <Controller {client} {roleName}></Controller>
+  <profiles-context store={profilesStore}>
+    {#if !prof || $prof.status === "pending"}
+      <div class="loading"><div class="loader"></div></div>
+    {:else if $prof.status === "complete" && !$prof.value}
+      <div class="create-profile">
+        <h1 class="welcome-text">Welcome to the Grocery App!</h1>
+        <p>Please create your profile to continue.</p>
+        <create-profile on:profile-created={handleProfileCreated}
+        ></create-profile>
+      </div>
+    {:else}
+      <Controller {client} {roleName}></Controller>
+    {/if}
+  </profiles-context>
 {:else}
   <div class="loading"><div class="loader"></div></div>
 {/if}

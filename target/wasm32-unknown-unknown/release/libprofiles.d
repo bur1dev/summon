@@ -1,0 +1,1 @@
+/home/bur1/Holochain/summon/target/wasm32-unknown-unknown/release/libprofiles.rlib: /home/bur1/Holochain/summon/dnas/grocery/zomes/coordinator/profiles/src/lib.rs /home/bur1/Holochain/summon/dnas/grocery/zomes/integrity/profiles/src/lib.rs

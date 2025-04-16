@@ -1,5 +1,5 @@
-use hdi::prelude::*;
-use crate::DeliveryTimeSlot; // Add this import
+use crate::DeliveryTimeSlot;
+use hdi::prelude::*; // Add this import
 
 // For storing checked out carts
 #[hdk_entry_helper]

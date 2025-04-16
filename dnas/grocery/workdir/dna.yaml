@@ -7,26 +7,37 @@ integrity:
   zomes:
   - name: products_integrity
     hash: null
-    bundled: ../../../target/wasm32-unknown-unknown/release/products_integrity.wasm
+    bundled: '../../../target/wasm32-unknown-unknown/release/products_integrity.wasm'
     dependencies: null
     dylib: null
   - name: cart_integrity
     hash: null
-    bundled: ../../../target/wasm32-unknown-unknown/release/cart_integrity.wasm
+    bundled: '../../../target/wasm32-unknown-unknown/release/cart_integrity.wasm'
+    dependencies: null
+    dylib: null
+  - name: profiles_integrity
+    hash: null
+    bundled: '../../../target/wasm32-unknown-unknown/release/profiles_integrity.wasm'
     dependencies: null
     dylib: null
 coordinator:
   zomes:
   - name: products
     hash: null
-    bundled: ../../../target/wasm32-unknown-unknown/release/products.wasm
+    bundled: '../../../target/wasm32-unknown-unknown/release/products.wasm'
     dependencies:
     - name: products_integrity
     dylib: null
   - name: cart
     hash: null
-    bundled: ../../../target/wasm32-unknown-unknown/release/cart.wasm
+    bundled: '../../../target/wasm32-unknown-unknown/release/cart.wasm'
     dependencies:
     - name: cart_integrity
+    dylib: null
+  - name: profiles
+    hash: null
+    bundled: '../../../target/wasm32-unknown-unknown/release/profiles.wasm'
+    dependencies:
+    - name: profiles_integrity
     dylib: null
 lineage: []

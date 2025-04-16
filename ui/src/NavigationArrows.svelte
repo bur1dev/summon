@@ -321,7 +321,7 @@
     }
 
     .nav-arrow.left {
-        left: 5px;
+        left: -1px;
     }
 
     .nav-arrow.right {

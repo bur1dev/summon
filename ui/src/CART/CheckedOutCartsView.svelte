@@ -4,12 +4,18 @@
   import { writable, type Writable } from "svelte/store";
   import { AddressService } from "./AddressService";
 
+  // Import agent-avatar component
+  import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
+
   // Get cart service directly from the context
   const cartService = getContext("cartService") as Writable<any>;
 
   // Get the store for the client
   const { getStore } = getContext("store");
   const store = getStore();
+
+  // Get profiles store from context
+  const profilesStore = getContext("profiles-store");
 
   // Services
   let addressService;
@@ -133,21 +139,33 @@
         {#each checkedOutCarts as item}
           <div class="cart-card">
             <div class="cart-header">
-              {#if item.total}
-                {@const estimatedTax =
-                  Math.round(item.total * 0.0775 * 100) / 100}
-                {@const orderTotal = item.total + estimatedTax}
-                <h2>Order ${orderTotal.toFixed(2)}</h2>
-                <div class="cart-pricing">
-                  <span class="subtotal">Items: ${item.total.toFixed(2)}</span>
-                  <span class="tax">Tax: ${estimatedTax.toFixed(2)}</span>
+              <div class="order-info">
+                {#if item.total}
+                  {@const estimatedTax =
+                    Math.round(item.total * 0.0775 * 100) / 100}
+                  {@const orderTotal = item.total + estimatedTax}
+                  <h2>Order ${orderTotal.toFixed(2)}</h2>
+                  <div class="cart-pricing">
+                    <span class="subtotal">Items: ${item.total.toFixed(2)}</span
+                    >
+                    <span class="tax">Tax: ${estimatedTax.toFixed(2)}</span>
+                  </div>
+                {:else}
+                  <h2>Order</h2>
+                {/if}
+                <div class="cart-date">{item.createdAt}</div>
+                <div class="cart-status status-{item.status}">
+                  Status: {formatStatus(item.status)}
                 </div>
-              {:else}
-                <h2>Order</h2>
-              {/if}
-              <div class="cart-date">{item.createdAt}</div>
-              <div class="cart-status status-{item.status}">
-                Status: {formatStatus(item.status)}
+              </div>
+
+              <div class="agent-avatar-container">
+                <agent-avatar
+                  size="40"
+                  agent-pub-key={store.myAgentPubKeyB64}
+                  disable-tooltip={true}
+                  disable-copy={true}
+                ></agent-avatar>
               </div>
             </div>
 
@@ -334,6 +352,13 @@
     padding: 16px;
     border-bottom: 1px solid #f0f0f0;
     background: #f9f9f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .order-info {
+    flex: 1;
   }
 
   .cart-header h2 {
@@ -352,6 +377,13 @@
     font-size: 14px;
     font-weight: 500;
     margin-top: 4px;
+  }
+
+  .agent-avatar-container {
+    margin-left: 16px;
+    padding: 2px;
+    border-radius: 50%;
+    border: 2px solid #e0e0e0;
   }
 
   .status-processing {

@@ -6,14 +6,30 @@
   import CategorySidebar from "./CategorySidebar.svelte";
   import { mainCategories } from "./categoryData";
   import SlideOutCart from "./CART/SlideOutCart.svelte";
-  import HeaderContainer from "./HeaderContainer.svelte";
   import SearchResults from "./SEARCH/SearchResults.svelte";
   import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
-  import { writable } from "svelte/store";
   import { ProductCacheStore } from "./ProductCacheStore";
   import { ProductDataService } from "./ProductDataService";
   import ProductBrowser from "./ProductBrowser.svelte";
   import CheckedOutCarts from "./CART/CheckedOutCartsView.svelte";
+
+  // Import UI state stores
+  import {
+    currentViewStore,
+    isCartOpenStore,
+    searchModeStore,
+    searchQueryStore,
+    selectedCategoryStore,
+    selectedSubcategoryStore,
+    selectedProductTypeStore,
+    showReportDialogStore,
+    reportedProductStore,
+    productNameStore,
+    selectedProductHashStore,
+    fuseResultsStore,
+    isViewAllStore,
+    resetSearchState,
+  } from "./UiStateStore";
 
   // Store setup
   const { getStore } = getContext("store");
@@ -21,18 +37,6 @@
 
   // Get cart service directly from the context
   const cartService = getContext("cartService");
-  let cartTotalValue = 0;
-
-  // Subscribe to the cartTotal from the cart service
-  onMount(() => {
-    const unsubscribe = $cartService?.cartTotal?.subscribe((value) => {
-      cartTotalValue = value || 0;
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  });
 
   $: uiProps = store.uiProps;
 
@@ -40,49 +44,43 @@
   // Create product data service
   const productDataService = new ProductDataService(store, productCache);
 
-  // Component state
-  let currentView: "active" | "checked-out" = "active";
-  let selectedLocationId = "70300168";
-  let cartScrollState = { scrollPercent: 0 };
-  let errorMessage = "";
+  // Add productCache to store for sharing
+  store.productCache = productCache;
 
   // Only keep standAlone param
   export let standAlone = false;
 
-  // Category state
-  let selectedCategory: string | null = null;
-  let selectedSubcategory: string | null = null;
-  let selectedProductType = "All";
   let scrollContainer;
 
-  let isCartOpen = false;
-
-  let searchMode = false;
-  let searchQuery = "";
-  let showReportDialog = false;
-  let reportedProduct = null;
-
-  // State derivations
+  // Sync with UI store when uiProps changes
   $: {
-    if ($uiProps) {
-      searchMode = $uiProps.searchMode || false;
-      searchQuery = $uiProps.searchQuery || "";
-    }
+    if ($uiProps.searchMode !== undefined)
+      $searchModeStore = $uiProps.searchMode;
+    if ($uiProps.searchQuery !== undefined)
+      $searchQueryStore = $uiProps.searchQuery;
+    if ($uiProps.selectedProductHash !== undefined)
+      $selectedProductHashStore = $uiProps.selectedProductHash;
+    if ($uiProps.productName !== undefined)
+      $productNameStore = $uiProps.productName;
+    if ($uiProps.fuseResults !== undefined)
+      $fuseResultsStore = $uiProps.fuseResults || [];
+    if ($uiProps.isViewAll !== undefined)
+      $isViewAllStore = $uiProps.isViewAll || false;
   }
 
   function handleCategorySelect({ detail: { category, subcategory } }) {
-    searchMode = false;
+    $searchModeStore = false;
     store.setUIprops({ ...($uiProps || {}), searchMode: false });
-    selectedCategory = category;
-    selectedSubcategory = subcategory;
-    selectedProductType = "All";
+    $selectedCategoryStore = category;
+    $selectedSubcategoryStore = subcategory;
+    $selectedProductTypeStore = "All";
 
     scrollContainer.scrollTop = 0;
     window.scrollTo(0, 0);
   }
 
   function handleProductTypeSelect({ detail: { productType } }) {
-    selectedProductType = productType;
+    $selectedProductTypeStore = productType;
   }
 
   function handleViewMore({ detail: { category, subcategory } }) {
@@ -102,7 +100,7 @@
 
       if (response.ok) {
         alert("Thank you for your feedback!");
-        showReportDialog = false;
+        $showReportDialogStore = false;
       } else {
         throw new Error(`Server responded with ${response.status}`);
       }
@@ -115,75 +113,73 @@
   }
 </script>
 
-<div class="root-container" class:no-sidebar={currentView !== "active"}>
-  {#if currentView === "active"}
+<div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
+  {#if $currentViewStore === "active"}
     <CategorySidebar on:categorySelect={handleCategorySelect} />
   {/if}
   <div class="main-content">
-    <HeaderContainer
-      bind:currentView
-      bind:isCartOpen
-      cartTotal={cartTotalValue}
-      {standAlone}
-    />
-    {#if selectedCategory && selectedSubcategory && !searchMode}
-      <div class="product-type-nav">
-        <div class="product-type-container">
-          <button
-            class="product-type-btn {selectedProductType === 'All'
-              ? 'active'
-              : ''}"
-            on:click={() =>
-              handleProductTypeSelect({ detail: { productType: "All" } })}
-          >
-            All
-          </button>
-          {#each mainCategories
-            .find((c) => c.name === selectedCategory)
-            .subcategories.find((s) => s.name === selectedSubcategory).productTypes ?? [] as productType}
-            <button
-              class="product-type-btn {selectedProductType === productType
-                ? 'active'
-                : ''}"
-              on:click={() =>
-                handleProductTypeSelect({ detail: { productType } })}
-            >
-              {productType}
-            </button>
-          {/each}
-        </div>
-      </div>
-    {/if}
-    {#if currentView === "active"}
-      <SlideOutCart isOpen={isCartOpen} onClose={() => (isCartOpen = false)} />
+    {#if $currentViewStore === "active"}
+      <SlideOutCart
+        isOpen={$isCartOpenStore}
+        onClose={() => ($isCartOpenStore = false)}
+      />
       <div class="scroll-container" bind:this={scrollContainer}>
+        {#if $selectedCategoryStore && $selectedSubcategoryStore && !$searchModeStore}
+          <div class="product-type-nav">
+            <div class="product-type-container">
+              <button
+                class="product-type-btn {$selectedProductTypeStore === 'All'
+                  ? 'active'
+                  : ''}"
+                on:click={() =>
+                  handleProductTypeSelect({ detail: { productType: "All" } })}
+              >
+                All
+              </button>
+              {#each mainCategories
+                .find((c) => c.name === $selectedCategoryStore)
+                .subcategories.find((s) => s.name === $selectedSubcategoryStore).productTypes ?? [] as productType}
+                <button
+                  class="product-type-btn {$selectedProductTypeStore ===
+                  productType
+                    ? 'active'
+                    : ''}"
+                  on:click={() =>
+                    handleProductTypeSelect({ detail: { productType } })}
+                >
+                  {productType}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
         <div class="product-sections">
-          {#if searchMode}
+          {#if $searchModeStore}
             <SearchResults
               {store}
-              query={searchQuery}
-              selectedProductHash={$uiProps.selectedProductHash}
-              productName={$uiProps.productName}
-              fuseResults={$uiProps.fuseResults || []}
+              query={$searchQueryStore}
+              selectedProductHash={$selectedProductHashStore}
+              productName={$productNameStore}
+              fuseResults={$fuseResultsStore}
               on:reportCategory={(event) => {
-                reportedProduct = event.detail;
-                showReportDialog = true;
+                $reportedProductStore = event.detail;
+                $showReportDialogStore = true;
               }}
             />
           {:else}
             <ProductBrowser
-              {selectedCategory}
-              {selectedSubcategory}
-              {selectedProductType}
-              {searchMode}
+              selectedCategory={$selectedCategoryStore}
+              selectedSubcategory={$selectedSubcategoryStore}
+              selectedProductType={$selectedProductTypeStore}
+              searchMode={$searchModeStore}
               {store}
               {productCache}
               {productDataService}
               on:viewMore={handleViewMore}
               on:productTypeSelect={handleProductTypeSelect}
               on:reportCategory={(event) => {
-                reportedProduct = event.detail;
-                showReportDialog = true;
+                $reportedProductStore = event.detail;
+                $showReportDialogStore = true;
               }}
             />
           {/if}
@@ -194,10 +190,10 @@
     {/if}
   </div>
 </div>
-{#if reportedProduct && showReportDialog}
+{#if $reportedProductStore && $showReportDialogStore}
   <ReportCategoryDialog
-    bind:isOpen={showReportDialog}
-    product={reportedProduct}
+    bind:isOpen={$showReportDialogStore}
+    product={$reportedProductStore}
     on:submit={handleReportSubmit}
   />
 {/if}
@@ -240,10 +236,9 @@
   .root-container {
     display: flex;
     height: calc(100vh - 60px);
-    width: calc(100% - 265px);
-    margin: 15px 0 15px 265px;
-    position: fixed;
-    top: 45px;
+    width: calc(100% - 250px); /* Match sidebar width exactly */
+    margin: 0 0 0 250px; /* Match sidebar width exactly */
+    position: relative;
   }
 
   .main-content {
@@ -295,7 +290,7 @@
 
   .root-container.no-sidebar {
     width: calc(100% - 30px);
-    margin: 15px;
+    margin: 0 15px;
   }
 
   .scroll-container {
@@ -303,6 +298,7 @@
     overflow-y: auto;
     overflow-x: visible;
     padding-right: 0;
+    padding-left: 10px;
     margin-top: 0px;
     padding-top: 0px;
     height: 100%;

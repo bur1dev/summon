@@ -258,7 +258,9 @@
   >
     {#if itemCount > 0}
       <span class="minus" on:click|stopPropagation={decrementCount}>-</span>
-      <span class="count">{itemCount} ct</span>
+      <span class="count" on:click|stopPropagation={() => {}}>
+        {itemCount} ct
+      </span>
       <span class="plus" on:click|stopPropagation={incrementCount}>+</span>
     {:else}
       <span class="plus-icon">+</span>
@@ -316,7 +318,7 @@
     box-shadow: none;
     transition: all 0.25s ease;
     transform: scale(1) translate3d(0, 0, 0);
-    overflow-y: visible;
+    overflow: hidden;
     will-change: transform;
   }
 

@@ -2,13 +2,13 @@
 
 # Features
 
-Browse products by categories, subcategories and product types
-Product search with categorization
-Shopping cart with real-time updates
-User profiles with avatar support
-Address management for deliveries
-Delivery scheduling and instructions
-Order history tracking and management
+- Browse products by categories, subcategories and product types
+- Product search with categorization
+- Shopping cart with real-time updates
+- User profiles with avatar support
+- Address management for deliveries
+- Delivery scheduling and instructions
+- Order history tracking and management
 
 ### Summon currently uses a hybrid architecture:
 

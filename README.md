@@ -1,4 +1,4 @@
-# SUMMON
+# SUMMON (customer facing application)
 
 # Features
 

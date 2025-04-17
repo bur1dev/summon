@@ -70,14 +70,3 @@ AGENTS=3 npm run network
 
 Substitute the "3" for the number of nodes that you want to bootstrap in your network.
 This will also bring up the Holochain Playground for advanced introspection of the conductors.
-
-## Packaging
-
-To package the web happ:
-``` bash
-npm run package
-```
-
-You'll have the `talking-stickies.webhapp` in `workdir`. This is what you should distribute so that the Holochain Launcher can install it.
-You will also have its subcomponent `talking-stickies.happ` in the same folder`.
-

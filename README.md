@@ -16,7 +16,7 @@
 - **Backend**: Express.js server (index.js) for product fetching and FAISS/LLM powered categorization
 - **Data Storage**: Holochain DHT for user categorized product data, profiles, cart management, and orders
 
-There are also two test buttons (fetch products and load saved data) in the header container for testing purposes. 
+There are also two test buttons—"Fetch Products" and "Load Saved Data"—in the header container for testing purposes. To use them, you need to run npm run dev in the Express.js backend directory. However, fetching data requires Kroger API credentials, which you can obtain from https://developer.kroger.com/.
 
 ### Future Plans
 
@@ -24,7 +24,7 @@ The Express.js backend is temporary. Future plans include:
 
 1. Migrating product fetching logic to Holochain zomes
 2. Implementing decentralized product categorization
-3. Removing dependency on centralized servers
+3. Reducing dependency on servers
 
 ## Environment Setup
 

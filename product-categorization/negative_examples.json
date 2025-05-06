@@ -1,0 +1,20 @@
+[
+  {
+    "text": "Spice World\u2122 Organic Minced Garlic",
+    "negative_match": [
+      "Produce",
+      "Herbs",
+      "Basil"
+    ],
+    "timestamp": "2025-03-08T00:43:12.250805"
+  },
+  {
+    "text": "Johnson's Baby Oil",
+    "negative_match": [
+      "Baby",
+      "Baby Food & Drinks",
+      "Drinks"
+    ],
+    "timestamp": "2025-03-09T22:41:58.237968"
+  }
+]

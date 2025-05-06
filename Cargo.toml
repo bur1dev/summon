@@ -1,0 +1,26 @@
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+
+[workspace]
+members = ["dnas/*/zomes/coordinator/*", "dnas/*/zomes/integrity/*"]
+resolver = "2"
+
+[workspace.dependencies]
+hdi = "=0.5.1"
+hdk = "^0.4.1"
+holochain_types = "0.3.2"
+mio = "0.8"
+serde = "1.0"
+
+[workspace.dependencies.profiles]
+path = "dnas/grocery/zomes/coordinator/profiles"
+
+[workspace.dependencies.profiles_integrity]
+path = "dnas/grocery/zomes/integrity/profiles"
+
+[workspace.dependencies.tokio]
+features = ["full"]
+version = "1.0"

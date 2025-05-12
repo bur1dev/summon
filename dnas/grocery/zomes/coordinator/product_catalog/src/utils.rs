@@ -5,7 +5,7 @@ use hdk::prelude::*;
 pub fn concurrent_get_records(hashes: Vec<ActionHash>) -> ExternResult<Vec<Record>> {
     warn!("🔄 START concurrent_get_records: Fetching {} records in batches", hashes.len());
     
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
     let mut all_records = Vec::new();
     let mut successful_fetches = 0;
     let mut failed_fetches = 0;

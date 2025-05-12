@@ -4,7 +4,6 @@
     import ProfileEditor from "./ProfileEditor.svelte";
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
     import { X } from "lucide-svelte";
-    import { fade, fly } from "svelte/transition";
 
     export let store: any;
     export let myAgentPubKeyB64: string | undefined;
@@ -13,9 +12,14 @@
     let showCategoryAdmin = false;
     let showProfileEditor = false;
     let profileEditorComponent;
+    let isClosing = false;
 
     function closeMenu() {
-        $showMenuStore = false;
+        isClosing = true;
+        setTimeout(() => {
+            $showMenuStore = false;
+            isClosing = false;
+        }, 300); // Match animation duration
     }
 
     function handleProfileUpdated(event) {
@@ -26,16 +30,18 @@
 {#if $showMenuStore}
     <!-- Overlay -->
     <div
-        class="overlay"
+        class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
         on:click={closeMenu}
-        transition:fade={{ duration: 200 }}
     />
 
     <!-- Sidebar Panel -->
-    <div class="sidebar-panel" transition:fly={{ x: -320, duration: 300 }}>
+    <div class="sidebar-panel {isClosing ? 'slide-out-left' : 'slide-in-left'}">
         <div class="sidebar-header">
-            <button class="close-button" on:click={closeMenu}>
-                <X size={24} color="#343538" />
+            <button
+                class="close-button btn btn-icon btn-icon-primary btn-icon-sm"
+                on:click={closeMenu}
+            >
+                <X size={20} />
             </button>
         </div>
 
@@ -69,21 +75,21 @@
 
                 <!-- Data controls -->
                 <button
-                    class="menu-button"
+                    class="btn btn-menu"
                     on:click={() => store.productStore?.fetchAllProducts()}
                 >
                     Fetch API
                 </button>
 
                 <button
-                    class="menu-button"
+                    class="btn btn-menu"
                     on:click={() => store.productStore?.loadFromSavedData()}
                 >
                     Load Saved Data
                 </button>
 
                 <button
-                    class="menu-button admin-btn"
+                    class="btn btn-menu btn-menu-gradient"
                     on:click={() => {
                         showCategoryAdmin = true;
                         closeMenu();
@@ -99,7 +105,7 @@
 
                 <a
                     href="https://github.com/bur1dev/summon/issues"
-                    class="menu-button"
+                    class="btn btn-menu"
                     target="_blank"
                     rel="noopener noreferrer"
                     on:click={closeMenu}
@@ -135,60 +141,66 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
+        background: var(--overlay-dark);
         z-index: 1999;
+    }
+
+    .overlay.fade-in {
+        animation: fadeIn var(--transition-fast) ease forwards;
+    }
+
+    .overlay.fade-out {
+        animation: fadeOut var(--transition-fast) ease forwards;
     }
 
     .sidebar-panel {
         position: fixed;
         top: 0;
         left: 0;
-        width: 320px;
+        width: var(--sidebar-width);
         height: 100vh;
-        background: white;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        background: var(--background);
+        box-shadow: var(--shadow-sidebar);
         z-index: 2000;
         display: flex;
         flex-direction: column;
     }
 
+    .sidebar-panel.slide-in-left {
+        animation: slideInLeft var(--transition-normal) ease forwards;
+    }
+
+    .sidebar-panel.slide-out-left {
+        animation: slideOutLeft var(--transition-normal) ease forwards;
+    }
+
     .sidebar-header {
         display: flex;
         justify-content: flex-end;
-        padding: 12px 16px;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .close-button {
-        display: flex;
+        padding: 0 var(--spacing-md);
+        border-bottom: var(--border-width-thin) solid var(--border);
+        height: var(--component-header-height);
         align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        border-radius: 8px;
-        transition: background-color 0.2s;
     }
 
-    .close-button:hover {
-        background-color: #f5f5f5;
+    :global(.close-button svg) {
+        color: var(--button-text);
+        stroke: var(--button-text);
     }
 
     .sidebar-content {
         flex: 1;
         overflow-y: auto;
-        padding: 20px;
+        padding: var(--spacing-lg);
     }
 
     .profile-section {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 20px 0;
-        margin-bottom: 24px;
-        border-bottom: 1px solid #e0e0e0;
+        padding: var(--spacing-lg) 0;
+        margin-bottom: var(--spacing-xl);
+        border-bottom: var(--border-width-thin) solid var(--border);
     }
 
     .avatar-container {
@@ -197,61 +209,33 @@
         justify-content: center;
         border-radius: 50%;
         overflow: hidden;
-        border: 2px solid #e0e0e0;
+        border: var(--border-width) solid var(--primary);
         cursor: pointer;
-        width: 76px;
-        height: 76px;
-        transition:
-            transform 0.2s,
-            border-color 0.2s;
-        margin-bottom: 12px;
+        width: var(--avatar-size);
+        height: var(--avatar-size);
+        transition: var(--btn-transition);
+        margin-bottom: var(--spacing-sm);
     }
 
     .avatar-container:hover {
-        border-color: none;
-        transform: scale(1.05);
+        transform: scale(var(--hover-scale-subtle));
+        box-shadow: var(--shadow-medium);
     }
 
     .profile-text {
-        font-size: 14px;
-        color: #666;
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
     }
 
     .menu-section {
-        margin-bottom: 32px;
+        margin-bottom: var(--spacing-xxl);
     }
 
     .section-title {
-        font-size: 16px;
-        font-weight: 600;
-        color: #343538;
-        margin-bottom: 12px;
-    }
-
-    .menu-button {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        width: 100%;
-        padding: 12px 16px;
-        border: none;
-        background: white;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 16px;
-        color: #343538;
-        text-align: left;
-        transition: background-color 0.2s;
-        margin-bottom: 8px;
-        text-decoration: none;
-    }
-
-    .menu-button:hover {
-        background: #f5f5f5;
-    }
-
-    .admin-btn {
-        background-color: #f8f8f8;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
+        margin-bottom: var(--spacing-sm);
     }
 
     .admin-overlay {
@@ -261,11 +245,11 @@
         width: 100%;
         height: 100%;
         z-index: 2100;
-        background: rgba(255, 255, 255, 0.95);
+        background: var(--overlay-light);
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 20px;
+        padding: var(--spacing-lg);
         overflow-y: auto;
     }
 </style>

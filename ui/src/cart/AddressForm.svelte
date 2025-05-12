@@ -194,37 +194,39 @@
 
 <style>
     .address-form {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        padding: 24px;
+        background: var(--background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-medium);
+        padding: var(--spacing-xl);
         max-width: 500px;
         margin: 0 auto;
     }
 
     h2 {
         margin-top: 0;
-        margin-bottom: 24px;
-        font-size: 20px;
+        margin-bottom: var(--spacing-xl);
+        font-size: var(--spacing-lg);
         text-align: center;
+        color: var(--text-primary);
     }
 
     .validation-error {
-        background-color: #ffebee;
-        color: #c62828;
-        padding: 12px;
-        border-radius: 4px;
-        margin-bottom: 16px;
-        font-size: 14px;
+        background-color: rgba(211, 47, 47, 0.1);
+        color: var(--error);
+        padding: var(--spacing-sm);
+        border-radius: var(--btn-border-radius);
+        margin-bottom: var(--spacing-md);
+        font-size: var(--font-size-sm);
+        border-left: 3px solid var(--error);
     }
 
     .form-group {
-        margin-bottom: 16px;
+        margin-bottom: var(--spacing-md);
     }
 
     .form-row {
         display: flex;
-        gap: 16px;
+        gap: var(--spacing-md);
     }
 
     .form-row .form-group {
@@ -234,30 +236,34 @@
     label {
         display: block;
         margin-bottom: 4px;
-        font-size: 14px;
-        font-weight: 500;
-        color: #333;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
     }
 
     input,
     select {
         width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        font-size: 16px;
+        padding: var(--spacing-sm) var(--spacing-sm);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--font-size-md);
+        background: var(--background);
+        color: var(--text-primary);
+        transition: var(--btn-transition);
+        box-sizing: border-box;
     }
 
     input:focus,
     select:focus {
-        border-color: rgb(61, 61, 61);
+        border-color: var(--primary);
         outline: none;
-        box-shadow: 0 0 0 2px rgba(26, 139, 81, 0.2);
+        box-shadow: 0 0 0 2px rgba(86, 98, 189, 0.2);
     }
 
     .state-zip-group {
         display: flex;
-        gap: 12px;
+        gap: var(--spacing-sm);
     }
 
     .state-group {
@@ -283,47 +289,62 @@
 
     .checkbox-group input {
         width: auto;
-        margin-right: 8px;
+        margin-right: var(--spacing-xs);
     }
 
     .form-actions {
         display: flex;
         justify-content: flex-end;
-        gap: 12px;
-        margin-top: 24px;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-xl);
     }
 
     button {
-        padding: 10px 18px;
-        border-radius: 4px;
-        font-size: 16px;
-        font-weight: 500;
+        padding: var(--btn-padding-md);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--btn-font-size-md);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: var(--btn-transition);
+        height: var(--btn-height-md);
     }
 
     .submit-btn {
-        background-color: rgb(61, 61, 61);
-        color: white;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: var(--button-text);
         border: none;
+        box-shadow: var(--shadow-button);
     }
 
     .submit-btn:hover:not(:disabled) {
-        background: rgb(98, 98, 98);
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
     }
 
     .cancel-btn {
-        background: white;
-        color: #333;
-        border: 1px solid #e0e0e0;
+        background: var(--surface);
+        color: var(--text-primary);
+        border: var(--border-width-thin) solid var(--border);
     }
 
     .cancel-btn:hover:not(:disabled) {
-        background: #f5f5f5;
+        background: var(--background);
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-subtle);
     }
 
     button:disabled {
         opacity: 0.7;
         cursor: not-allowed;
+        background: var(--surface);
+        color: var(--text-secondary);
+        border: var(--border-width-thin) solid var(--border);
+        box-shadow: none;
+        transform: none;
     }
 </style>

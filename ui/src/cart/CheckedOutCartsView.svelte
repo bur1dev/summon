@@ -1,8 +1,9 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import { ShoppingCart, ArrowLeft, MapPin, Clock } from "lucide-svelte";
+  import { ShoppingCart, ArrowLeft, MapPin, Clock, X } from "lucide-svelte";
   import { writable, type Writable } from "svelte/store";
   import { AddressService } from "./AddressService";
+  import { currentViewStore } from "../UiStateStore";
 
   // Import agent-avatar component
   import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
@@ -25,6 +26,7 @@
   let checkedOutCarts = [];
   let errorMessage = "";
   let addressCache = new Map();
+  let isClosing = false;
 
   onMount(async () => {
     try {
@@ -115,10 +117,26 @@
     if (!addressHash) return null;
     return addressCache.get(addressHash);
   }
+
+  // Go back to store view
+  function goBackToStore() {
+    isClosing = true;
+    setTimeout(() => {
+      $currentViewStore = "active";
+      isClosing = false;
+    }, 300); // Match animation duration
+  }
 </script>
 
-<div class="checkout-view">
+<div
+  class="checkout-view"
+  class:fade-out={isClosing}
+  class:fade-in={!isClosing}
+>
   <div class="fixed-header">
+    <button class="back-button" on:click={goBackToStore}>
+      <X size={24} />
+    </button>
     <h1>Checked Out Orders</h1>
     <p>View the status of your checked out orders</p>
   </div>
@@ -129,15 +147,15 @@
     {:else if errorMessage}
       <div class="error-message">{errorMessage}</div>
     {:else if checkedOutCarts.length === 0}
-      <div class="empty-state">
-        <ShoppingCart size={64} color="#cccccc" />
+      <div class="empty-state scale-in">
+        <ShoppingCart size={64} color="var(--border)" />
         <h2>No Checked Out Orders</h2>
         <p>Your checked out orders will appear here.</p>
       </div>
     {:else}
       <div class="carts-grid">
         {#each checkedOutCarts as item}
-          <div class="cart-card">
+          <div class="cart-card scale-in">
             <div class="cart-header">
               <div class="order-info">
                 {#if item.total}
@@ -268,36 +286,75 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 60px);
+    height: 100%;
     overflow: hidden;
     padding: 0;
   }
 
+  .checkout-view.fade-in {
+    animation: fadeIn var(--transition-normal) ease forwards;
+  }
+
+  .checkout-view.fade-out {
+    animation: fadeOut var(--transition-normal) ease forwards;
+  }
+
   .fixed-header {
-    padding: 10px;
+    padding: var(--spacing-md);
     text-align: center;
-    background: white;
-    z-index: 10;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    z-index: var(--z-index-sticky);
+    box-shadow: var(--shadow-medium);
+    border-radius: var(--card-border-radius);
+    border-bottom: none;
+    position: relative;
   }
 
   .fixed-header h1 {
-    font-size: 24px;
-    margin-bottom: 0px;
-    color: #333;
+    font-size: var(--spacing-xl);
+    margin-bottom: 0;
+    color: var(--button-text);
   }
 
   .fixed-header p {
-    color: #666;
+    color: rgba(255, 255, 255, 0.9);
     margin: 0;
-    font-size: 15px;
+    font-size: var(--font-size-md);
+  }
+
+  .back-button {
+    position: absolute;
+    right: var(--spacing-md); /* Changed 'left' to 'right' */
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--btn-icon-size);
+    height: var(--btn-icon-size);
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: var(--btn-transition);
+  }
+
+  .back-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-50%) scale(var(--hover-scale));
+  }
+
+  :global(.back-button svg) {
+    color: var(--button-text);
+    stroke: var(--button-text);
   }
 
   .scrollable-content {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: var(--spacing-lg);
     height: 100%;
+    background-color: var(--surface);
   }
 
   .empty-state {
@@ -305,15 +362,24 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 60px 0;
+    padding: var(--spacing-xxxl) 0;
     text-align: center;
-    color: #666;
+    color: var(--text-secondary);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--shadow-subtle);
+    margin: var(--spacing-lg) auto;
+    max-width: 500px;
+    padding: var(--spacing-xxxl) var(--spacing-lg);
+  }
+
+  .scale-in {
+    animation: scaleIn var(--transition-normal) ease forwards;
   }
 
   .empty-state h2 {
-    margin: 20px 0 10px;
-    font-size: 20px;
-    color: #333;
+    margin: var(--spacing-lg) 0 var(--spacing-sm);
+    font-size: var(--spacing-lg);
+    color: var(--text-primary);
   }
 
   .empty-state p {
@@ -321,37 +387,48 @@
   }
 
   .error-message {
-    margin: 20px;
-    padding: 15px;
-    background-color: #ffebee;
-    color: #c62828;
-    border-radius: 4px;
-    font-size: 14px;
+    margin: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background-color: rgba(211, 47, 47, 0.1);
+    color: var(--error);
+    border-radius: var(--card-border-radius);
+    font-size: var(--font-size-sm);
     text-align: center;
+    border-left: 3px solid var(--error);
   }
 
   .carts-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: 24px;
-    padding-bottom: 40px;
+    gap: var(--spacing-xl);
+    padding-bottom: var(--spacing-xl);
     max-width: 1400px;
     margin: 0 auto;
   }
 
   .cart-card {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    background: var(--background);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--shadow-medium);
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transition: var(--card-transition);
+  }
+
+  .cart-card:hover {
+    transform: translateY(var(--hover-lift));
+    box-shadow: var(--shadow-medium);
   }
 
   .cart-header {
-    padding: 16px;
-    border-bottom: 1px solid #f0f0f0;
-    background: #f9f9f9;
+    padding: var(--spacing-md);
+    border-bottom: var(--border-width-thin) solid var(--border);
+    background: linear-gradient(
+      135deg,
+      rgba(86, 98, 189, 0.1),
+      rgba(112, 70, 168, 0.1)
+    );
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -363,56 +440,69 @@
 
   .cart-header h2 {
     margin: 0;
-    font-size: 18px;
-    font-weight: 600;
+    font-size: var(--btn-font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
   }
 
   .cart-date {
-    font-size: 14px;
-    color: #666;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
     margin-top: 4px;
   }
 
   .cart-status {
-    font-size: 14px;
-    font-weight: 500;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     margin-top: 4px;
   }
 
   .agent-avatar-container {
-    margin-left: 16px;
+    margin-left: var(--spacing-md);
     padding: 2px;
     border-radius: 50%;
-    border: 2px solid #e0e0e0;
+    border: var(--border-width) solid var(--primary);
+    box-shadow: var(--shadow-subtle);
+    transition: var(--btn-transition);
+  }
+
+  .agent-avatar-container:hover {
+    transform: scale(var(--hover-scale));
+    box-shadow: var(--shadow-medium);
   }
 
   .status-processing {
-    color: #f57c00;
+    color: var(--warning);
   }
 
   .status-completed {
-    color: rgb(61, 61, 61);
+    color: var(--success);
   }
 
   .status-returned {
-    color: #666;
+    color: var(--text-secondary);
   }
 
   .delivery-details {
-    padding: 16px;
-    background-color: #f5f5f5;
-    border-bottom: 1px solid #e0e0e0;
+    padding: var(--spacing-md);
+    background-color: var(--surface);
+    border-bottom: var(--border-width-thin) solid var(--border);
   }
 
   .delivery-address,
   .delivery-time {
     display: flex;
-    margin-bottom: 12px;
+    margin-bottom: var(--spacing-sm);
   }
 
   .delivery-icon {
-    margin-right: 12px;
-    color: #666;
+    margin-right: var(--spacing-sm);
+    color: var(--primary);
+  }
+
+  :global(.delivery-icon svg) {
+    color: var(--primary);
+    stroke: var(--primary);
   }
 
   .delivery-content {
@@ -420,25 +510,30 @@
   }
 
   .delivery-label {
-    font-weight: 500;
+    font-weight: var(--font-weight-semibold);
     margin-bottom: 4px;
-    font-size: 14px;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
   }
 
   .address-line {
-    font-size: 14px;
-    color: #333;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
     line-height: 1.4;
   }
 
   .delivery-instructions {
-    margin-top: 12px;
-    font-size: 14px;
-    color: #555;
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    background-color: var(--surface);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--btn-border-radius);
+    border-left: var(--border-width) solid var(--primary);
   }
 
   .cart-items {
-    padding: 16px;
+    padding: var(--spacing-md);
     overflow-y: auto;
     max-height: 300px;
     flex: 1;
@@ -446,22 +541,25 @@
 
   .cart-product {
     display: flex;
-    padding: 10px 0;
-    border-bottom: 1px solid #f0f0f0;
+    padding: var(--spacing-sm) 0;
+    border-bottom: var(--border-width-thin) solid var(--border);
     align-items: center;
   }
 
   .product-image {
-    width: 50px;
-    height: 50px;
-    margin-right: 16px;
+    width: 70px;
+    height: 70px;
+    margin-right: var(--spacing-md);
     flex-shrink: 0;
+    overflow: hidden;
+    border-radius: var(--card-border-radius);
   }
 
   .product-image img {
     width: 100%;
     height: 100%;
     object-fit: contain;
+    object-position: top;
   }
 
   .product-details {
@@ -470,62 +568,73 @@
   }
 
   .product-name {
-    font-weight: 500;
+    font-weight: var(--font-weight-semibold);
     margin-bottom: 4px;
-    font-size: 15px;
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
   }
 
   .product-size {
-    color: #666;
-    font-size: 13px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
     margin-bottom: 2px;
   }
 
   .product-quantity {
-    font-size: 13px;
-    color: #666;
+    font-size: var(--font-size-sm);
+    color: var(--primary);
+    font-weight: var(--font-weight-semibold);
   }
 
   .product-price {
-    font-weight: 600;
-    font-size: 15px;
-    margin-left: 12px;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-md);
+    margin-left: var(--spacing-sm);
+    color: var(--text-primary);
   }
 
   .return-button {
-    margin: 16px;
-    padding: 10px 16px;
-    background: rgb(61, 61, 61);
+    margin: var(--spacing-md);
+    height: var(--btn-height-md);
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
     border: none;
-    color: white;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
+    color: var(--button-text);
+    border-radius: var(--btn-border-radius);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    transition: background-color 0.2s;
+    gap: var(--spacing-xs);
+    transition: var(--btn-transition);
+    box-shadow: var(--shadow-button);
   }
 
   .return-button:hover {
-    background: rgb(98, 98, 98);
+    background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
+    transform: translateY(var(--hover-lift));
+    box-shadow: var(--shadow-medium);
+  }
+
+  :global(.return-button svg) {
+    color: var(--button-text);
+    stroke: var(--button-text);
   }
 
   .loading {
     display: flex;
     justify-content: center;
-    padding: 40px;
-    font-size: 18px;
-    color: #666;
+    padding: var(--spacing-xl);
+    font-size: var(--btn-font-size-md);
+    color: var(--text-secondary);
   }
 
   .cart-pricing {
     display: flex;
-    font-size: 13px;
-    color: #666;
-    gap: 12px;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    gap: var(--spacing-sm);
     margin-top: 4px;
   }
 </style>

@@ -3,6 +3,7 @@ use hdk::prelude::*;
 
 mod address;
 mod cart;
+mod preference;
 
 // Input for adding product to cart (legacy)
 #[derive(Serialize, Deserialize, Debug)]
@@ -136,4 +137,37 @@ pub fn update_address(input: (ActionHash, Address)) -> ExternResult<ActionHash> 
 #[hdk_extern]
 pub fn delete_address(action_hash: ActionHash) -> ExternResult<ActionHash> {
     address::delete_address_impl(action_hash)
+}
+
+// NEW: Input for get_product_preference_by_product
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetPreferenceInput {
+    pub group_hash: ActionHash,
+    pub product_index: u32,
+}
+
+// Add these at the end of your file:
+#[hdk_extern]
+pub fn save_product_preference(preference: ProductPreference) -> ExternResult<ActionHash> {
+    preference::save_product_preference_impl(preference)
+}
+
+#[hdk_extern]
+pub fn get_product_preferences(_: ()) -> ExternResult<Vec<(ActionHash, ProductPreference)>> {
+    preference::get_product_preferences_impl()
+}
+
+#[hdk_extern]
+pub fn get_product_preference_by_product(input: GetPreferenceInput) -> ExternResult<Option<(ActionHash, ProductPreference)>> {
+    preference::get_product_preference_by_product_impl(input.group_hash, input.product_index)
+}
+
+#[hdk_extern]
+pub fn update_product_preference(input: (ActionHash, ProductPreference)) -> ExternResult<ActionHash> {
+    preference::update_product_preference_impl(input.0, input.1)
+}
+
+#[hdk_extern]
+pub fn delete_product_preference(action_hash: ActionHash) -> ExternResult<ActionHash> {
+    preference::delete_product_preference_impl(action_hash)
 }

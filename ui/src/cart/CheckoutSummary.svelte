@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
-    import { PencilLine } from "lucide-svelte";
+    import { PencilLine, Plus, Minus, X, Save } from "lucide-svelte";
     import type { Address } from "./AddressService";
     import type { DeliveryTimeSlot } from "./SimpleCartService";
 
@@ -13,10 +13,39 @@
     export let isCheckingOut = false;
     export let cartService = null;
 
-    // Calculate total with tax
-    $: itemsTotal = cartTotal;
-    $: estimatedTax = Math.round(itemsTotal * 0.0775 * 100) / 100; // 7.75% CA sales tax
-    $: subtotal = itemsTotal + estimatedTax;
+    // Calculate totals with tax - UPDATED with promo totals
+    $: {
+        // Calculate regular price total
+        let regularTotal = 0;
+        let promoTotal = 0;
+
+        cartItems.forEach((item) => {
+            const product = item.productDetails;
+            if (product) {
+                regularTotal += product.price * item.quantity;
+
+                // Use promo price if available, otherwise regular price
+                const priceToUse =
+                    product.promo_price && product.promo_price < product.price
+                        ? product.promo_price
+                        : product.price;
+                promoTotal += priceToUse * item.quantity;
+            }
+        });
+
+        itemsTotal = regularTotal;
+        itemsPromoTotal = promoTotal;
+        estimatedTax = Math.round(itemsPromoTotal * 0.0775 * 100) / 100; // 7.75% CA sales tax on promo prices
+        subtotal = itemsPromoTotal + estimatedTax;
+        totalSavings = regularTotal - promoTotal;
+    }
+
+    // UPDATED: Variables for price calculation
+    let itemsTotal = 0;
+    let itemsPromoTotal = 0;
+    let estimatedTax = 0;
+    let subtotal = 0;
+    let totalSavings = 0;
 
     // Track which items are being updated - using composite key for groupHash_productIndex
     let updatingProducts = new Map(); // Change from Set to Map to store timestamps
@@ -26,6 +55,11 @@
     let currentNote = "";
     let showNoteButtons = false;
     let noteChanged = false;
+
+    // New state for preference saving
+    let savePreference = false;
+    let existingPreference = null;
+    let loadingPreference = false;
 
     // To detect new cart items
     let previousCartItems = [...cartItems];
@@ -180,11 +214,36 @@
     }
 
     // Note editing functionality
-    function startEditingNote(item) {
+    async function startEditingNote(item) {
         editingNoteForItem = item;
         currentNote = item.note || "";
         showNoteButtons = false;
         noteChanged = false;
+
+        // Load existing preference data using the service
+        if (cartService) {
+            loadingPreference = true;
+            try {
+                const result = await cartService.getProductPreference(
+                    item.groupHash,
+                    item.productIndex,
+                );
+
+                if (result && result.success && result.data) {
+                    existingPreference = result.data;
+                    savePreference = true;
+                } else {
+                    existingPreference = null;
+                    savePreference = false;
+                }
+            } catch (error) {
+                console.error("Error loading product preference:", error);
+                existingPreference = null;
+                savePreference = false;
+            } finally {
+                loadingPreference = false;
+            }
+        }
     }
 
     function closeNoteEdit() {
@@ -192,6 +251,8 @@
         currentNote = "";
         showNoteButtons = false;
         noteChanged = false;
+        savePreference = false;
+        existingPreference = null;
     }
 
     function handleNoteInput() {
@@ -199,6 +260,7 @@
         noteChanged = currentNote !== (editingNoteForItem?.note || "");
     }
 
+    // Save note function with preference handling
     async function saveNote() {
         if (!editingNoteForItem) return;
 
@@ -221,6 +283,20 @@
                 cartItems[index].note = currentNote || undefined;
             }
 
+            // Save or delete preference based on toggle state using service
+            if (savePreference && currentNote && currentNote.trim()) {
+                await cartService.saveProductPreference({
+                    groupHash: editingNoteForItem.groupHash,
+                    productIndex: editingNoteForItem.productIndex,
+                    note: currentNote.trim(),
+                    is_default: true,
+                });
+            } else if (!savePreference && existingPreference) {
+                await cartService.deleteProductPreference(
+                    existingPreference.hash,
+                );
+            }
+
             closeNoteEdit();
         } catch (error) {
             console.error("Error saving note:", error);
@@ -229,6 +305,15 @@
 
     function cancelNote() {
         closeNoteEdit();
+    }
+
+    // Toggle preference saving based on checkbox
+    function handleSavePreferenceToggle(e) {
+        savePreference = e.target.checked;
+
+        // If toggle turned off and there's an existing preference, show delete button
+        showNoteButtons =
+            savePreference !== (existingPreference !== null) || noteChanged;
     }
 
     // Helper to determine display unit based on product type
@@ -307,37 +392,22 @@
                                 {/if}
                             </div>
 
-                            {#if editingNoteForItem && editingNoteForItem.groupHash === item.groupHash && editingNoteForItem.productIndex === item.productIndex}
-                                <div class="note-edit-section">
+                            <div class="content-container">
+                                <div
+                                    class="note-edit-section"
+                                    class:active={editingNoteForItem &&
+                                        editingNoteForItem.groupHash ===
+                                            item.groupHash &&
+                                        editingNoteForItem.productIndex ===
+                                            item.productIndex}
+                                >
                                     <div class="note-header">
                                         <h4>Your preferences</h4>
                                         <button
                                             class="close-note-button"
                                             on:click={cancelNote}
                                         >
-                                            <svg
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                            >
-                                                <line
-                                                    x1="18"
-                                                    y1="6"
-                                                    x2="6"
-                                                    y2="18"
-                                                ></line>
-                                                <line
-                                                    x1="6"
-                                                    y1="6"
-                                                    x2="18"
-                                                    y2="18"
-                                                ></line>
-                                            </svg>
+                                            <X size={20} />
                                         </button>
                                     </div>
                                     <p>Special instructions</p>
@@ -350,34 +420,65 @@
                                             : ''}"
                                         rows="3"
                                     ></textarea>
-                                    {#if showNoteButtons}
-                                        <div class="note-buttons">
-                                            <button
-                                                class="cancel-button"
-                                                on:click={cancelNote}
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                class="save-button"
-                                                on:click={saveNote}
-                                            >
-                                                Save instructions
-                                            </button>
-                                        </div>
-                                    {/if}
+
+                                    <!-- Preference toggle -->
+                                    <div class="save-preference-toggle">
+                                        <label class="toggle-container">
+                                            <input
+                                                type="checkbox"
+                                                bind:checked={savePreference}
+                                                on:change={handleSavePreferenceToggle}
+                                                disabled={loadingPreference}
+                                            />
+                                            <span class="toggle-text">
+                                                {#if loadingPreference}
+                                                    Loading...
+                                                {:else}
+                                                    Remember my preferences for
+                                                    next time
+                                                {/if}
+                                            </span>
+                                            {#if existingPreference}
+                                                <span class="saved-badge">
+                                                    <Save size={12} />
+                                                    Saved
+                                                </span>
+                                            {/if}
+                                        </label>
+                                    </div>
+
+                                    <div
+                                        class="note-buttons"
+                                        class:visible={showNoteButtons}
+                                    >
+                                        <button
+                                            class="cancel-button"
+                                            on:click={cancelNote}>Cancel</button
+                                        >
+                                        <button
+                                            class="save-button"
+                                            on:click={saveNote}
+                                            >Save instructions</button
+                                        >
+                                    </div>
                                 </div>
-                            {:else}
-                                <div class="item-content">
+
+                                <div
+                                    class="item-content"
+                                    class:hidden={editingNoteForItem &&
+                                        editingNoteForItem.groupHash ===
+                                            item.groupHash &&
+                                        editingNoteForItem.productIndex ===
+                                            item.productIndex}
+                                >
                                     <div class="item-left">
                                         <div class="item-name">
                                             {item.productDetails?.name ||
                                                 "Unknown Product"}
                                         </div>
+
+                                        <!-- UPDATED: Static price display -->
                                         <div class="item-quantity-price">
-                                            <span class="item-quantity"
-                                                >{item.quantity}×</span
-                                            >
                                             <span class="item-unit-price">
                                                 ${(
                                                     item.productDetails
@@ -388,7 +489,24 @@
                                                     ? "/lb"
                                                     : "each"}
                                             </span>
+                                            {#if item.productDetails?.promo_price && item.productDetails.promo_price < item.productDetails.price}
+                                                <span class="price-separator"
+                                                    >/</span
+                                                >
+                                                <span
+                                                    class="item-unit-price promo-price"
+                                                >
+                                                    ${item.productDetails.promo_price.toFixed(
+                                                        2,
+                                                    )}
+                                                    {item.productDetails
+                                                        ?.sold_by === "WEIGHT"
+                                                        ? "/lb"
+                                                        : "each"}
+                                                </span>
+                                            {/if}
                                         </div>
+
                                         {#if item.note}
                                             <div class="item-note">
                                                 Shopper note: {item.note}
@@ -411,7 +529,7 @@
                                         {#if cartService}
                                             <div class="quantity-control">
                                                 <button
-                                                    class="quantity-btn remove-btn"
+                                                    class="quantity-btn minus-btn"
                                                     on:click|stopPropagation={() =>
                                                         handleDecrementItem(
                                                             item,
@@ -421,7 +539,7 @@
                                                         item.productIndex,
                                                     )}
                                                 >
-                                                    -
+                                                    <Minus size={14} />
                                                 </button>
                                                 <span class="quantity-display">
                                                     {isUpdating(
@@ -433,7 +551,7 @@
                                                     {getDisplayUnit(item)}
                                                 </span>
                                                 <button
-                                                    class="quantity-btn add-btn"
+                                                    class="quantity-btn plus-btn"
                                                     on:click|stopPropagation={() =>
                                                         handleIncrementItem(
                                                             item,
@@ -443,16 +561,55 @@
                                                         item.productIndex,
                                                     )}
                                                 >
-                                                    +
+                                                    <Plus size={14} />
                                                 </button>
                                             </div>
                                         {/if}
+
+                                        <!-- UPDATED: Accumulated totals with savings -->
                                         <div class="item-price">
-                                            ${(
-                                                (item.productDetails?.price ||
-                                                    0) * item.quantity
-                                            ).toFixed(2)}
+                                            {#if item.productDetails}
+                                                {@const regularTotal =
+                                                    item.productDetails.price *
+                                                    item.quantity}
+                                                {@const hasPromo =
+                                                    item.productDetails
+                                                        .promo_price &&
+                                                    item.productDetails
+                                                        .promo_price <
+                                                        item.productDetails
+                                                            .price}
+                                                {@const promoTotal = hasPromo
+                                                    ? item.productDetails
+                                                          .promo_price *
+                                                      item.quantity
+                                                    : regularTotal}
+                                                {@const savings =
+                                                    regularTotal - promoTotal}
+
+                                                <span class="price-amount"
+                                                    >${regularTotal.toFixed(
+                                                        2,
+                                                    )}</span
+                                                >
+                                                {#if hasPromo}
+                                                    <span class="promo-amount"
+                                                        >${promoTotal.toFixed(
+                                                            2,
+                                                        )}</span
+                                                    >
+                                                    {#if savings > 0}
+                                                        <span
+                                                            class="item-savings"
+                                                            >You save ${savings.toFixed(
+                                                                2,
+                                                            )}</span
+                                                        >
+                                                    {/if}
+                                                {/if}
+                                            {/if}
                                         </div>
+
                                         {#if cartService}
                                             <button
                                                 class="remove-item"
@@ -471,18 +628,35 @@
                                         {/if}
                                     </div>
                                 </div>
-                            {/if}
+                            </div>
                         </div>
                     {/each}
                 </div>
             </div>
         </div>
 
+        <!-- UPDATED: Price summary section -->
         <div class="price-summary">
             <div class="price-row">
                 <div class="price-label">Items Subtotal</div>
                 <div class="price-value">${itemsTotal.toFixed(2)}</div>
             </div>
+
+            {#if totalSavings > 0}
+                <div class="price-row savings-row">
+                    <div class="price-label">Loyalty Card Savings</div>
+                    <div class="price-value savings-value">
+                        -${totalSavings.toFixed(2)}
+                    </div>
+                </div>
+
+                <div class="price-row promo-subtotal-row">
+                    <div class="price-label">Subtotal with Savings</div>
+                    <div class="price-value promo-value">
+                        ${itemsPromoTotal.toFixed(2)}
+                    </div>
+                </div>
+            {/if}
 
             <div class="price-row">
                 <div class="price-label">Estimated Tax</div>
@@ -513,68 +687,86 @@
 
 <style>
     .checkout-summary {
-        background: white;
-        border-radius: 8px;
+        background: var(--background);
+        border-radius: var(--card-border-radius);
         width: 100%;
+        box-shadow: var(--shadow-subtle);
     }
 
     .checkout-summary-header {
-        padding: 16px;
-        border-bottom: 1px solid #f0f0f0;
+        height: var(--component-header-height); /* Explicit height */
+        box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        padding: 0 var(--spacing-md); /* Adjust padding, left/right as needed */
+        background: var(
+            --background
+        ); /* Changed from gradient to standard background */
+        border-bottom: var(--border-width-thin) solid var(--border); /* Ensure bottom border is applied */
+        border-radius: var(--card-border-radius) var(--card-border-radius) 0 0;
+        display: flex; /* To allow vertical alignment */
+        align-items: center; /* Vertically center content */
     }
 
     .checkout-summary-header h2 {
         margin: 0;
-        font-size: 20px;
-        font-weight: 600;
+        font-size: var(--spacing-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(
+            --text-primary
+        ); /* Changed to standard text color for light background */
     }
 
     .summary-content {
-        padding: 16px;
+        padding: var(--spacing-md);
     }
 
     .summary-sections {
         display: flex;
         flex-direction: column;
-        gap: 24px;
-        margin-bottom: 24px;
+        gap: var(--spacing-xl);
+        margin-bottom: var(--spacing-xl);
     }
 
     .summary-section {
-        border-bottom: 1px solid #f0f0f0;
-        padding-bottom: 16px;
+        border-bottom: var(--border-width-thin) solid var(--border);
+        padding-bottom: var(--spacing-md);
     }
 
     .section-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
+        margin-bottom: var(--spacing-sm);
     }
 
     .section-header h3 {
         margin: 0;
-        font-size: 16px;
-        font-weight: 600;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
     }
 
     .edit-button {
-        background: transparent;
-        border: none;
-        color: rgb(61, 61, 61);
-        font-size: 14px;
+        background: var(--surface);
+        border: var(--border-width-thin) solid var(--border);
+        color: var(--primary);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
-        padding: 4px 8px;
+        padding: 4px var(--spacing-sm);
+        border-radius: var(--btn-border-radius);
+        transition: var(--btn-transition);
     }
 
     .edit-button:hover {
-        text-decoration: underline;
+        border-color: var(--primary);
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-subtle);
     }
 
     .address-details,
     .time-details {
-        font-size: 14px;
-        color: #333;
+        font-size: var(--font-size-sm);
+        color: var(--text-primary);
         line-height: 1.5;
     }
 
@@ -583,47 +775,55 @@
     }
 
     .delivery-instructions {
-        margin-top: 8px;
-        font-size: 13px;
-        color: #555;
-        font-style: italic;
+        margin-top: var(--spacing-xs);
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        background-color: var(--surface);
+        padding: var(--spacing-xs) var(--spacing-sm);
+        border-radius: var(--btn-border-radius);
+        border-left: var(--border-width) solid var(--primary);
     }
 
     .instructions-label {
-        font-weight: 500;
+        font-weight: var(--font-weight-semibold);
         margin-right: 4px;
+        color: var(--primary);
     }
 
     .time-date {
-        font-weight: 500;
+        font-weight: var(--font-weight-semibold);
         margin-bottom: 4px;
     }
 
     .order-items {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--spacing-xs);
     }
 
     .order-item {
         display: flex;
-        padding: 10px 0;
+        padding: var(--spacing-sm) 0;
         align-items: flex-start;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: var(--border-width-thin) solid var(--border);
     }
 
     .item-image {
-        width: 50px;
-        height: 50px;
-        margin-right: 12px;
+        width: 70px;
+        height: 70px;
+        margin-right: var(--spacing-sm);
         flex-shrink: 0;
+        border-radius: var(--card-border-radius);
     }
 
     .item-image img {
         width: 100%;
         height: 100%;
         object-fit: contain;
-        border-radius: 4px;
+        border-radius: var(--btn-border-radius);
+        background-color: var(--surface);
+        padding: 4px;
+        border-radius: var(--card-border-radius);
     }
 
     .item-content {
@@ -635,30 +835,44 @@
 
     .item-left {
         flex: 0 1 auto;
-        margin-right: 20px;
+        margin-right: var(--spacing-lg);
         width: calc(100% - 140px);
         overflow: hidden;
     }
 
     .item-name {
-        font-weight: 500;
+        font-weight: var(--font-weight-semibold);
         margin-bottom: 4px;
+        color: var(--text-primary);
     }
 
+    /* UPDATED: Static price display styling */
     .item-quantity-price {
         display: flex;
-        font-size: 13px;
-        color: #666;
-        gap: 8px;
+        font-size: var(--font-size-sm);
+        gap: var(--spacing-xs);
+        align-items: center;
+        margin-bottom: 4px;
+        color: var(--text-secondary);
     }
 
-    .item-quantity {
-        color: #555;
+    .item-unit-price {
+        color: var(--text-secondary);
+    }
+
+    .price-separator {
+        margin: 0 4px;
+        color: var(--text-secondary);
+    }
+
+    .promo-price {
+        color: var(--primary);
+        font-weight: var(--font-weight-semibold);
     }
 
     .item-note {
-        font-size: 13px;
-        color: #666;
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
         margin-top: 4px;
         margin-bottom: 4px;
         max-width: 100%;
@@ -667,6 +881,10 @@
         display: block;
         overflow: hidden;
         text-overflow: ellipsis;
+        background-color: var(--surface);
+        padding: 4px var(--spacing-xs);
+        border-radius: 4px;
+        border-left: var(--border-width) solid var(--primary);
     }
 
     .item-right {
@@ -678,46 +896,94 @@
         flex: 0 0 120px;
     }
 
+    /* UPDATED: Accumulated price styling */
     .item-price {
-        font-weight: 600;
-        font-size: 15px;
         text-align: right;
+    }
+
+    .price-amount {
+        font-weight: var(--font-weight-semibold);
+        font-size: var(--font-size-md);
+        text-align: right;
+        color: var(--text-primary);
+        display: block;
+    }
+
+    .promo-amount {
+        font-size: var(--font-size-sm);
+        color: var(--primary);
+        font-weight: var(--font-weight-semibold);
+        display: block;
+    }
+
+    .item-savings {
+        font-size: var(--font-size-sm);
+        color: var(--success);
+        font-weight: var(--font-weight-semibold);
+        display: block;
     }
 
     .remove-item {
         background: transparent;
         border: none;
-        color: #666;
+        color: var(--error);
         cursor: pointer;
-        font-size: 14px;
-        padding: 0;
-        text-decoration: underline;
+        font-size: var(--font-size-sm);
+        padding: 4px var(--spacing-xs);
+        border-radius: var(--btn-border-radius);
+        transition: var(--btn-transition);
     }
 
     .remove-item:hover {
-        color: #333;
+        background-color: rgba(211, 47, 47, 0.1);
+        text-decoration: underline;
     }
 
+    /* UPDATED: Price summary styling */
     .price-summary {
-        background-color: #f9f9f9;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 24px;
+        background-color: var(--surface);
+        border-radius: var(--card-border-radius);
+        padding: var(--spacing-md);
+        margin-bottom: var(--spacing-xl);
+        box-shadow: var(--shadow-subtle);
     }
 
     .price-row {
         display: flex;
         justify-content: space-between;
-        padding: 8px 0;
-        font-size: 14px;
+        padding: var(--spacing-xs) 0;
+        font-size: var(--font-size-sm);
+        color: var(--text-primary);
+    }
+
+    .savings-row {
+        color: var(--success);
+    }
+
+    .savings-value {
+        color: var(--success);
+        font-weight: var(--font-weight-semibold);
+    }
+
+    .promo-subtotal-row {
+        border-top: var(--border-width-thin) solid var(--border);
+        border-bottom: var(--border-width-thin) solid var(--border);
+        margin: var(--spacing-xs) 0;
+        padding: var(--spacing-sm) 0;
+    }
+
+    .promo-value {
+        color: var(--primary);
+        font-weight: var(--font-weight-semibold);
     }
 
     .total-row {
-        border-top: 1px solid #e0e0e0;
-        margin-top: 8px;
-        padding-top: 12px;
-        font-weight: 600;
-        font-size: 16px;
+        border-top: var(--border-width-thin) solid var(--border);
+        margin-top: var(--spacing-xs);
+        padding-top: var(--spacing-sm);
+        font-weight: var(--font-weight-semibold);
+        font-size: var(--font-size-md);
+        color: var(--text-primary);
     }
 
     .checkout-actions {
@@ -728,167 +994,340 @@
 
     .place-order-btn {
         width: 100%;
-        padding: 14px;
-        background: rgb(61, 61, 61);
+        height: var(--btn-height-lg);
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
         border: none;
-        color: white;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
+        color: var(--button-text);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--btn-font-size-md);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         text-align: center;
-        transition: background-color 0.2s;
+        transition: var(--btn-transition);
+        box-shadow: var(--shadow-button);
     }
 
     .place-order-btn:hover:not(:disabled) {
-        background-color: rgb(98, 98, 98);
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
     }
 
     .place-order-btn:disabled {
         opacity: 0.7;
         cursor: not-allowed;
+        background: var(--surface);
+        color: var(--text-secondary);
+        border: var(--border-width-thin) solid var(--border);
+        box-shadow: none;
     }
 
+    /* Use the same quantity control style as ProductCartItem */
     .quantity-control {
+        width: 140px;
+        height: var(--btn-height-sm);
+        border-radius: 30px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
         display: flex;
-        align-items: center;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
+        justify-content: space-between;
+        padding: 0;
         overflow: hidden;
-        height: 36px;
+        border: none;
+        box-shadow: var(--shadow-button);
     }
 
     .quantity-btn {
-        width: 36px;
-        height: 36px;
-        background: white;
+        width: var(--btn-height-sm);
+        height: var(--btn-height-sm);
         border: none;
-        font-size: 18px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: var(--btn-transition);
+        background-color: rgba(0, 0, 0, 0.15);
+        border-radius: 50%;
+    }
+
+    .quantity-btn.minus-btn {
+        margin-right: -5px;
+    }
+
+    .quantity-btn.plus-btn {
+        margin-left: -5px;
     }
 
     .quantity-btn:hover {
-        background: #f5f5f5;
+        background-color: rgba(0, 0, 0, 0.3);
+        transform: scale(var(--hover-scale-subtle));
+    }
+
+    :global(.quantity-btn svg) {
+        color: var(--button-text);
+        stroke: var(--button-text);
+    }
+
+    .quantity-btn:disabled {
+        background-color: rgba(0, 0, 0, 0.1);
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    :global(.quantity-btn:disabled svg) {
+        color: var(--button-text);
+        opacity: 0.5;
+        stroke: var(--button-text);
     }
 
     .quantity-display {
-        min-width: 40px;
+        min-width: 60px;
         text-align: center;
-        font-size: 14px;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
+        color: var(--button-text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        padding: 0 var(--spacing-xs);
     }
 
     .instructions-link {
         background: transparent;
         border: none;
-        color: rgb(61, 61, 61);
-        font-size: 13px;
+        color: var(--primary);
+        font-size: var(--font-size-sm);
         cursor: pointer;
-        padding: 0;
+        padding: 4px var(--spacing-xs);
         display: flex;
         align-items: center;
         gap: 4px;
         margin-top: 4px;
+        border-radius: var(--btn-border-radius);
+        transition: var(--btn-transition);
     }
 
     .instructions-link:hover {
-        text-decoration: underline;
+        background-color: var(--surface);
+        transform: translateY(var(--hover-lift));
     }
 
     .note-edit-section {
         flex: 1;
-        background: #f7f7f7;
-        border-radius: 8px;
-        padding: 16px;
+        background: var(--surface);
+        border-radius: var(--card-border-radius);
+        padding: var(--spacing-md);
+        box-shadow: var(--shadow-subtle);
+        box-sizing: border-box;
     }
 
     .note-edit-section h4 {
-        font-size: 18px;
-        font-weight: 600;
-        margin: 0 0 8px 0;
+        font-size: var(--btn-font-size-lg);
+        font-weight: var(--font-weight-semibold);
+        margin: 0 0 var(--spacing-xs) 0;
+        color: var(--text-primary);
     }
 
     .note-edit-section p {
-        font-size: 14px;
-        margin: 0 0 8px 0;
+        font-size: var(--font-size-sm);
+        margin: 0 0 var(--spacing-xs) 0;
+        color: var(--text-secondary);
     }
 
     .note-input {
         width: 100%;
         min-height: 80px;
-        padding: 12px;
-        border: 1px solid #c0c0c0;
-        border-radius: 12px;
-        font-size: 14px;
-        background: #ffffff;
+        padding: var(--spacing-sm);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--font-size-sm);
+        background: var(--background);
         resize: vertical;
         line-height: 1.4;
+        transition: var(--btn-transition);
+        box-sizing: border-box;
+        max-width: 100%;
     }
 
     .note-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: var(--spacing-xs);
     }
 
     .close-note-button {
-        background: transparent;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
         border: none;
         cursor: pointer;
-        color: #666;
-        padding: 4px;
+        width: var(--btn-height-sm);
+        height: var(--btn-height-sm);
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%;
+        transition: var(--btn-transition);
+        box-shadow: var(--shadow-button);
     }
 
     .close-note-button:hover {
-        background: #e0e0e0;
+        transform: scale(var(--hover-scale));
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
+        box-shadow: var(--shadow-medium);
+    }
+
+    :global(.close-note-button svg) {
+        color: var(--button-text);
+        stroke: var(--button-text);
     }
 
     .note-input:focus {
         outline: none;
-        border-color: #3f8ae0;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(86, 98, 189, 0.2);
     }
 
     .note-input.active {
-        border-color: #3f8ae0;
+        border-color: var(--primary);
     }
 
     .note-input::placeholder {
-        color: #999;
+        color: var(--text-secondary);
     }
 
     .note-buttons {
         display: flex;
-        gap: 12px;
+        gap: var(--spacing-sm);
         justify-content: center;
-        margin-top: 16px;
+        opacity: 0;
+        max-height: 0;
+        overflow: hidden;
+        margin-top: 0;
+        transition:
+            opacity 0.3s ease,
+            max-height 0.3s ease,
+            margin-top 0.3s ease;
+    }
+
+    .note-buttons.visible {
+        opacity: 1;
+        max-height: 50px;
+        margin-top: var(--spacing-md);
+    }
+
+    .content-container {
+        position: relative;
+        flex: 1;
+        display: flex;
+    }
+
+    .note-edit-section,
+    .item-content {
+        position: absolute;
+        width: 100%;
+        opacity: 0;
+        visibility: hidden;
+        transition:
+            opacity 0.3s ease,
+            visibility 0.3s ease;
+    }
+
+    .note-edit-section.active,
+    .item-content:not(.hidden) {
+        position: relative;
+        opacity: 1;
+        visibility: visible;
     }
 
     .cancel-button,
     .save-button {
-        padding: 10px 20px;
-        border-radius: 30px;
-        font-size: 14px;
-        font-weight: 600;
+        padding: var(--spacing-sm) var(--spacing-lg);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         min-width: 120px;
+        transition: var(--btn-transition);
+        height: var(--btn-height-md);
     }
 
     .cancel-button {
-        background: #e0e0e0;
-        border: none;
-        color: #343538;
+        background: var(--surface);
+        border: var(--border-width-thin) solid var(--border);
+        color: var(--text-primary);
+    }
+
+    .cancel-button:hover {
+        background: var(--background);
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-subtle);
     }
 
     .save-button {
-        background: rgb(61, 61, 61);
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
         border: none;
+        color: var(--button-text);
+        box-shadow: var(--shadow-button);
+    }
+
+    .save-button:hover {
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
+    }
+
+    /* New styles for save preference toggle */
+    .save-preference-toggle {
+        margin-top: var(--spacing-md);
+    }
+
+    .toggle-container {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .toggle-container input {
+        margin-right: var(--spacing-sm);
+        accent-color: var(--primary);
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+    }
+
+    .toggle-text {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+    }
+
+    .saved-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background-color: var(--success);
         color: white;
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: var(--spacing-sm);
+        font-weight: var(--font-weight-semibold);
+    }
+
+    :global(.saved-badge svg) {
+        color: white;
+        stroke: white;
     }
 </style>

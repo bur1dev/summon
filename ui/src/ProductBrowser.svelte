@@ -180,9 +180,6 @@
         startIndex: number,
         capacity: number,
     ) {
-        const isProductType =
-            selectedProductType !== "All" && selectedSubcategory;
-
         // For home view, parse the identifier to get category and subcategory
         let category = selectedCategory;
         let subcategory = selectedSubcategory;
@@ -191,19 +188,40 @@
             const parts = identifier.split("_");
             category = parts[0];
             subcategory = parts[1];
+            console.log(
+                `Home view: Using category=${category}, subcategory=${subcategory}`,
+            );
+        } else if (!isHomeView && !selectedSubcategory) {
+            // When in main category view, the identifier is the subcategory name
+            subcategory = identifier;
+            console.log(
+                `Main category view: Using identifier "${identifier}" as subcategory`,
+            );
         }
 
         try {
-            // Determine if this is a subcategory or product type row
+            // First check if we're in subcategory view with product type rows
+            const isInSubcategoryView = selectedCategory && selectedSubcategory;
+
+            // Check if this identifier is a product type for the current subcategory
             const isProductTypeRow =
-                isProductType &&
-                mainCategories
+                isInSubcategoryView &&
+                (mainCategories
                     .find((c) => c.name === category)
                     ?.subcategories.find((s) => s.name === subcategory)
-                    ?.productTypes?.includes(identifier);
+                    ?.productTypes?.includes(identifier) ??
+                    false);
+
+            console.log(
+                `Checking row type for ${identifier}: isInSubcategoryView=${isInSubcategoryView}, isProductTypeRow=${isProductTypeRow}`,
+            );
 
             let result;
             if (isProductTypeRow) {
+                // This is a product type row - use the identifier as the product type
+                console.log(
+                    `Loading product type products for ${category}/${subcategory}/${identifier}`,
+                );
                 result = await productDataService.loadProductTypeProducts(
                     category,
                     subcategory,
@@ -212,6 +230,10 @@
                     capacity,
                 );
             } else {
+                // This is a subcategory row
+                console.log(
+                    `Loading subcategory products for ${category}/${subcategory}`,
+                );
                 result = await productDataService.loadSubcategoryProducts(
                     category,
                     subcategory,
@@ -525,7 +547,6 @@
                 end: initialProducts.length,
             };
             categoryProducts[identifier] = initialProducts;
-            totalProducts[identifier] = result.total;
             hasMore[identifier] =
                 result.hasMore || result.products.length > capacity;
             rowCapacities[identifier] = capacity;
@@ -548,7 +569,6 @@
                 end: initialProducts.length,
             };
             categoryProducts[identifier] = initialProducts;
-            totalProducts[identifier] = result.total;
             hasMore[identifier] =
                 result.hasMore || result.products.length > capacity;
             rowCapacities[identifier] = capacity;
@@ -571,7 +591,6 @@
                 end: initialProducts.length,
             };
             categoryProducts[identifier] = initialProducts;
-            totalProducts[identifier] = result.total;
             hasMore[identifier] =
                 result.hasMore || result.products.length > capacity;
             rowCapacities[identifier] = capacity;
@@ -644,8 +663,16 @@
             end: newStart + products.length,
         };
 
-        // Update the total product count for this row's path
-        totalProducts[identifier] = total;
+        // totalProducts[identifier] is primarily set by handleBoundariesInitialized.
+        // This ensures that if it wasn't set (e.g., for a very fast first load of a single product type
+        // where dataLoaded might arrive before boundariesInitialized fully processed in parent),
+        // it gets an initial value. 'total' from dataLoaded is NavigationArrows' current grand total prop.
+        if (
+            totalProducts[identifier] === undefined &&
+            typeof total === "number"
+        ) {
+            totalProducts[identifier] = total;
+        }
 
         // Update hasMore value
         hasMore[identifier] = newHasMore;
@@ -662,6 +689,19 @@
 
     function handleReportCategory(event) {
         dispatch("reportCategory", event.detail);
+    }
+
+    function handleBoundariesInitialized(event) {
+        const { identifier: id, grandTotal } = event.detail;
+        if (id && typeof grandTotal === "number") {
+            if (totalProducts[id] !== grandTotal) {
+                console.log(
+                    `ProductBrowser: Grand total for ${id} initialized/updated to ${grandTotal} by boundariesInitialized event.`,
+                );
+                totalProducts[id] = grandTotal;
+                totalProducts = { ...totalProducts };
+            }
+        }
     }
 
     // Get subcategory name for display from identifier
@@ -708,6 +748,7 @@
                             subcategory: rowSubcategory,
                         })}
                     on:dataLoaded={handleDataLoaded}
+                    on:boundariesInitialized={handleBoundariesInitialized}
                     on:reportCategory={handleReportCategory}
                 />
             {/if}
@@ -739,6 +780,7 @@
                             subcategory: identifier,
                         })}
                     on:dataLoaded={handleDataLoaded}
+                    on:boundariesInitialized={handleBoundariesInitialized}
                     on:reportCategory={handleReportCategory}
                 />
             {/if}
@@ -796,6 +838,7 @@
                                 productType: identifier,
                             })}
                         on:dataLoaded={handleDataLoaded}
+                        on:boundariesInitialized={handleBoundariesInitialized}
                         on:reportCategory={handleReportCategory}
                     />
                 {/if}
@@ -808,10 +851,8 @@
     .product-browser {
         display: flex;
         flex-direction: column;
-        gap: 30px;
+        gap: var(--section-spacing);
         overflow: visible;
-        padding: 0;
-        width: 100%;
         background-color: white;
     }
 </style>

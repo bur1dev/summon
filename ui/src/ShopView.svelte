@@ -3,9 +3,7 @@
   import type { ShopStore } from "./store";
   import ProductCard from "./ProductCard.svelte";
   import { onMount, onDestroy } from "svelte";
-  import CategorySidebar from "./CategorySidebar.svelte";
   import { mainCategories } from "./categoryData";
-  import SlideOutCart from "./cart/SlideOutCart.svelte";
   import SearchResults from "./search/SearchResults.svelte";
   import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
   import { ProductDataService } from "./ProductDataService";
@@ -47,7 +45,10 @@
   // Only keep standAlone param
   export let standAlone = false;
 
-  let scrollContainer;
+  // Export this function to be called from Controller
+  export function selectCategory(category, subcategory) {
+    handleCategorySelect({ detail: { category, subcategory } });
+  }
 
   // Sync with UI store when uiProps changes
   $: {
@@ -82,11 +83,12 @@
       $selectedProductTypeStore = "All";
     }
 
-    // Ensure scrollContainer exists before trying to set scrollTop
+    // Scroll to top using global scroll container
+    const scrollContainer = document.querySelector(".global-scroll-container");
     if (scrollContainer) {
       scrollContainer.scrollTop = 0;
     } else {
-      // Fallback or wait if container not ready
+      // Fallback
       window.scrollTo(0, 0);
     }
   }
@@ -126,113 +128,103 @@
 </script>
 
 <div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
-  {#if $currentViewStore === "active"}
-    <CategorySidebar on:categorySelect={handleCategorySelect} />
-  {/if}
   <div class="main-content">
-    {#if $currentViewStore === "active"}
-      <SlideOutCart
-        isOpen={$isCartOpenStore}
-        onClose={() => ($isCartOpenStore = false)}
-      />
-      <div class="scroll-container" bind:this={scrollContainer}>
-        {#if !$searchModeStore}
-          {#if !$isHomeViewStore && $selectedCategoryStore && $selectedSubcategoryStore}
-            {@const subcategory = mainCategories
-              .find((c) => c.name === $selectedCategoryStore)
-              ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)}
-            {#if subcategory?.productTypes && subcategory.productTypes.length > 1 && !subcategory.gridOnly}
-              <div class="product-type-nav">
-                <div class="product-type-container">
+    <div class="content-wrapper">
+      {#if !$searchModeStore}
+        {#if !$isHomeViewStore && $selectedCategoryStore && $selectedSubcategoryStore}
+          {@const subcategory = mainCategories
+            .find((c) => c.name === $selectedCategoryStore)
+            ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)}
+          {#if subcategory?.productTypes && subcategory.productTypes.length > 1 && !subcategory.gridOnly}
+            <div class="product-type-nav">
+              <div class="product-type-container">
+                <button
+                  class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
+                  'All'
+                    ? 'active'
+                    : ''}"
+                  on:click={() =>
+                    handleProductTypeSelect({
+                      detail: { productType: "All" },
+                    })}
+                >
+                  All
+                </button>
+                {#each mainCategories
+                  .find((c) => c.name === $selectedCategoryStore)
+                  ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)
+                  ?.productTypes?.filter((pt) => pt !== "All") ?? [] as productType}
                   <button
-                    class="product-type-btn {$selectedProductTypeStore === 'All'
+                    class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
+                    productType
                       ? 'active'
                       : ''}"
                     on:click={() =>
-                      handleProductTypeSelect({
-                        detail: { productType: "All" },
-                      })}
+                      handleProductTypeSelect({ detail: { productType } })}
                   >
-                    All
+                    {productType}
                   </button>
-                  {#each mainCategories
-                    .find((c) => c.name === $selectedCategoryStore)
-                    ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)
-                    ?.productTypes?.filter((pt) => pt !== "All") ?? [] as productType}
-                    <button
-                      class="product-type-btn {$selectedProductTypeStore ===
-                      productType
-                        ? 'active'
-                        : ''}"
-                      on:click={() =>
-                        handleProductTypeSelect({ detail: { productType } })}
-                    >
-                      {productType}
-                    </button>
-                  {/each}
-                </div>
+                {/each}
               </div>
-            {/if}
+            </div>
           {/if}
-
-          {#if $isHomeViewStore}{/if}
         {/if}
 
-        <div class="product-sections">
-          {#if $searchModeStore}
-            <SearchResults
-              {store}
-              query={$searchQueryStore}
-              selectedProductHash={$selectedProductHashStore}
-              productName={$productNameStore}
-              fuseResults={$fuseResultsStore}
-              on:reportCategory={(event) => {
-                $reportedProductStore = event.detail;
-                $showReportDialogStore = true;
-              }}
-            />
-          {:else if $isHomeViewStore}
-            <!-- Home view with multiple featured subcategories -->
-            <ProductBrowser
-              selectedCategory={null}
-              selectedSubcategory={null}
-              selectedProductType={"All"}
-              isHomeView={true}
-              {featuredSubcategories}
-              searchMode={$searchModeStore}
-              {store}
-              {productDataService}
-              on:viewMore={handleViewMore}
-              on:productTypeSelect={handleProductTypeSelect}
-              on:reportCategory={(event) => {
-                $reportedProductStore = event.detail;
-                $showReportDialogStore = true;
-              }}
-            />
-          {:else}
-            <!-- Normal category browsing -->
-            <ProductBrowser
-              selectedCategory={$selectedCategoryStore}
-              selectedSubcategory={$selectedSubcategoryStore}
-              selectedProductType={$selectedProductTypeStore}
-              isHomeView={false}
-              featuredSubcategories={[]}
-              searchMode={$searchModeStore}
-              {store}
-              {productDataService}
-              on:viewMore={handleViewMore}
-              on:productTypeSelect={handleProductTypeSelect}
-              on:reportCategory={(event) => {
-                $reportedProductStore = event.detail;
-                $showReportDialogStore = true;
-              }}
-            />
-          {/if}
-        </div>
+        {#if $isHomeViewStore}{/if}
+      {/if}
+
+      <div class="product-sections">
+        {#if $searchModeStore}
+          <SearchResults
+            {store}
+            query={$searchQueryStore}
+            selectedProductHash={$selectedProductHashStore}
+            productName={$productNameStore}
+            fuseResults={$fuseResultsStore}
+            on:reportCategory={(event) => {
+              $reportedProductStore = event.detail;
+              $showReportDialogStore = true;
+            }}
+          />
+        {:else if $isHomeViewStore}
+          <!-- Home view with multiple featured subcategories -->
+          <ProductBrowser
+            selectedCategory={null}
+            selectedSubcategory={null}
+            selectedProductType={"All"}
+            isHomeView={true}
+            {featuredSubcategories}
+            searchMode={$searchModeStore}
+            {store}
+            {productDataService}
+            on:viewMore={handleViewMore}
+            on:productTypeSelect={handleProductTypeSelect}
+            on:reportCategory={(event) => {
+              $reportedProductStore = event.detail;
+              $showReportDialogStore = true;
+            }}
+          />
+        {:else}
+          <!-- Normal category browsing -->
+          <ProductBrowser
+            selectedCategory={$selectedCategoryStore}
+            selectedSubcategory={$selectedSubcategoryStore}
+            selectedProductType={$selectedProductTypeStore}
+            isHomeView={false}
+            featuredSubcategories={[]}
+            searchMode={$searchModeStore}
+            {store}
+            {productDataService}
+            on:viewMore={handleViewMore}
+            on:productTypeSelect={handleProductTypeSelect}
+            on:reportCategory={(event) => {
+              $reportedProductStore = event.detail;
+              $showReportDialogStore = true;
+            }}
+          />
+        {/if}
       </div>
-    {:else}
-      <CheckedOutCarts />
-    {/if}
+    </div>
   </div>
 </div>
 {#if $reportedProductStore && $showReportDialogStore}
@@ -247,22 +239,10 @@
   .product-sections {
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: var(--spacing-xxxl);
     overflow: visible;
     padding: 0;
     width: 100%;
-    background-color: white;
-  }
-
-  .home-view-header {
-    padding: 20px 20px 0 20px;
-  }
-
-  .home-view-header h1 {
-    font-size: 32px;
-    font-weight: 700;
-    color: #343538;
-    margin-bottom: 20px;
   }
 
   :global(hr) {
@@ -270,95 +250,89 @@
   }
 
   :global(.attachment-button) {
-    width: 35px;
-    height: 35px;
+    width: var(--btn-icon-size-sm);
+    height: var(--btn-icon-size-sm);
     padding: 4px;
     border-radius: 50%;
-    border: 1px solid rgba(235, 235, 238, 1);
-    background-color: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 4px 5px rgba(0, 0, 0, 0.2);
+    border: var(--border-width-thin) solid var(--border);
+    background-color: var(--overlay-button);
+    box-shadow: var(--shadow-button);
   }
   :global(.attachment-button:hover) {
-    transform: scale(1.25);
+    transform: scale(var(--hover-scale-button));
   }
 
   :global(.attachment-group:active) {
-    border-color: rgb(76, 106, 167);
-    background-color: rgb(77, 123, 214);
-    box-shadow: 0 4px 5px rgba(0, 0, 0, 0.2);
-    border-bottom: 2px solid rgb(60, 83, 127);
+    border-color: var(--primary-dark);
+    background-color: var(--primary);
+    box-shadow: var(--shadow-button);
+    border-bottom: var(--border-width) solid var(--primary-dark);
   }
 
   .root-container {
     display: flex;
-    height: calc(100vh - 60px);
-    width: calc(100% - 250px); /* Match sidebar width exactly */
-    margin: 0 0 0 250px; /* Match sidebar width exactly */
+    height: 100%; /* Changed from calc height */
+    width: calc(100% - var(--sidebar-width-category));
+    margin: 0 0 0 var(--sidebar-width-category);
     position: relative;
+    box-sizing: border-box;
+    padding-right: 0;
+    right: 0;
   }
 
   .main-content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 60px);
-    overflow: hidden;
-    background-color: white;
+    overflow: visible;
+    max-width: 100%;
+  }
+
+  .content-wrapper {
+    padding-left: var(--spacing-md); /* <<< THIS IS THE KEY CHANGE */
+    padding-right: var(--spacing-md); /* <<< THIS IS THE KEY CHANGE */
+    box-sizing: border-box;
   }
 
   .product-type-nav {
     position: sticky;
-    top: 0;
-    z-index: 10;
-    background: white;
-    padding: 16px 20px;
-    border-bottom: 1px solid #f0f0f0;
+    top: var(--component-header-height);
+    z-index: 11;
+    background: var(--background);
+    min-height: var(--component-header-height);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    padding-top: var(--spacing-md);
+    padding-bottom: var(--spacing-md);
+    /* The nav bar itself doesn't need side padding if its content container has it */
+    padding-left: 0;
+    padding-right: 0;
+    /* Adjust negative margins to match the NEW parent padding (var(--spacing-md)) */
+    margin-left: calc(-1 * var(--spacing-md)); /* <<< CHANGED */
+    margin-right: calc(-1 * var(--spacing-md)); /* <<< CHANGED */
+    border-bottom: var(--border-width-thin) solid var(--border-lighter);
   }
 
   .product-type-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--spacing-xs);
+    width: 100%; /* Make sure it takes the full width of the .product-type-nav */
+    box-sizing: border-box; /* Important for width calculation with padding */
     max-width: 100%;
+    /* This padding aligns the actual buttons inside the nav with the content below */
+    padding-left: var(--spacing-md); /* <<< CHANGED */
+    padding-right: var(--spacing-md); /* <<< CHANGED */
   }
 
   .product-type-btn {
-    padding: 8px 16px;
-    border: 1px solid #e0e0e0;
-    border-radius: 20px;
-    background: white;
     white-space: nowrap;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
-    transition: all 0.2s ease;
-  }
-
-  .product-type-btn.active {
-    background: #343538;
-    color: white;
-    border-color: #343538;
-  }
-
-  .product-type-btn:not(.active):hover {
-    background: #f5f5f5;
+    height: var(--btn-height-sm);
   }
 
   .root-container.no-sidebar {
-    width: calc(100% - 30px);
-    margin: 0 15px;
-  }
-
-  .scroll-container {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: visible;
-    padding-right: 0;
-    padding-left: 10px;
-    margin-top: 0px;
-    padding-top: 0px;
-    height: 100%;
-    transform: translateZ(0);
-    will-change: transform;
+    width: calc(100% - var(--content-margin) * 2);
+    margin: 0 var(--content-margin);
   }
 </style>

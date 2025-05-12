@@ -307,52 +307,53 @@
   }
 
   function getStockColor(status) {
-    if (status === "HIGH") return "#2e7d32"; // Green
-    if (status === "LOW") return "#fbc02d"; // Yellow
-    return "#d32f2f"; // Red
+    if (status === "HIGH") return "var(--success)";
+    if (status === "LOW") return "var(--warning)";
+    return "var(--error)";
   }
 </script>
 
 <div
-  class="product-card"
+  class="product-card fade-in"
   use:preload
   data-src={product.image_url}
   on:click={handleCardClick}
 >
   <button
-    class="add-btn {displayAmount > 0 ? 'expanded' : ''}"
+    class="add-btn btn {displayAmount > 0
+      ? 'counter-btn-group expanded'
+      : 'btn-icon btn-icon-primary'}"
     on:click={(e) => {
       console.log("Add button clicked");
       handleButtonClick(e);
     }}
   >
     {#if displayAmount > 0}
-      <span class="minus" on:click|stopPropagation={decrementCount}>
+      <span class="minus counter-btn" on:click|stopPropagation={decrementCount}>
         <Minus size={16} color="white" />
       </span>
-      <span class="count" on:click|stopPropagation={() => {}}>
+      <span class="count counter-value" on:click|stopPropagation={() => {}}>
         {displayAmount}
         {displayUnit}
       </span>
-      <span class="plus" on:click|stopPropagation={incrementCount}>
-        <Plus size={20} color="white" />
+      <span class="plus counter-btn" on:click|stopPropagation={incrementCount}>
+        <Plus size={16} color="white" />
       </span>
     {:else}
       <span class="plus-icon">
         <Plus size={20} color="white" />
       </span>
-      <span class="add-text">Add</span>
-      <span class="expand-text">to cart</span>
     {/if}
   </button>
   <button
-    class="report-btn"
+    class="report-btn btn btn-icon-sm"
     on:click|stopPropagation={handleReportClick}
     title="Report incorrect category"
   >
     🚩
   </button>
   <div class="product-card-content">
+    <!-- Rest of the content remains unchanged -->
     {#if product.image_url}
       <img
         src={product.image_url}
@@ -419,30 +420,37 @@
     min-width: 245px;
     height: 450px;
     margin: 0;
-    padding: 0px;
-    background-color: #ffffff;
+    padding: 0;
     box-shadow: none;
-    transition: all 0.25s ease;
+    transition: var(--card-transition);
     transform: scale(1) translate3d(0, 0, 0);
-    overflow: hidden;
+    overflow: visible;
     will-change: transform;
     cursor: pointer;
+    border: none;
+    border-radius: var(--card-border-radius);
+    box-sizing: border-box;
   }
 
   .product-card-content {
     display: flex;
     flex-direction: column;
-    padding-right: 0px;
+    width: 100%; /* Added */
+    height: 100%; /* Optional: if it should fill height too */
+    box-sizing: border-box; /* Added */
+    padding: 0; /* Changed: ensures no padding on any side */
   }
 
   .product-image {
-    width: 245px;
+    width: 100%; /* Changed from 245px */
     height: 245px;
     object-fit: contain;
-    margin: 0 auto 0px auto;
     padding: 0;
+    box-sizing: border-box; /* Added */
+    display: block; /* Added */
   }
 
+  /* Price styling remains unchanged */
   .prices {
     margin-bottom: 2px;
   }
@@ -450,36 +458,36 @@
   .price-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--spacing-xs);
     margin-bottom: 4px;
   }
 
   .promo-price {
     font-size: 24px;
-    font-weight: bold;
-    color: #000;
-    background-color: #fdd400;
-    padding: 4px 8px;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    background-color: var(--warning);
+    padding: 4px var(--spacing-xs);
     border-radius: 4px;
     display: inline-block;
   }
 
   .regular-price {
-    font-size: 20px;
-    color: #666;
+    font-size: var(--spacing-lg);
+    color: var(--text-secondary);
   }
 
   .regular-price-solo {
     font-size: 24px;
-    font-weight: bold;
-    color: #000;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
   }
 
   .promo-label {
-    font-size: 14px;
-    font-weight: bold;
-    color: #333;
-    background-color: #fdd400;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    background-color: var(--warning);
     padding: 2px 6px;
     border-radius: 4px;
     display: inline-block;
@@ -489,127 +497,105 @@
     font-size: 18px;
     margin-bottom: 2px;
     line-height: 1.2;
+    color: var(--text-primary);
   }
 
   .size {
-    font-size: 16px;
-    color: #666;
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
     margin-bottom: 2px;
   }
 
   .stock {
-    font-size: 16px;
-    color: #000;
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
   }
 
-  /* Button styles - cleaned up and fixed */
+  /* Button positioning only */
   .add-btn {
     position: absolute;
-    top: 0px;
-    right: 0px;
-    background-color: rgb(61, 61, 61);
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    min-width: 80px;
-    width: 80px;
-    height: 45px;
-    transition:
-      width 0.5s ease,
-      background-color 0.3s;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
+    top: 0;
+    right: 0;
+    z-index: 10;
+    /* Styling comes from button system */
+  }
+
+  .add-btn.expanded {
+    width: 170px;
+    border-radius: 30px;
   }
 
   .plus-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    margin-right: 4px;
+    width: 100%;
+    height: 100%;
   }
 
-  .add-btn:hover {
-    background-color: rgb(61, 61, 61);
-    border: none;
-    width: 135px;
-  }
-
-  .plus-icon {
-    color: white;
-    margin-right: 4px;
-  }
-
-  .add-text {
-    color: white;
-    white-space: nowrap;
-  }
-
-  .expand-text {
-    color: white;
-    white-space: nowrap;
-    margin-left: 4px;
-    max-width: 0;
-    opacity: 0;
-    overflow: hidden;
-    transition:
-      max-width 0.5s ease,
-      opacity 0.3s ease;
-  }
-
-  .add-btn:hover .expand-text {
-    max-width: 100px;
-    opacity: 1;
-  }
-
-  /* Counter button styles */
+  /* Counter button styles - futuristic look */
   .add-btn.expanded {
-    width: 150px;
+    width: 170px;
+    border-radius: 30px; /* Pill shape when expanded */
     display: flex;
     justify-content: space-between;
     padding: 0;
     overflow: hidden;
     border: none;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
   }
 
   .minus,
   .plus {
     cursor: pointer;
-    padding: 8px 10px;
-    color: white;
-    transition: background-color 0.2s;
-    height: 100%;
+    width: var(--btn-height-md); /* Changed to use standard variable */
+    height: var(--btn-height-md); /* Changed to use standard variable */
     display: flex;
     align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(
+      --btn-transition
+    ); /* Changed from btn-transition-fast for consistency */
+    background-color: rgba(0, 0, 0, 0.15);
   }
 
   .minus:hover,
   .plus:hover {
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+
+  /* Add global styles for SVG icons in buttons */
+  :global(.minus svg),
+  :global(.plus svg),
+  :global(.plus-icon svg) {
+    color: var(--button-text);
+    stroke: var(--button-text);
   }
 
   .count {
-    margin: 0 8px;
+    margin: 0;
     white-space: nowrap;
-    color: white;
+    color: var(--button-text);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 0 5px;
+    min-width: 60px; /* Fixed width for count to prevent shifting */
+    font-size: var(--font-size-md); /* Added to match cart-total */
   }
-
-  /* Report button */
   .report-btn {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    background-color: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
+    top: var(--spacing-sm);
+    left: var(--spacing-sm);
+    font-size: var(--font-size-md);
     opacity: 0.6;
-    transition: opacity 0.2s;
+    z-index: 10;
+    transition: opacity var(--transition-fast);
+    background-color: transparent;
   }
 
   .report-btn:hover {

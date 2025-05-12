@@ -2,6 +2,14 @@
 import sys
 import json
 import os
+import logging
+
+# Configure logging to output to stderr
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - PYTHON DUAL BRIDGE - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr,
+)
 
 # Add parent directory to path to ensure imports work
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

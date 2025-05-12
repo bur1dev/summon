@@ -2,7 +2,7 @@
     import { createEventDispatcher, onMount } from "svelte";
     import { decode } from "@msgpack/msgpack";
     import { ProductRowCacheService } from "./ProductRowCacheService";
-
+    import { ChevronsLeft, ChevronsRight } from "lucide-svelte";
     export let direction: "left" | "right";
     export let disabled: boolean = false;
     export let currentRanges;
@@ -17,7 +17,7 @@
     export let containerCapacity: number; // New prop for dynamic capacity
 
     const dispatch = createEventDispatcher();
-    const PRODUCTS_PER_GROUP = 100; // From backend constant
+    const PRODUCTS_PER_GROUP = 1000; // From backend constant
 
     // Create product row cache service instance
     // Using a static instance to share across components
@@ -125,15 +125,23 @@
         });
 
         let accumulatedCount = 0;
+        let trueGrandTotalForPath = 0;
         groupBoundaries = response.map((count) => {
+            const numericCount = Number(count) || 0;
             const boundary = {
                 start: accumulatedCount,
-                end: accumulatedCount + count,
+                end: accumulatedCount + numericCount,
             };
-            accumulatedCount += count;
+            accumulatedCount += numericCount;
+            trueGrandTotalForPath += numericCount;
             return boundary;
         });
         boundariesInitialized = true;
+
+        dispatch("boundariesInitialized", {
+            identifier: identifier,
+            grandTotal: trueGrandTotalForPath,
+        });
     }
 
     function extractProductsFromGroups(groupRecords: any[]): any[] {
@@ -243,14 +251,17 @@
                     `Using cached data for ${identifier} at ${targetVirtualStart}-${targetVirtualEnd}`,
                 );
 
-                // We'll handle disabled state separately from hasMore
-                // Just pass through the cached hasMore value unchanged
+                // Use the component's totalProducts prop (the true grand total)
+                // instead of cachedData.totalInPath (which might be a chunk total for subcategories)
+                const accuratelyCalculatedHasMore =
+                    targetVirtualEnd < totalProducts[identifier];
+
                 dispatch("dataLoaded", {
                     newStart: targetVirtualStart,
                     products: cachedData.products,
-                    total: cachedData.totalInPath,
+                    total: totalProducts[identifier], // Use the true grand total prop
                     identifier,
-                    hasMore: cachedData.hasMore,
+                    hasMore: accuratelyCalculatedHasMore,
                 });
 
                 const navigationEndTime = performance.now();
@@ -365,18 +376,23 @@
             );
 
             // Check if there are more products remaining
-            let hasMoreProducts = false;
 
+            let hasMoreProducts = false;
             if (
                 groupBoundaries.length > 0 &&
                 groupBoundaries[groupBoundaries.length - 1]
             ) {
+                console.log(`DEBUG: Using IF branch for hasMoreProducts`);
                 hasMoreProducts =
                     targetVirtualEnd <
                     groupBoundaries[groupBoundaries.length - 1].end;
             } else {
+                console.log(
+                    `DEBUG: Using ELSE branch for hasMoreProducts - THIS IS LIKELY THE GHOST PAGE CAUSE`,
+                );
                 hasMoreProducts = accumulatedProducts.length > currentCapacity;
             }
+            console.log(`DEBUG: calculated hasMoreProducts:`, hasMoreProducts);
 
             // Parse identifier for caching
             const parsed = parseIdentifier(identifier);
@@ -413,7 +429,7 @@
             dispatch("dataLoaded", {
                 newStart: targetVirtualStart,
                 products: productsToShow,
-                total: totalInPath,
+                total: totalProducts[identifier], // Use the true grand total prop
                 identifier,
                 hasMore: newHasMore || hasMoreProducts, // Enable button if more groups OR more products remain
             });
@@ -459,50 +475,39 @@
     }
 </script>
 
-<button class="nav-arrow {direction}" {disabled} on:click={handleNavigation}>
-    {direction === "left" ? "←" : "→"}
+<button
+    class="nav-arrow-btn {direction} btn btn-icon {disabled ? 'disabled' : ''}"
+    {disabled}
+    on:click={handleNavigation}
+>
+    {#if direction === "left"}
+        <ChevronsLeft size={24} />
+    {:else}
+        <ChevronsRight size={24} />
+    {/if}
 </button>
 
 <style>
-    .nav-arrow {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        background: white;
-        border: 1px solid rgb(199, 200, 205);
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        cursor: pointer;
-        z-index: 10;
-        font-size: 20px;
-        font-weight: bold;
-        box-shadow:
-            0 2px 5px rgba(0, 0, 0, 0.2),
-            0 0 3px rgba(0, 0, 0, 0.1);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease-in-out;
+    /* Base .nav-arrow-btn styles (positioning, z-index, initial transform, icon color)
+       are now in app.css to be shared if this component were used elsewhere or
+       to keep button styling centralized.
+       The .btn and .btn-icon classes provide appearance, size, and base hover mechanics.
+    */
+
+    .nav-arrow-btn.left {
+        left: 0px; /* Position the left arrow */
+        /* Offset slightly to not touch the very edge if desired, e.g., left: var(--spacing-xs); */
     }
 
-    .nav-arrow:hover {
-        transform: translateY(-50%) scale(1.2);
-        background-color: rgb(61, 61, 61); /* Green background on hover */
-        color: white; /* White arrow on hover */
-        border: none;
+    .nav-arrow-btn.right {
+        right: 0px; /* Position the right arrow */
+        /* Offset slightly to not touch the very edge if desired, e.g., right: var(--spacing-xs); */
     }
 
-    .nav-arrow.left {
-        left: -1px;
-    }
-
-    .nav-arrow.right {
-        right: 6px;
-    }
-
-    .nav-arrow:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
+    /*
+      Disabled styles are now handled by the more specific rules in app.css for .nav-arrow-btn:disabled.
+      This avoids duplication and ensures consistency.
+      The global .btn:disabled provides base opacity and cursor.
+      The .nav-arrow-btn:disabled in app.css provides specific background, color, and transform for these arrows.
+    */
 </style>

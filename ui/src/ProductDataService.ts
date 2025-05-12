@@ -2,7 +2,7 @@ import { decode } from "@msgpack/msgpack";
 
 export class ProductDataService {
     private store: any;
-    private readonly PRODUCTS_PER_GROUP = 100; // Define backend constant here
+    private readonly PRODUCTS_PER_GROUP = 1000; // Define backend constant here
 
     constructor(store: any) {
         this.store = store;
@@ -152,7 +152,7 @@ export class ProductDataService {
 
             } else if (!isPreview) {
                 // Fetch all for grid - use a large limit
-                const groupLimit = 100; // Fetch up to 100 groups (2000 products) for the grid view
+                const groupLimit = 1000; // Fetch up to 100 groups (2000 products) for the grid view
 
                 const result = await this.fetchProductsFromApi(
                     category,

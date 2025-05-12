@@ -98,5 +98,8 @@ wasm-build/
 .running/
 
 backend/output/kroger_data_27490.json
-backend/output/kroger_data_27490.json
 backend/output/*.json
+
+product-categorization/categorized_products_sorted.json
+product-categorization/categorized_products.json
+product-categorization/category_corrections.jsonl

@@ -41,3 +41,14 @@ pub struct PrivateCart {
     pub items: Vec<CartProduct>,
     pub last_updated: u64,
 }
+
+// New structure for product preferences
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct ProductPreference {
+    pub group_hash: ActionHash,    // Reference to ProductGroup
+    pub product_index: u32,        // Index of product within the group
+    pub note: String,              // Customer note/preference
+    pub timestamp: u64,            // When this preference was last updated
+    pub is_default: bool           // If true, apply automatically
+}

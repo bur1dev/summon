@@ -2,7 +2,7 @@
     import CartItem from "./CartItem.svelte";
     import ProductDetailModal from "../ProductDetailModal.svelte";
     import { getContext } from "svelte";
-    import { PencilLine } from "lucide-svelte";
+    import { PencilLine, Plus, Minus } from "lucide-svelte";
 
     // Props - UPDATED FOR NEW STRUCTURE
     export let product;
@@ -22,6 +22,11 @@
     const isSoldByWeight = product.sold_by === "WEIGHT";
     const displayUnit = isSoldByWeight ? "lbs" : "ct";
     const incrementValue = isSoldByWeight ? 0.25 : 1;
+
+    // NEW: Calculate totals
+    $: regularTotal = product.price * quantity;
+    $: promoTotal = (product.promo_price || product.price) * quantity;
+    $: hasPromo = product.promo_price && product.promo_price < product.price;
 
     // Methods - UPDATED FOR NEW STRUCTURE
     const handleDecrementItem = async () => {
@@ -93,9 +98,24 @@
             <div class="cart-item-name">
                 {product.name}
             </div>
+
+            <!-- UPDATED: Price display section -->
             <div class="cart-item-price">
-                ${product.price.toFixed(2)}{isSoldByWeight ? "/lb" : ""}
+                <span
+                    >${product.price.toFixed(2)}{isSoldByWeight
+                        ? "/lb"
+                        : ""}</span
+                >
+                {#if hasPromo}
+                    <span class="price-separator">/</span>
+                    <span class="promo-price"
+                        >${product.promo_price.toFixed(2)}{isSoldByWeight
+                            ? "/lb"
+                            : ""}</span
+                    >
+                {/if}
             </div>
+
             {#if note}
                 <div class="cart-item-note">
                     Shopper note: {note}
@@ -117,24 +137,30 @@
         <div class="cart-item-right">
             <div class="quantity-control">
                 <button
-                    class="quantity-btn remove-btn"
+                    class="quantity-btn minus-btn"
                     on:click|stopPropagation={handleDecrementItem}
                     disabled={isUpdating || !$cartService}
                 >
-                    -
+                    <Minus size={16} />
                 </button>
                 <span class="quantity-display">{quantity} {displayUnit}</span>
                 <button
-                    class="quantity-btn add-btn"
+                    class="quantity-btn plus-btn"
                     on:click|stopPropagation={handleIncrementItem}
                     disabled={isUpdating || !$cartService}
                 >
-                    +
+                    <Plus size={16} />
                 </button>
             </div>
+
+            <!-- UPDATED: Total price with both regular and promo totals -->
             <div class="cart-item-total">
-                ${(product.price * quantity).toFixed(2)}
+                <span class="total-regular">${regularTotal.toFixed(2)}</span>
+                {#if hasPromo}
+                    <span class="total-promo">${promoTotal.toFixed(2)}</span>
+                {/if}
             </div>
+
             <button
                 class="remove-item"
                 on:click|stopPropagation={handleRemove}
@@ -159,14 +185,17 @@
     .cart-item-img {
         width: 70px;
         height: 70px;
-        margin-right: 15px;
+        margin-right: var(--spacing-md);
         flex-shrink: 0;
+        overflow: hidden;
+        border-radius: var(--card-border-radius);
     }
 
     .cart-item-img img {
         width: 100%;
         height: 100%;
         object-fit: contain;
+        object-position: top;
     }
 
     .cart-item-content {
@@ -178,97 +207,172 @@
 
     .cart-item-left {
         flex: 1;
-        margin-right: 20px;
+        margin-right: var(--spacing-lg);
     }
 
     .cart-item-name {
-        font-weight: 500;
-        margin-bottom: 5px;
-        font-size: 16px;
+        font-weight: var(--font-weight-semibold);
+        margin-bottom: var(--spacing-xs);
+        font-size: var(--font-size-md);
+        color: var(--text-primary);
     }
 
+    /* UPDATED: Price styling */
     .cart-item-price {
-        color: #666;
-        font-size: 14px;
+        font-size: var(--font-size-sm);
         margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        color: var(--text-secondary);
+    }
+
+    .price-separator {
+        margin: 0 4px;
+        color: var(--text-secondary);
+    }
+
+    .promo-price {
+        color: var(--primary);
+        font-weight: var(--font-weight-semibold);
     }
 
     .cart-item-note {
-        font-size: 14px;
-        color: #666;
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
         margin-bottom: 4px;
+        background-color: var(--surface);
+        padding: 4px var(--spacing-xs);
+        border-radius: 4px;
+        border-left: var(--border-width) solid var(--primary);
     }
 
     .instructions-link {
         background: transparent;
         border: none;
-        color: rgb(61, 61, 61);
-        font-size: 14px;
+        color: var(--primary);
+        font-size: var(--font-size-sm);
         cursor: pointer;
-        padding: 0;
+        padding: 4px var(--spacing-xs);
         display: flex;
         align-items: center;
         gap: 4px;
+        border-radius: var(--btn-border-radius);
+        transition: var(--btn-transition);
     }
 
     .instructions-link:hover {
-        text-decoration: underline;
+        background-color: var(--surface);
+        transform: translateY(var(--hover-lift));
     }
 
     .cart-item-right {
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        gap: 8px;
+        gap: var(--spacing-xs);
     }
 
     .quantity-control {
+        width: 140px;
+        height: var(--btn-height-sm);
+        border-radius: 30px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
         display: flex;
-        align-items: center;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
+        justify-content: space-between;
+        padding: 0;
         overflow: hidden;
-        height: 36px;
+        border: none;
+        box-shadow: var(--shadow-button);
     }
 
     .quantity-btn {
-        width: 36px;
-        height: 36px;
-        background: white;
+        width: var(--btn-height-sm);
+        height: var(--btn-height-sm);
         border: none;
-        font-size: 18px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: var(--btn-transition);
+        background-color: rgba(0, 0, 0, 0.15);
+        border-radius: 50%;
+    }
+
+    .quantity-btn.minus-btn {
+        margin-right: -5px;
+    }
+
+    .quantity-btn.plus-btn {
+        margin-left: -5px;
     }
 
     .quantity-btn:hover {
-        background: #f5f5f5;
+        background-color: rgba(0, 0, 0, 0.3);
+        transform: scale(var(--hover-scale-subtle));
+    }
+
+    :global(.quantity-btn svg) {
+        color: var(--button-text);
+        stroke: var(--button-text);
+    }
+
+    .quantity-btn:disabled {
+        background-color: rgba(0, 0, 0, 0.1);
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    :global(.quantity-btn:disabled svg) {
+        color: var(--button-text);
+        opacity: 0.5;
+        stroke: var(--button-text);
     }
 
     .quantity-display {
-        min-width: 40px;
+        min-width: 60px;
         text-align: center;
-        font-size: 14px;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
+        color: var(--button-text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        padding: 0 var(--spacing-xs);
     }
 
+    /* UPDATED: Total price styling */
     .cart-item-total {
-        font-weight: 600;
-        font-size: 16px;
+        text-align: right;
+    }
+
+    .total-regular {
+        font-weight: var(--font-weight-semibold);
+        font-size: var(--font-size-md);
+        color: var(--text-primary);
+        display: block;
+    }
+
+    .total-promo {
+        font-size: var(--font-size-sm);
+        color: var(--primary);
+        font-weight: var(--font-weight-semibold);
+        display: block;
     }
 
     .remove-item {
         background: transparent;
         border: none;
-        color: #666;
+        color: var(--error);
         cursor: pointer;
-        font-size: 14px;
-        padding: 0;
-        text-decoration: underline;
+        font-size: var(--font-size-sm);
+        padding: 4px var(--spacing-xs);
+        border-radius: var(--btn-border-radius);
+        transition: var(--btn-transition);
     }
 
     .remove-item:hover {
-        color: #333;
+        background-color: rgba(211, 47, 47, 0.1);
+        text-decoration: underline;
     }
 </style>

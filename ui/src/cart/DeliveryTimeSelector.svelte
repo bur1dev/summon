@@ -1,6 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
     import type { DeliveryTimeSlot } from "./SimpleCartService";
+    import { ChevronLeft, ChevronRight } from "lucide-svelte";
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
@@ -111,7 +112,7 @@
             on:click={() => scrollDates("left")}
             disabled={!canScrollLeft}
         >
-            ←
+            <ChevronLeft size={20} />
         </button>
 
         <div class="date-cards-container">
@@ -134,7 +135,7 @@
             on:click={() => scrollDates("right")}
             disabled={!canScrollRight}
         >
-            →
+            <ChevronRight size={20} />
         </button>
     </div>
 
@@ -163,134 +164,192 @@
 
 <style>
     .delivery-time-selector {
-        background: white;
-        border-radius: 8px;
+        background: var(--background);
+        border-radius: var(--card-border-radius);
         width: 100%;
+        box-shadow: var(--shadow-subtle);
     }
 
     .delivery-time-header {
-        padding: 16px;
-        border-bottom: 1px solid #f0f0f0;
+        height: var(--component-header-height); /* Explicit height */
+        box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        padding: 0 var(--spacing-md); /* Adjust padding, left/right as needed */
+        border-bottom: var(--border-width-thin) solid var(--border);
+        background: var(--background);
+        border-radius: var(--card-border-radius) var(--card-border-radius) 0 0;
+        display: flex; /* To allow vertical alignment */
+        align-items: center; /* Vertically center content */
     }
 
     .delivery-time-header h2 {
         margin: 0;
-        font-size: 20px;
-        font-weight: 600;
+        font-size: var(--spacing-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
     }
 
     .date-selector {
         display: flex;
         align-items: center;
-        padding: 16px;
-        border-bottom: 1px solid #f0f0f0;
+        padding: var(--spacing-md);
+        border-bottom: var(--border-width-thin) solid var(--border);
         position: relative;
+        overflow: visible;
     }
 
     .date-cards-container {
         display: flex;
         flex: 1;
         justify-content: center;
-        gap: 12px;
-        overflow: hidden;
+        gap: var(--spacing-xs);
+        overflow: visible;
+        padding: 0 var(--spacing-xl);
     }
 
     .date-card {
         min-width: 90px;
+        max-width: 100px;
         flex: 1;
         text-align: center;
-        padding: 12px 8px;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
+        padding: var(--spacing-sm) var(--spacing-xs);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
         cursor: pointer;
-        transition:
-            background-color 0.2s,
-            border-color 0.2s;
+        transition: var(--btn-transition);
+        background: var(--background);
     }
 
     .date-card:hover {
-        background-color: #f9f9f9;
+        transform: translateY(var(--hover-lift));
+        border-color: var(--primary);
+        box-shadow: var(--shadow-subtle);
     }
 
     .date-card.selected {
-        border-color: rgb(61, 61, 61);
-        background-color: rgba(26, 139, 81, 0.05);
+        border-color: var(--primary);
+        background: linear-gradient(
+            135deg,
+            rgba(86, 98, 189, 0.1),
+            rgba(112, 70, 168, 0.1)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
     }
 
     .date-card-day {
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         margin-bottom: 4px;
-        font-size: 14px;
+        font-size: var(--font-size-sm);
+        color: var(--text-primary);
     }
 
     .date-card-date {
-        font-size: 14px;
-        color: #666;
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
     }
 
     .scroll-button {
-        background: #f5f5f5;
-        border: 1px solid #e0e0e0;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
+        width: var(--btn-icon-size-sm);
+        height: var(--btn-icon-size-sm);
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border-radius: 50%;
         cursor: pointer;
-        margin: 0 8px;
-        font-size: 14px;
-        color: #333;
-        transition: background-color 0.2s;
+        transition: var(--btn-transition);
+        box-shadow: var(--shadow-button);
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: var(--z-index-sticky);
+        margin: 0;
+    }
+
+    .scroll-button.left {
+        left: var(--spacing-xs);
+    }
+
+    .scroll-button.right {
+        right: var(--spacing-xs);
     }
 
     .scroll-button:hover:not(.disabled) {
-        background-color: #e0e0e0;
+        transform: translateY(-50%) scale(var(--hover-scale));
+        box-shadow: var(--shadow-medium);
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
+    }
+
+    :global(.scroll-button svg) {
+        color: var(--button-text);
+        stroke: var(--button-text);
     }
 
     .scroll-button.disabled {
-        opacity: 0.4;
+        opacity: 0.5;
         cursor: not-allowed;
+        background: var(--surface);
+        color: var(--text-secondary);
+        border: var(--border-width-thin) solid var(--border);
+        box-shadow: none;
+    }
+
+    :global(.scroll-button.disabled svg) {
+        color: var(--text-secondary);
+        stroke: var(--text-secondary);
     }
 
     .time-slots-container {
-        padding: 16px;
+        padding: var(--spacing-md);
     }
 
     .time-slots-header {
-        margin-bottom: 16px;
-        font-weight: 500;
-        color: #333;
+        margin-bottom: var(--spacing-md);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
     }
 
     .time-slots-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 12px;
+        gap: var(--spacing-sm);
     }
 
     .time-slot {
-        padding: 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
+        padding: var(--spacing-sm);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
         cursor: pointer;
         text-align: center;
-        transition:
-            background-color 0.2s,
-            border-color 0.2s;
+        transition: var(--btn-transition);
+        background: var(--background);
     }
 
     .time-slot:hover {
-        background-color: #f9f9f9;
+        transform: translateY(var(--hover-lift));
+        border-color: var(--primary);
+        box-shadow: var(--shadow-subtle);
     }
 
     .time-slot.selected {
-        border-color: rgb(61, 61, 61);
-        background-color: rgba(26, 139, 81, 0.05);
+        border-color: var(--primary);
+        background: linear-gradient(
+            135deg,
+            rgba(86, 98, 189, 0.1),
+            rgba(112, 70, 168, 0.1)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
     }
 
     .time-slot-time {
-        font-size: 14px;
-        font-weight: 500;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
     }
 </style>

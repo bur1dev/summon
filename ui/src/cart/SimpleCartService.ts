@@ -48,10 +48,13 @@ export class SimpleCartService {
         items.reduce((sum, item) => sum + item.quantity, 0)
     );
 
+    public readonly uniqueItemCount = derived(this.cartItems, items => items.length);
+
     public readonly hasItems = derived(this.cartItems, items => items.length > 0);
 
-    // Cart total store - initialized to 0
+    // Cart total stores - regular and promo
     public cartTotal = writable(0);
+    public cartPromoTotal = writable(0);
 
     // Ready state to track initialization
     public ready = writable(false);
@@ -65,6 +68,7 @@ export class SimpleCartService {
     constructor(public client: any) {
         this.cartItems.set([]);
         this.cartTotal.set(0);
+        this.cartPromoTotal.set(0);
         this.loading.set(true);
         console.log("SimpleCartService initialized");
 
@@ -350,8 +354,18 @@ export class SimpleCartService {
                 standardizedHash = encodeHashToBase64(byteArray);
             }
 
+            // Get current item quantity for price delta calculation
+            const currentItem = this.localCartItems.find(item =>
+                item.groupHash === standardizedHash && item.productIndex === productIndex
+            );
+            const oldQuantity = currentItem ? currentItem.quantity : 0;
+            const quantityDelta = quantity - oldQuantity;
+
             // Update local cart
             this.updateLocalCart(standardizedHash, productIndex, quantity, note);
+
+            // Calculate price delta instead of full recalculation
+            await this.updateCartTotalDelta(standardizedHash, productIndex, quantityDelta);
 
             // Schedule sync to Holochain
             this.scheduleSyncToHolochain();
@@ -363,7 +377,70 @@ export class SimpleCartService {
         }
     }
 
-    // NEW: Update local cart
+    // UPDATED: Add this new method to handle promo price delta
+    private async updateCartTotalDelta(groupHash: ActionHashB64, productIndex: number, quantityDelta: number) {
+        if (quantityDelta === 0) return;
+
+        try {
+            // Get product details
+            const groupHashDecoded = decodeHashFromBase64(groupHash);
+            const result = await this.productStore.client.callZome({
+                role_name: 'grocery',
+                zome_name: 'products',
+                fn_name: 'get_product_group',
+                payload: groupHashDecoded
+            });
+
+            if (result) {
+                const group = decode(result.entry.Present.entry);
+                if (group?.products?.[productIndex]) {
+                    const product = group.products[productIndex];
+
+                    // Calculate both regular and promo price changes
+                    const regularPriceChange = product.price * quantityDelta;
+                    const promoPriceChange = (product.promo_price || product.price) * quantityDelta;
+
+                    // Log for debugging
+                    console.log(`Price change - Regular: ${regularPriceChange}, Promo: ${promoPriceChange}`);
+
+                    this.cartTotal.update(current => {
+                        const newTotal = current + regularPriceChange;
+                        return newTotal < 0 ? 0 : newTotal;
+                    });
+
+                    this.cartPromoTotal.update(current => {
+                        const newTotal = current + promoPriceChange;
+                        return newTotal < 0 ? 0 : newTotal;
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error updating cart total delta:', error);
+            this.recalculateCartTotal();
+        }
+    }
+
+    // Add to SimpleCartService
+    public async clearCart() {
+        try {
+            // Clear local cart immediately
+            this.localCartItems = [];
+            this.cartItems.set([]);
+            this.cartTotal.set(0);
+            this.cartPromoTotal.set(0);
+            this.saveToLocalStorage();
+
+            // Schedule sync to Holochain
+            this.scheduleSyncToHolochain();
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error clearing cart:', error);
+            return { success: false, error };
+        }
+    }
+
+
     private updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantity: number, note?: string) {
         const currentTime = Date.now();
         const itemIndex = this.localCartItems.findIndex(item =>
@@ -398,8 +475,10 @@ export class SimpleCartService {
         // Save to localStorage
         this.saveToLocalStorage();
 
-        // Update cart total
-        this.recalculateCartTotal();
+        // Update cart total with a delay to ensure store updates complete
+        setTimeout(() => {
+            this.recalculateCartTotal();
+        }, 0);
     }
 
     // Force sync before checkout
@@ -474,6 +553,7 @@ export class SimpleCartService {
                 this.localCartItems = [];
                 this.cartItems.set([]);
                 this.cartTotal.set(0);
+                this.cartPromoTotal.set(0);
                 this.saveToLocalStorage();
 
                 // Clear saved delivery details
@@ -490,7 +570,7 @@ export class SimpleCartService {
         }
     }
 
-    // Recalculate cart total from items and product prices - MODIFIED to use local cart
+    // UPDATED: Recalculate both regular and promo cart totals
     private async recalculateCartTotal() {
         console.log("Recalculating cart total");
         if (!this.productStore) {
@@ -499,12 +579,15 @@ export class SimpleCartService {
         }
 
         if (this.localCartItems.length === 0) {
-            console.log("Cart is empty, setting total to 0");
+            console.log("Cart is empty, setting totals to 0");
             this.cartTotal.set(0);
+            this.cartPromoTotal.set(0);
             return;
         }
 
-        let total = 0;
+        let regularTotal = 0;
+        let promoTotal = 0;
+
         for (const item of this.localCartItems) {
             try {
                 // Skip invalid items
@@ -537,8 +620,16 @@ export class SimpleCartService {
                     if (group && group.products && group.products[item.productIndex]) {
                         const product = group.products[item.productIndex];
                         if (product && product.price) {
-                            total += product.price * item.quantity;
-                            console.log(`Added ${product.price * item.quantity} for ${product.name} (${item.quantity}x)`);
+                            // Add to regular total
+                            regularTotal += product.price * item.quantity;
+
+                            // Add to promo total (use promo_price if exists, otherwise regular price)
+                            const promoPrice = product.promo_price && product.promo_price < product.price
+                                ? product.promo_price
+                                : product.price;
+                            promoTotal += promoPrice * item.quantity;
+
+                            console.log(`Added - Regular: ${product.price * item.quantity}, Promo: ${promoPrice * item.quantity} for ${product.name} (${item.quantity}x)`);
                         }
                     }
                 }
@@ -547,8 +638,9 @@ export class SimpleCartService {
             }
         }
 
-        console.log(`Setting cart total to ${total}`);
-        this.cartTotal.set(total);
+        console.log(`Setting cart totals - Regular: ${regularTotal}, Promo: ${promoTotal}`);
+        this.cartTotal.set(regularTotal);
+        this.cartPromoTotal.set(promoTotal);
     }
 
     // Load checked out carts
@@ -897,5 +989,106 @@ export class SimpleCartService {
         }
 
         return days;
+    }
+
+    // Get product preference for a specific product
+    public async getProductPreference(groupHashB64: ActionHashB64, productIndex: number) {
+        try {
+            if (!this.client) {
+                console.warn("No client available for getProductPreference");
+                return { success: false, message: "No Holochain client available" };
+            }
+
+            // Decode hash
+            const groupHash = decodeHashFromBase64(groupHashB64);
+
+            // Call the zome function
+            const result = await this.client.callZome({
+                role_name: 'grocery',
+                zome_name: 'cart',
+                fn_name: 'get_product_preference_by_product',
+                payload: {
+                    group_hash: groupHash,
+                    product_index: productIndex
+                }
+            });
+
+            if (result) {
+                // Result contains [hash, preference]
+                const [prefHash, preference] = result;
+                return {
+                    success: true,
+                    data: {
+                        hash: encodeHashToBase64(prefHash),
+                        preference: preference
+                    }
+                };
+            }
+
+            return { success: false, message: "No preference found" };
+        } catch (error) {
+            console.error('Error getting product preference:', error);
+            return { success: false, message: error.toString() };
+        }
+    }
+
+    // Save product preference
+    public async saveProductPreference(preference: {
+        groupHash: string,
+        productIndex: number,
+        note: string,
+        is_default: boolean
+    }) {
+        try {
+            if (!this.client) return { success: false, message: "No client available" };
+
+            // Convert to Holochain format
+            const holochainPreference = {
+                group_hash: decodeHashFromBase64(preference.groupHash),
+                product_index: preference.productIndex,
+                note: preference.note,
+                timestamp: Date.now(),
+                is_default: preference.is_default
+            };
+
+            // Call the zome function - exactly as declared in #[hdk_extern]
+            const hash = await this.client.callZome({
+                role_name: 'grocery',
+                zome_name: 'cart',
+                fn_name: 'save_product_preference',
+                payload: holochainPreference
+            });
+
+            return { success: true, data: { hash: encodeHashToBase64(hash), preference: holochainPreference } };
+        } catch (error) {
+            console.error('Error saving preference:', error);
+            return { success: false, message: error.toString() };
+        }
+    }
+
+    // Delete product preference
+    public async deleteProductPreference(prefHashB64: ActionHashB64) {
+        try {
+            if (!this.client) {
+                console.warn("No client available for deleteProductPreference");
+                return { success: false, message: "No Holochain client available" };
+            }
+
+            // Decode hash
+            const prefHash = decodeHashFromBase64(prefHashB64);
+
+            // Call the zome function
+            await this.client.callZome({
+                role_name: 'grocery',
+                zome_name: 'cart',
+                fn_name: 'delete_product_preference',
+                payload: prefHash
+            });
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting product preference:', error);
+            return { success: false, message: error.toString() };
+        }
     }
 }

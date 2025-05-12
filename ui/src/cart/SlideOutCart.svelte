@@ -1,4 +1,3 @@
-<!-- Original content with fixed fetchProductDetails function -->
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import CartHeader from "./CartHeader.svelte";
@@ -27,6 +26,11 @@
   let isCheckingOut = false;
   let isShowingCheckoutFlow = false;
   let checkoutError = "";
+  let isClosing = false; // Added for animation control
+  let cartTotalUnsubscribe;
+  let cartPromoTotalUnsubscribe;
+  let cartTotal = 0;
+  let cartPromoTotal = 0;
 
   // Subscribe to cart changes
   let unsubscribe;
@@ -63,6 +67,17 @@
 
         isLoading = false;
       });
+
+      // Subscribe to cart totals
+      cartTotalUnsubscribe = $cartService.cartTotal.subscribe((total) => {
+        cartTotal = total;
+      });
+
+      cartPromoTotalUnsubscribe = $cartService.cartPromoTotal.subscribe(
+        (total) => {
+          cartPromoTotal = total;
+        },
+      );
     } else {
       console.warn("Cart service not available in SlideOutCart");
       cartItems = [];
@@ -71,6 +86,8 @@
 
     return () => {
       if (unsubscribe) unsubscribe();
+      if (cartTotalUnsubscribe) cartTotalUnsubscribe();
+      if (cartPromoTotalUnsubscribe) cartPromoTotalUnsubscribe();
     };
   });
 
@@ -136,29 +153,25 @@
     }
   }
 
-  // Calculate cart total - using the cart service's total
-  let cartTotal = 0;
-  $: if ($cartService) {
-    $cartService.cartTotal.subscribe((total) => {
-      cartTotal = total;
-    });
-  }
-
   // Clear cart
   async function clearCart() {
     try {
-      if ($cartService) {
-        // Remove all items by setting quantity to 0
-        for (const item of cartItems) {
-          if (item && item.groupHash) {
-            await $cartService.addToCart(item.groupHash, item.productIndex, 0);
-          }
-        }
+      if ($cartService && typeof $cartService.clearCart === "function") {
+        await $cartService.clearCart();
       }
-      onClose();
+      closeCart();
     } catch (error) {
       console.error("Error clearing cart:", error);
     }
+  }
+  // Close cart with animation
+  function closeCart() {
+    isClosing = true;
+    setTimeout(() => {
+      isOpen = false;
+      isClosing = false;
+      onClose();
+    }, 300); // Match animation duration
   }
 
   // Start checkout flow
@@ -168,7 +181,7 @@
 
   // Handle checkout success
   function handleCheckoutSuccess(event) {
-    onClose();
+    closeCart();
   }
 
   // Close checkout flow
@@ -189,10 +202,21 @@
     // Compare strings
     return String(a).localeCompare(String(b));
   }
+
+  // NEW: Calculate savings
+  $: totalSavings = cartTotal > cartPromoTotal ? cartTotal - cartPromoTotal : 0;
 </script>
 
-<div class="overlay" class:visible={isOpen} on:click={onClose}>
-  <div class="cart-container" class:open={isOpen} on:click|stopPropagation>
+<div
+  class="overlay {isOpen ? (isClosing ? 'fade-out' : 'fade-in') : ''}"
+  class:visible={isOpen}
+  on:click={closeCart}
+>
+  <div
+    class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"
+    class:open={isOpen}
+    on:click|stopPropagation
+  >
     {#if isShowingCheckoutFlow}
       <CheckoutFlow
         {client}
@@ -204,17 +228,33 @@
         on:checkout-success={handleCheckoutSuccess}
       />
     {:else}
-      <CartHeader {onClose} />
+      <CartHeader onClose={closeCart} />
 
       <div class="cart-content">
         <div class="cart-main">
           <div class="cart-main-header">
             <div class="cart-title">
-              Cart (Total: ${cartTotal.toFixed(2)})
+              Cart ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})
             </div>
-            <button class="delete-cart-btn" on:click={clearCart}>
-              <X size={20} color="#343538" />
+            <button
+              class="delete-cart-btn btn btn-icon btn-icon-primary btn-icon-sm"
+              on:click={clearCart}
+            >
+              <X size={20} />
             </button>
+          </div>
+
+          <!-- NEW: Dual price display section -->
+          <div class="cart-totals-section">
+            <div class="cart-total-regular">Total: ${cartTotal.toFixed(2)}</div>
+            <div class="cart-total-promo">
+              With loyalty card: ${cartPromoTotal.toFixed(2)}
+            </div>
+            {#if totalSavings > 0}
+              <div class="savings-amount">
+                You save: ${totalSavings.toFixed(2)}
+              </div>
+            {/if}
           </div>
 
           <div class="cart-items">
@@ -250,7 +290,7 @@
 
           <div class="checkout-button-container">
             <button
-              class="checkout-button"
+              class="checkout-button btn btn-primary btn-lg"
               disabled={cartItems.length === 0}
               on:click={startCheckout}
             >
@@ -270,11 +310,12 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--overlay-dark);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s;
-    z-index: 2000;
+    z-index: var(
+      --z-index-highest
+    ); /* Increased z-index to be above all other elements */
   }
 
   .overlay.visible {
@@ -282,22 +323,35 @@
     pointer-events: auto;
   }
 
+  .overlay.fade-in {
+    animation: fadeIn var(--transition-fast) ease forwards;
+  }
+
+  .overlay.fade-out {
+    animation: fadeOut var(--transition-fast) ease forwards;
+  }
+
   .cart-container {
     position: fixed;
     top: 0;
-    right: -480px;
+    right: 0;
     width: 480px;
     height: 100vh;
-    background: #ffffff;
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
-    transition: right 0.3s ease;
+    background: var(--background);
+    box-shadow: var(--shadow-sidebar);
     display: flex;
     flex-direction: column;
-    z-index: 2001;
+    z-index: var(
+      --z-index-highest
+    ); /* Same as overlay to ensure it's visible */
   }
 
-  .cart-container.open {
-    right: 0;
+  .cart-container.slide-in-right {
+    animation: slideInRight var(--transition-normal) ease forwards;
+  }
+
+  .cart-container.slide-out-right {
+    animation: slideOutRight var(--transition-normal) ease forwards;
   }
 
   .cart-content {
@@ -311,7 +365,7 @@
     border: none;
     margin: 0;
     padding: 0;
-    background-color: #ffffff;
+    background-color: var(--background);
     width: 100%;
     height: 100%;
     display: flex;
@@ -319,90 +373,110 @@
   }
 
   .cart-main-header {
-    padding: 15px 20px;
+    height: var(--component-header-height); /* Explicit height */
+    min-height: var(--component-header-height);
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+    padding: 0 var(--spacing-lg); /* Adjust padding if needed, top/bottom padding will be handled by align-items */
     position: sticky;
     top: 0;
-    background: #ffffff;
-    z-index: 10;
+    background: var(--background);
+    z-index: var(--z-index-sticky);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: var(--border-width-thin) solid var(--border);
   }
 
   .cart-title {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
   }
 
-  .delete-cart-btn {
-    background: transparent;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: #666;
-    padding: 0 5px;
+  /* NEW: Cart totals styling */
+  .cart-totals-section {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: linear-gradient(
+      135deg,
+      rgba(86, 98, 189, 0.05),
+      rgba(112, 70, 168, 0.05)
+    );
+    border-bottom: var(--border-width-thin) solid var(--border);
+  }
+
+  .cart-total-regular {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .cart-total-promo {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--primary);
+  }
+
+  .savings-amount {
+    font-size: var(--font-size-sm);
+    color: var(--success);
+    font-weight: var(--font-weight-semibold);
+    margin-top: 4px;
+  }
+
+  :global(.delete-cart-btn svg) {
+    color: var(--button-text);
+    stroke: var(--button-text);
   }
 
   .cart-items {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 10px 20px;
+    padding: var(--spacing-sm) var(--spacing-lg);
     min-height: 0;
   }
 
   .error-message {
-    margin: 15px 0;
-    padding: 10px;
-    background-color: #ffebee;
-    color: #c62828;
-    border-radius: 4px;
-    font-size: 14px;
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-sm);
+    background-color: rgba(211, 47, 47, 0.1);
+    color: var(--error);
+    border-radius: var(--card-border-radius);
+    font-size: var(--font-size-sm);
   }
 
   .empty-cart {
-    padding: 30px 0;
+    padding: var(--spacing-xxl) 0;
     text-align: center;
-    color: #888;
-    font-size: 16px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-md);
   }
 
   .loading {
-    padding: 30px 0;
+    padding: var(--spacing-xxl) 0;
     text-align: center;
-    color: #888;
-    font-size: 16px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-md);
   }
 
   .checkout-button-container {
-    padding: 20px;
-    background: #ffffff;
-    border-top: 1px solid #e0e0e0;
+    padding: var(--spacing-lg);
+    background: var(--background);
+    border-top: var(--border-width-thin) solid var(--border);
     margin-top: auto;
   }
 
   .checkout-button {
     width: 100%;
-    padding: 14px;
-    background: rgb(61, 61, 61);
-    border: none;
-    color: white;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: center;
-    transition: background-color 0.2s;
-  }
-
-  .checkout-button:hover:not([disabled]) {
-    background: rgb(98, 98, 98);
   }
 
   .checkout-button[disabled] {
-    background: #cccccc;
-    border-color: #bbbbbb;
+    background: var(--surface);
+    border: var(--border-width-thin) solid var(--border);
+    color: var(--text-secondary);
     cursor: not-allowed;
     opacity: 0.7;
+    box-shadow: none;
+    transform: none;
   }
 </style>

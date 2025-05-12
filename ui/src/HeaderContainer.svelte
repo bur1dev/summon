@@ -38,6 +38,7 @@
 
   // Subscribe to cart total from cart service
   let unsubscribeCartTotal;
+  let uniqueItemCount = 0;
 
   onMount(() => {
     // Wait for client to be initialized
@@ -53,6 +54,18 @@
       unsubscribeCartTotal = $cartService.cartTotal.subscribe((total) => {
         cartTotal = total;
       });
+
+      // Subscribe to unique item count
+      const unsubscribeUniqueCount = $cartService.uniqueItemCount.subscribe(
+        (count) => {
+          uniqueItemCount = count;
+        },
+      );
+
+      return () => {
+        if (unsubscribeCartTotal) unsubscribeCartTotal();
+        if (unsubscribeUniqueCount) unsubscribeUniqueCount();
+      };
     }
 
     return () => {
@@ -74,12 +87,16 @@
 <div class="header-container">
   <div class="left-section">
     <!-- Hamburger menu button -->
-    <button class="menu-button" on:click={toggleMenu} title="Menu">
-      <Menu size={24} color="#343538" />
+    <button
+      class="menu-button btn btn-icon btn-icon-primary"
+      on:click={toggleMenu}
+      title="Menu"
+    >
+      <Menu size={24} color="white" />
     </button>
 
-    <!-- Logo image -->
-    <img src="./logo.png" alt="SUMN." class="app-logo" />
+    <!-- Logo text -->
+    <span class="app-logo">SUMN.</span>
   </div>
 
   <div class="center-section">
@@ -112,7 +129,7 @@
   <div class="right-section">
     <!-- View toggle button -->
     <button
-      class="view-toggle"
+      class="view-toggle btn btn-secondary btn-md"
       on:click={() => {
         $currentViewStore =
           $currentViewStore === "active" ? "checked-out" : "active";
@@ -123,131 +140,149 @@
         : "Go Back To Store"}
     </button>
 
-    <button class="cart-button" on:click={toggleCart} title="Shopping Cart">
+    <button
+      class="cart-button btn btn-primary btn-md"
+      on:click={toggleCart}
+      title="Shopping Cart"
+    >
+      <span class="item-count">{uniqueItemCount}</span>
       <ShoppingCart size={30} color="#ffffff" />
       <span class="cart-total">${cartTotal.toFixed(2)}</span>
     </button>
   </div>
 </div>
 
-<!-- Sidebar Menu Component -->
-<SidebarMenu {store} {myAgentPubKeyB64} {avatarLoaded} />
-
 <style>
   .header-container {
-    position: fixed;
+    position: sticky; /* Changed from fixed to sticky */
     top: 0;
     left: 0;
     right: 0;
-    height: 72px;
-    background: white;
+    height: var(--component-header-height); /* Explicit height */
+    background: var(--background);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
+    box-shadow: var(--shadow-subtle);
+    z-index: var(--z-index-modal);
+    padding-left: var(
+      --sidebar-width-category
+    ); /* Keeps left side aligned as it is now */
   }
 
   .left-section {
     display: flex;
     align-items: center;
-    gap: 8px;
-    width: 250px; /* Match sidebar width */
-    padding-left: 16px;
+    gap: var(--spacing-xs);
+    width: var(--sidebar-width-category);
+    position: absolute;
+    left: 0;
+    padding-left: var(--spacing-md);
+    box-sizing: border-box;
   }
 
   .menu-button {
+    /* Positioning only - appearance from btn classes */
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    border-radius: 8px;
-    transition: background-color 0.2s;
-  }
-
-  .menu-button:hover {
-    background-color: #f5f5f5;
+    width: var(--btn-height-md); /* 45px */
+    height: var(--btn-height-md); /* 45px */
   }
 
   .app-logo {
-    height: 60px;
-    width: auto;
+    font-size: var(--font-size-xl, 35px);
+    font-weight: var(--font-weight-bold, 700);
+    color: var(--text-primary, #ffffff);
+    padding-left: var(--spacing-xs);
   }
 
   .view-toggle,
   .cart-button {
-    padding: 0 14px;
-    height: 48px;
+    width: 235px; /* Made consistent */
+    height: var(--btn-height-md);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    white-space: nowrap;
+    box-sizing: border-box;
+    padding: 0;
+  }
+
+  .view-toggle {
+    justify-content: center;
+    padding: 0 var(--spacing-sm);
+  }
+
+  .cart-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
   }
 
   .center-section {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: var(--spacing-md);
     flex: 1;
     justify-content: flex-start;
+    /* Remove the padding and let the items inside align */
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
   }
 
   .right-section {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding-right: 16px;
-  }
-
-  .view-toggle {
-    padding: 8px 14px;
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 16px;
-    white-space: nowrap;
-    transition: background-color 0.2s;
-  }
-
-  .view-toggle:hover {
-    background: #f5f5f5;
+    gap: var(--spacing-sm);
+    padding-right: var(--spacing-md);
   }
 
   .search-container {
     flex: 1;
-    max-width: 700px;
+    height: var(--btn-height-md);
+    width: 100%;
+    max-width: 100%;
   }
 
   /* Style the search input within the container */
   .search-container :global(input) {
-    border-radius: 8px !important;
-    height: 48px !important;
-    font-size: 16px !important;
+    border-radius: var(--btn-border-radius) !important;
+    height: var(--btn-height-md) !important;
+    font-size: var(--font-size-md) !important;
+    border: var(--border-width-thin) solid var(--border) !important;
+    transition: var(--btn-transition) !important;
+    box-sizing: border-box !important;
   }
 
-  .cart-button {
+  .search-container :global(input:focus) {
+    border-color: var(--primary) !important;
+    box-shadow: var(--shadow-subtle) !important;
+  }
+
+  .item-count {
     display: flex;
     align-items: center;
-    gap: 6px;
-    background: rgb(61, 61, 61);
-    border: none;
-    color: white;
-    border-radius: 20px;
-    padding: 8px 14px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: background-color 0.2s;
-  }
-
-  .cart-button:hover {
-    background: rgb(98, 98, 98);
-    border: none;
+    justify-content: center;
+    width: var(--btn-icon-size-sm);
+    height: var(--btn-icon-size-sm);
+    min-width: var(--btn-icon-size-sm);
+    background-color: rgba(0, 0, 0, 0.15);
+    color: var(--button-text);
+    border-radius: 50%;
+    font-size: var(--font-size-md); /* Match .cart-total font size */
+    /* font-weight: normal; (This line was removed to inherit parent's font-weight) */
+    position: absolute;
+    left: calc(50% - 100px); /* Position left of center */
   }
 
   .cart-total {
-    font-size: 16px;
-    color: white;
+    font-size: var(--font-size-md);
+    color: var(--button-text);
+    white-space: nowrap;
+    position: absolute;
+    right: calc(50% - 100px); /* Position right of center */
   }
 </style>

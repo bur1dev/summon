@@ -167,7 +167,7 @@ app.get('/api/all-products', async (req, res) => {
   const allProducts = [];
   // Comprehensive list of search terms for testing Kroger/Ralphs product search in Holochain DHT
   const searchTerms = [
-    'Simple Truth Organic Honey Crisp Apples Pound Bag', 'Private Selection Fresh Petite Cherry Snacking Tomatoes', 'Kroger Extra Large Grade Aa White Eggs', 'Simple Truth Dairy Free Original Almond Milk Half', 'Western Hearth 100% Whole Wheat Bread'
+    'Project Partners 12 Ft Fast Read Tape Measure'
   ];
   try {
     console.log(`Fetching all products for location: ${locationId}`);
@@ -231,20 +231,36 @@ app.get('/api/all-products', async (req, res) => {
 });
 
 app.post('/api/categorize', async (req, res) => {
-  console.log("Categorize endpoint hit with", req.body.length, "products");
-  const products = req.body;
+  const { products, taxonomy_cache_name_from_client } = req.body;
+  if (!products || !Array.isArray(products)) {
+    return res.status(400).json({ error: "Request body must include a 'products' array." });
+  }
+  console.log("Categorize endpoint hit with", products.length, "products");
+  if (taxonomy_cache_name_from_client) {
+    console.log("➡️ Received taxonomy_cache_name_from_client:", taxonomy_cache_name_from_client);
+  } else {
+    console.log("➡️ No taxonomy_cache_name_from_client received (expected for first batch).");
+  }
 
   try {
     console.log("API Key loaded:", process.env.GEMINI_API_KEY ?
       `Yes (${process.env.GEMINI_API_KEY.substring(0, 10)}...)` : "No");
 
-    // Initialize categorizer with API key
     const categorizer = new ProductCategorizer(process.env.GEMINI_API_KEY);
 
-    // Categorize products in batches
-    const categorizedProducts = await categorizer.categorizeProducts(products);
+    if (taxonomy_cache_name_from_client) {
+      categorizer.currentTaxonomyCacheName = taxonomy_cache_name_from_client;
+      console.log(`🔧 Set categorizer.currentTaxonomyCacheName to: ${categorizer.currentTaxonomyCacheName}`);
+    }
 
-    const transformedProducts = categorizedProducts.map(product => ({
+    // The `categorizeProducts` method in api_categorizer.js internally calls processBatch,
+    // which uses `this.currentTaxonomyCacheName`.
+    // The result of `categorizeProducts` is just the array of categorized products.
+    // The updated `this.currentTaxonomyCacheName` (if a new cache was made or an old one confirmed)
+    // is stored on the `categorizer` instance.
+    const categorizedProductList = await categorizer.categorizeProducts(products);
+
+    const transformedProducts = categorizedProductList.map(product => ({
       product: {
         name: product.description,
         price: product.items?.[0]?.price?.regular || 0,
@@ -255,7 +271,7 @@ app.post('/api/categorize', async (req, res) => {
         subcategory: product.subcategory || null,
         product_type: product.product_type || null,
         image_url: product.image_url || null,
-        sold_by: product.items?.[0]?.soldBy || null  // Add sold_by field
+        sold_by: product.items?.[0]?.soldBy || null
       },
       main_category: product.category,
       subcategory: product.subcategory || null,
@@ -263,34 +279,42 @@ app.post('/api/categorize', async (req, res) => {
       additional_categorizations: product.additional_categorizations || []
     }));
 
-    // Save categorized products
+    // Save categorized products (This logic seems to assume categorizedProductList has productIds, ensure it does)
     const categorizedDataPath = path.join(__dirname, '../product-categorization/categorized_products.json');
     let allCategorized = [];
 
     if (fs.existsSync(categorizedDataPath)) {
       try {
-        const existingData = JSON.parse(fs.readFileSync(categorizedDataPath, 'utf8'));
-        // Avoid duplicates
+        const existingDataFileContent = fs.readFileSync(categorizedDataPath, 'utf8');
+        const existingData = existingDataFileContent ? JSON.parse(existingDataFileContent) : [];
+
         const existingProductIds = new Set(existingData.map(p => p.productId));
-        const newProducts = categorizedProducts.filter(p => !p.productId || !existingProductIds.has(p.productId));
+        const newProducts = categorizedProductList.filter(p => !p.productId || !existingProductIds.has(p.productId));
         allCategorized = existingData.concat(newProducts);
       } catch (error) {
-        console.error('Error reading existing data:', error);
-        allCategorized = categorizedProducts;
+        console.error('Error reading or parsing existing categorized_products.json:', error);
+        // If file is corrupt or empty, start fresh with current batch
+        allCategorized = categorizedProductList;
       }
     } else {
-      allCategorized = categorizedProducts;
+      allCategorized = categorizedProductList;
     }
 
-    fs.writeFileSync(categorizedDataPath, JSON.stringify(allCategorized));
+    fs.writeFileSync(categorizedDataPath, JSON.stringify(allCategorized, null, 2)); // Added null, 2 for pretty print
 
     // Run the sort script
-    const { spawn } = require('child_process');
+    const { spawn } = require('child_process'); // Already required above, but ensure it's accessible
     spawn('python3', ['sort_products.py'], {
       cwd: path.join(__dirname, '../product-categorization/')
     });
 
-    res.json(transformedProducts);
+    // Respond with an object that includes the products and the updated cache name
+    console.log(`⬅️ Responding with taxonomy_cache_name: ${categorizer.currentTaxonomyCacheName}`);
+    res.json({
+      categorizedProducts: transformedProducts,
+      taxonomy_cache_name: categorizer.currentTaxonomyCacheName
+    });
+
   } catch (error) {
     console.error('Categorization error:', error);
     res.status(500).json({ error: error.message });

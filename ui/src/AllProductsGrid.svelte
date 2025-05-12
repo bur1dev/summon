@@ -35,6 +35,7 @@
     let targetVisibleIndices = [];
     let renderFrameId = null;
     let lastRenderTime = 0;
+    let prevIndicesString = "";
 
     function startRenderLoop() {
         if (renderLoopActive) return;
@@ -43,8 +44,17 @@
         function renderFrame() {
             const now = performance.now();
             if (now - lastRenderTime >= 16) {
-                // REPLACE indices rather than accumulating
+                // Only log when indices actually change
                 if (targetVisibleIndices.length > 0) {
+                    const currentIndicesString = `${targetVisibleIndices[0]}-${targetVisibleIndices[targetVisibleIndices.length - 1]}`;
+
+                    if (currentIndicesString !== prevIndicesString) {
+                        console.log(
+                            `Virtualization: Rendering ${targetVisibleIndices.length} items (indices ${currentIndicesString})`,
+                        );
+                        prevIndicesString = currentIndicesString;
+                    }
+
                     // Clear and replace with new indices only
                     visibleIndices = [...targetVisibleIndices];
                 }
@@ -92,20 +102,23 @@
     function recalculateGrid() {
         if (!productsGridRef) return;
 
-        // Get actual width of grid container
-        gridWidth = productsGridRef.offsetWidth - 10;
+        // Delay calculation slightly to ensure DOM is fully rendered
+        setTimeout(() => {
+            // Get actual width of grid container, but don't exceed parent width
+            gridWidth = productsGridRef.offsetWidth;
 
-        // Calculate how many items fit per row (floor to ensure no overflow)
-        columnsPerRow = Math.floor(gridWidth / itemWidth);
+            // Calculate how many items fit per row (floor to ensure no overflow)
+            columnsPerRow = Math.floor(gridWidth / itemWidth);
 
-        // Update container height based on how many rows we need
-        const rowCount = Math.ceil(products.length / columnsPerRow);
-        totalHeight = rowCount * 450;
+            // Update container height based on how many rows we need
+            const rowCount = Math.ceil(products.length / columnsPerRow);
+            totalHeight = rowCount * 450;
 
-        // No need for gap size calculation when using percentage widths in absolute positioning
-        // We'll use the full width divided by columns for positioning
+            calculateVisibleIndices();
 
-        calculateVisibleIndices();
+            // Force update position cache after width calculation
+            updatePositionCache();
+        }, 50);
     }
 
     // Pre-compute all positions once
@@ -113,13 +126,28 @@
         if (!columnsPerRow) return;
         positionCache.clear();
 
-        // Pre-compute ALL positions instead of just visible ones
+        // Fixed width for each card
+        const cardWidth = 245;
+
+        // Calculate total used width and remaining space
+        const totalContentWidth = columnsPerRow * cardWidth;
+        const remainingSpace = gridWidth - totalContentWidth;
+
+        // Calculate gap between items (space-between logic)
+        const gapBetweenItems =
+            columnsPerRow > 1 ? remainingSpace / (columnsPerRow - 1) : 0;
+
+        // Calculate position for each item
         for (let i = 0; i < products.length; i++) {
             const row = Math.floor(i / columnsPerRow);
             const col = i % columnsPerRow;
+
+            // Position calculation: first item flush left, others with calculated gaps
+            const leftPosition = col * (cardWidth + gapBetweenItems);
+
             positionCache.set(i, {
                 top: row * rowHeight,
-                left: col * (gridWidth / columnsPerRow),
+                left: leftPosition,
             });
         }
     }
@@ -128,12 +156,21 @@
         if (!productsGridRef || !parentScrollContainer || !columnsPerRow)
             return;
 
-        const scrollTop = Math.max(
+        // Get the grid's position relative to the scroll container
+        const gridRect = productsGridRef.getBoundingClientRect();
+        const containerRect = parentScrollContainer.getBoundingClientRect();
+
+        // Calculate the scroll position relative to the grid
+        const relativeScrollTop = Math.max(
             0,
-            parentScrollContainer.scrollTop - productsGridRef.offsetTop,
+            parentScrollContainer.scrollTop -
+                (gridRect.top -
+                    containerRect.top +
+                    parentScrollContainer.scrollTop),
         );
+
         const viewportHeight = parentScrollContainer.clientHeight;
-        const startRow = Math.floor(scrollTop / rowHeight);
+        const startRow = Math.floor(relativeScrollTop / rowHeight);
         const visibleRows = Math.ceil(viewportHeight / rowHeight) + 4;
         const startIndex = Math.max(0, (startRow - 3) * columnsPerRow);
         const endIndex = Math.min(
@@ -150,19 +187,32 @@
             { length: endIndex - startIndex },
             (_, i) => startIndex + i,
         );
+
+        // Log virtualization stats
+        console.log(
+            `Virtualization: Rendering ${endIndex - startIndex} items (rows ${startRow} to ${startRow + visibleRows}) with buffer rows`,
+        );
     }
 
     function handleScroll() {
         if (!productsGridRef || !parentScrollContainer || !columnsPerRow)
             return;
 
-        const scrollTop = Math.max(
+        // Get the grid's position relative to the scroll container
+        const gridRect = productsGridRef.getBoundingClientRect();
+        const containerRect = parentScrollContainer.getBoundingClientRect();
+
+        // Calculate the scroll position relative to the grid
+        const relativeScrollTop = Math.max(
             0,
-            parentScrollContainer.scrollTop - productsGridRef.offsetTop,
+            parentScrollContainer.scrollTop -
+                (gridRect.top -
+                    containerRect.top +
+                    parentScrollContainer.scrollTop),
         );
 
         const viewportHeight = parentScrollContainer.clientHeight;
-        const startRow = Math.floor(scrollTop / rowHeight);
+        const startRow = Math.floor(relativeScrollTop / rowHeight);
 
         // Maximum 3 visible rows (plus buffer)
         const visibleRows = Math.min(3, Math.ceil(viewportHeight / rowHeight));
@@ -207,11 +257,34 @@
 
     onMount(() => {
         containerHeight = window.innerHeight - 200;
-        parentScrollContainer = productsGridRef?.closest(".scroll-container");
+
+        // Find the global scroll container instead of closest .scroll-container
+        parentScrollContainer = document.querySelector(
+            ".global-scroll-container",
+        );
 
         if (parentScrollContainer) {
-            parentScrollContainer.addEventListener("scroll", handleScroll);
+            // Explicitly bind the context to handleScroll
+            const boundScrollHandler = handleScroll.bind(this);
+            parentScrollContainer.addEventListener(
+                "scroll",
+                boundScrollHandler,
+            );
             parentScrollContainer.style.willChange = "transform";
+
+            // Add immediate logging
+            console.log(
+                "Scroll handler attached to global container",
+                parentScrollContainer,
+            );
+
+            // Force initial calculation
+            setTimeout(() => {
+                handleScroll();
+                console.log("Initial scroll calculation forced");
+            }, 100);
+        } else {
+            console.error("Global scroll container not found!");
         }
 
         window.addEventListener("resize", handleResize);
@@ -241,7 +314,11 @@
 
 <div class="all-products-grid" id={gridId}>
     {#if title}
-        <h2 class="all-products-title">{title}</h2>
+        <div class="section-header">
+            <div class="all-products-title">
+                <b>{title}</b>
+            </div>
+        </div>
     {/if}
     <div class="products-grid" bind:this={productsGridRef}>
         {#if products.length > 0}
@@ -278,33 +355,47 @@
 
 <style>
     .all-products-grid {
-        margin-top: 20px;
+        padding-top: 20px;
+        padding-bottom: 20px;
         width: 100%;
+        box-sizing: border-box;
     }
 
     .all-products-title {
         font-size: 30px;
         font-weight: bold;
         text-align: left;
-        margin-bottom: 20px;
-        padding-left: 15px;
+        margin-bottom: 0px;
         color: #343538;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        margin-bottom: 20px;
+        position: relative;
     }
 
     .products-grid {
         width: 100%;
         position: relative;
+        box-sizing: border-box; /* Add this */
+        overflow: visible;
+        max-width: 100%; /* Add this */
     }
 
     .grid-container {
         position: relative;
         width: 100%;
-        overflow-x: hidden;
+        overflow: visible;
         transform: translateZ(0);
         will-change: transform;
         backface-visibility: hidden;
-        contain: content;
+        contain: layout size;
         perspective: 1000px;
+        box-sizing: border-box; /* Add this */
+        max-width: 100%; /* Add this */
     }
 
     .product-container {
@@ -313,12 +404,15 @@
         transform: translateZ(0);
         will-change: transform;
         contain: layout size;
+        box-sizing: border-box; /* Add this */
+        max-width: 100%; /* Add this */
     }
 
     .loading-message {
         padding: 20px;
         text-align: center;
         width: 100%;
+        box-sizing: border-box;
     }
 
     :global(*) {

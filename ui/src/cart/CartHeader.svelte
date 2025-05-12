@@ -5,45 +5,60 @@
 
 <div class="cart-header">
     <button class="close-btn" on:click={onClose}>
-        <X size={24} color="#343538" />
+        <X size={20} />
     </button>
     <h2>Shopping Cart</h2>
 </div>
 
 <style>
     .cart-header {
-        padding: 20px;
-        border-bottom: 1px solid #e0e0e0;
+        height: var(--component-header-height);
+        box-sizing: border-box;
+        padding: 0 var(--spacing-xl);
         display: flex;
         align-items: center;
         position: relative;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
     }
 
     .cart-header h2 {
         margin: 0;
-        font-size: 20px;
-        font-weight: 600;
+        font-size: var(--spacing-lg);
+        font-weight: var(--font-weight-semibold);
         flex-grow: 1;
         text-align: center;
+        color: var(--button-text);
+        line-height: 1;
     }
 
     .close-btn {
         position: absolute;
-        left: 20px;
-        background: transparent;
+        left: var(--spacing-lg);
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.2);
         border: none;
         cursor: pointer;
-        color: #666;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 8px;
-        transition: background-color 0.2s;
+        width: var(--btn-icon-size-sm);
+        height: var(--btn-icon-size-sm);
+        border-radius: 50%;
+        transition: var(--btn-transition);
+        box-shadow: var(--shadow-button);
+        transform-origin: center;
+        padding: 0;
     }
 
     .close-btn:hover {
-        background-color: #f5f5f5;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-50%) scale(var(--hover-scale));
+        box-shadow: var(--shadow-medium);
+    }
+
+    :global(.close-btn svg) {
+        color: var(--button-text);
+        stroke: var(--button-text);
     }
 </style>

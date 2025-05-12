@@ -16,7 +16,7 @@ async function main() {
         // Parse command line args
         const args = process.argv.slice(2);
         const inputFile = args[0] || 'products.json';
-        const batchSize = parseInt(args[1], 10) || 10;
+        const batchSize = parseInt(args[1], 10) || 20;
 
         if (!fs.existsSync(inputFile)) {
             console.error(`Input file not found: ${inputFile}`);

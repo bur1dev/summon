@@ -2,6 +2,7 @@
     import NavigationArrows from "./NavigationArrows.svelte";
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
+    import { ChevronRight } from "lucide-svelte";
 
     // Required props
     export let title: string;
@@ -32,8 +33,12 @@
         <div class="product-row-title">
             <b>{title}</b>
         </div>
-        <span class="view-all-link" on:click|stopPropagation={onViewMore}>
+        <span
+            class="view-all-link btn btn-text"
+            on:click|stopPropagation={onViewMore}
+        >
             View More
+            <ChevronRight size={20} class="chevron-icon" />
         </span>
     </div>
     <!-- Pass identifier to data-subcategory for resize observer -->
@@ -52,6 +57,7 @@
             {containerCapacity}
             {isProductType}
             on:dataLoaded
+            on:boundariesInitialized
         />
 
         <!-- This loop iterates over the 'products' prop directly -->
@@ -79,6 +85,7 @@
             {containerCapacity}
             {isProductType}
             on:dataLoaded
+            on:boundariesInitialized
         />
     </div>
 </div>
@@ -93,63 +100,67 @@
         min-width: 290px;
         border: none;
         background-color: transparent;
-        border-radius: 15px;
-        padding-top: 20px;
-        padding-bottom: 20px;
+        border-radius: var(--card-border-radius);
+        padding-top: var(--spacing-lg);
+        padding-bottom: var(--spacing-lg);
         width: 100%;
+        margin-bottom: var(--spacing-lg);
+        box-sizing: border-box;
+        transition: var(--card-transition);
     }
 
     .product-row-title {
         font-size: 30px;
-        font-weight: bold;
+        font-weight: var(--font-weight-bold);
         text-align: left;
         margin-bottom: 0px;
-        padding-left: 15px;
-        color: #343538;
+        color: var(--text-primary);
     }
 
     .product-row-title b {
-        color: #343538;
+        color: var(--text-primary);
     }
 
     .section-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: baseline; /* Vertically align items along their text baseline */
         width: 100%;
-        margin-bottom: 20px;
-        position: relative;
+        margin-bottom: var(--spacing-lg);
+        position: relative; /* This is fine, can stay */
     }
 
     .view-all-link {
-        color: #343538;
-        font-size: 20px;
-        font-weight: bold;
+        font-size: var(--spacing-lg);
+        font-weight: var(--font-weight-bold);
         text-decoration: none;
         cursor: pointer;
-        position: absolute;
-        right: 20px;
-        top: 10px;
+        /* position: absolute; -- REMOVED */
+        /* right: var(--spacing-lg); -- REMOVED */
+        /* top: var(--content-padding); -- REMOVED */
+        display: flex; /* This is good for aligning the text and icon within the link */
+        align-items: center; /* Aligns "View More" text and the chevron icon vertically */
+        /* The .btn and .btn-text classes already provide padding and other styles */
     }
 
-    .view-all-link:hover {
-        text-decoration: underline;
+    :global(.chevron-icon) {
+        transition: transform var(--transition-normal) ease;
     }
 
-    .view-all-link::after {
-        content: "›";
-        margin-left: 4px;
-        font-size: 16px;
+    .view-all-link:hover :global(.chevron-icon) {
+        transform: translateX(2px);
     }
 
     .product-row-items {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+        grid-template-columns: repeat(auto-fill, 245px);
         grid-template-rows: 450px;
         gap: 0px;
         width: 100%;
-        justify-content: start;
+        justify-content: space-between;
         max-height: 450px;
-        overflow: hidden;
+        overflow: visible;
+        box-sizing: border-box;
+        max-width: 100%;
     }
 </style>

@@ -2,8 +2,7 @@
     import { createEventDispatcher, onMount } from "svelte";
     import { debounce } from "lodash";
     import Fuse from "fuse.js";
-    import { decode } from "@msgpack/msgpack";
-    import { Search } from "lucide-svelte"; // Added Search icon import
+    import { Search } from "lucide-svelte";
     import SearchCacheService from "./SearchCacheService";
     import type { Product, ProductTypeGroup } from "./search-types";
     import { parseQuery } from "./search-utils";
@@ -19,6 +18,35 @@
     let isLoading = false;
     let productIndex: Product[] = [];
     let fuse: Fuse<Product>;
+    let searchInputRect: DOMRect | null = null;
+    let searchInputElement: HTMLElement;
+
+    // Portal function - renders a node at document.body level
+    function portal(node) {
+        let target = document.body;
+
+        function update() {
+            target.appendChild(node);
+        }
+
+        function destroy() {
+            node.parentNode?.removeChild(node);
+        }
+
+        update();
+
+        return {
+            update,
+            destroy,
+        };
+    }
+
+    // Update dropdown position based on search input position
+    function updateDropdownPosition() {
+        if (searchInputElement) {
+            searchInputRect = searchInputElement.getBoundingClientRect();
+        }
+    }
 
     // Fuse.js search options
     const fuseOptions = {
@@ -41,6 +69,12 @@
         } catch (error) {
             console.error("Error initializing search:", error);
         }
+
+        // Add window resize listener to update dropdown position
+        window.addEventListener("resize", updateDropdownPosition);
+        return () => {
+            window.removeEventListener("resize", updateDropdownPosition);
+        };
     });
 
     function initializeProductIndex(products: any[]) {
@@ -71,10 +105,6 @@
         // Check for products without names
         const productsWithoutNames = products.filter((p) => !p.name);
 
-        // Log sample products
-        if (productsWithoutNames.length > 0) {
-        }
-
         // Check for berry products as a sample test case
         const berryProducts = products.filter(
             (p) =>
@@ -82,8 +112,6 @@
                 (p.product_type &&
                     p.product_type.toLowerCase().includes("berr")),
         );
-
-        // Check for empty/malformed products
     }
 
     function initFuse(products: Product[]) {
@@ -112,6 +140,11 @@
 
             searchResults = processedResults;
             showDropdown = searchResults.length > 0;
+
+            // Update dropdown position when showing it
+            if (showDropdown) {
+                updateDropdownPosition();
+            }
         } catch (error) {
             console.error("Search error:", error);
             searchResults = [];
@@ -319,15 +352,33 @@
     }
 
     function handleEnterKey() {
-        if (searchResults.length > 0) {
-            handleViewAllResults();
+        // Handle search regardless of whether dropdown is showing
+        if (searchQuery.trim()) {
+            // Cancel any pending debounced searches
+            debouncedSearch.cancel();
+
+            // Force immediate search if we don't have results yet
+            if (searchResults.length === 0 && fuse) {
+                const allFuseResults = fuse
+                    .search(searchQuery)
+                    .map((r) => r.item);
+                dispatch("viewAll", {
+                    query: searchQuery,
+                    fuseResults: allFuseResults,
+                    isViewAll: true,
+                });
+            } else if (searchResults.length > 0) {
+                handleViewAllResults();
+            }
         }
+
+        // Always close dropdown
         showDropdown = false;
     }
 </script>
 
 <div class="search-container">
-    <div class="search-input-container">
+    <div class="search-input-container" bind:this={searchInputElement}>
         <!-- Added Search icon from lucide -->
         <div class="search-icon">
             <Search size={18} color="#666666" />
@@ -337,6 +388,12 @@
             placeholder="Search products..."
             bind:value={searchQuery}
             on:input={handleInput}
+            on:click={() => {
+                if (searchQuery.trim()) debouncedSearch();
+            }}
+            on:focus={() => {
+                if (searchQuery.trim()) debouncedSearch();
+            }}
             on:keydown={(e) => {
                 if (e.key === "Enter" && searchQuery.trim()) {
                     handleEnterKey();
@@ -346,12 +403,26 @@
     </div>
 
     {#if showDropdown}
-        <!-- Background overlay -->
+        <!-- Portal the overlay and dropdown to body level -->
         <div
             class="search-overlay"
             on:click={() => (showDropdown = false)}
+            use:portal
         ></div>
-        <div class="search-dropdown">
+
+        <!-- The dropdown is also portaled but positioned relative to the search input -->
+        <div
+            class="search-dropdown"
+            use:portal
+            style="
+                position: fixed; 
+                top: {searchInputRect ? searchInputRect.bottom + 'px' : '0'};
+                left: {searchInputRect ? searchInputRect.left + 'px' : '0'};
+                width: {searchInputRect
+                ? searchInputRect.width + 'px'
+                : '100%'};
+            "
+        >
             <div class="results-container">
                 {#if isLoading}
                     <div class="loading">Loading...</div>
@@ -414,7 +485,6 @@
     .search-container {
         position: relative;
         width: 100%;
-        max-width: 600px;
     }
 
     .search-input-container {
@@ -426,78 +496,107 @@
 
     .search-icon {
         position: absolute;
-        left: 12px;
+        left: var(--spacing-md);
         display: flex;
         align-items: center;
         pointer-events: none;
+        color: var(--text-secondary);
+        z-index: 5;
     }
 
     input {
         width: 100%;
-        padding: 10px 15px 10px 38px; /* Added left padding for icon */
-        border: 1px solid #ddd;
-        border-radius: 20px;
-        font-size: 14px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        transition: box-shadow 0.2s ease;
+        height: var(--btn-height-md);
+        padding: var(--spacing-sm) var(--spacing-md) var(--spacing-sm)
+            calc(var(--spacing-md) * 2 + 18px);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--font-size-md);
+        color: var(--text-primary);
+        background-color: var(--surface);
+        box-shadow: var(--shadow-subtle);
+        transition: var(--btn-transition);
+        box-sizing: border-box;
     }
 
-    input:hover,
+    input:hover {
+        border-color: var(--primary);
+    }
+
     input:focus {
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        border-color: var(--primary);
+        box-shadow: var(--shadow-medium);
         outline: none;
     }
 
     .search-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        width: 100%;
         max-height: 500px;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        background: var(--surface);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-medium);
         display: flex;
         flex-direction: column;
-        z-index: 1001;
+        z-index: var(--z-index-modal);
+        animation: scaleIn var(--transition-fast) ease forwards;
+        overflow: hidden;
     }
 
     .results-container {
         flex: 1;
         overflow-y: auto;
+        max-height: 400px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
+
+    .results-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .results-container::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+    }
+
+    .results-container::-webkit-scrollbar-thumb {
+        background-color: var(--scrollbar-thumb);
+        border-radius: 3px;
     }
 
     .search-overlay {
         position: fixed;
-        top: 60px; /* Below header */
+        top: var(--component-header-height);
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.3);
-        z-index: 900;
+        background: var(--overlay-dark);
+        z-index: var(--z-index-sticky);
+        animation: fadeIn var(--transition-fast) ease forwards;
     }
 
     .dropdown-item {
         display: flex;
         align-items: center;
-        padding: 10px;
-        border-bottom: 1px solid #eee;
+        padding: var(--spacing-sm) var(--spacing-md);
+        border-bottom: var(--border-width-thin) solid var(--border-lighter);
         cursor: pointer;
+        transition: background-color var(--transition-fast) ease;
     }
 
     .dropdown-item:hover {
-        background-color: #f5f5f5;
+        background-color: var(--surface-hover);
     }
 
     .product-image {
         width: 40px;
         height: 40px;
         min-width: 40px;
-        margin-right: 10px;
+        margin-right: var(--spacing-sm);
         display: flex;
         align-items: center;
         justify-content: center;
+        background-color: var(--background);
+        border-radius: var(--card-border-radius);
     }
 
     .product-image img {
@@ -508,38 +607,52 @@
 
     .product-name {
         flex: 1;
-        font-size: 14px;
+        font-size: var(--font-size-md);
+        color: var(--text-primary);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
     .product-price {
-        margin-left: 10px;
-        font-weight: bold;
+        margin-left: var(--spacing-sm);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
         white-space: nowrap;
     }
 
     .view-all {
-        padding: 10px;
+        padding: var(--spacing-md);
         text-align: center;
-        background-color: #f5f5f5;
-        font-weight: bold;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: var(--button-text);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
+        transition: var(--btn-transition);
+    }
+
+    .view-all:hover {
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
     }
 
     .type-item {
-        background-color: #f9f9f9;
+        background-color: var(--surface-hover);
     }
 
     .product-type {
-        font-weight: bold;
+        font-weight: var(--font-weight-semibold);
+        color: var(--primary);
     }
 
     .loading,
     .no-results {
-        padding: 15px;
+        padding: var(--spacing-lg);
         text-align: center;
-        color: #666;
+        color: var(--text-secondary);
+        font-size: var(--font-size-md);
     }
 </style>

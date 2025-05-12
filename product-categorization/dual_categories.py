@@ -35,6 +35,10 @@ DUAL_CATEGORY_MAPPINGS = {
             "product_type_to_subcategory": {"ALL": "Milk"},
             "dual_category": "Beverages",
         },
+        "Cheese": {
+            "product_type_to_subcategory": {"ALL": "Cheese"},
+            "dual_category": "Deli",
+        },
     },
     # Canned Goods & Soups mappings
     "Canned Goods & Soups": {
@@ -80,7 +84,11 @@ DUAL_CATEGORY_MAPPINGS = {
                 "Guacamole": "Deli",
                 "Cheese Dips": "Deli",
             },
-        }
+        },
+        "Snack Bars": {
+            "product_type_to_subcategory": {"Breakfast Bars": "Breakfast Bars"},
+            "dual_category": "Breakfast",
+        },
     },
     # Liquor mappings
     "Liquor": {
@@ -107,6 +115,7 @@ DUAL_CATEGORY_MAPPINGS = {
         }
     },
     # Deli mappings
+    # Deli mappings
     "Deli": {
         "Tofu & Meat Alternatives": {
             "product_type_to_subcategory": {"Tofu": "Plant-Based Meat"},
@@ -119,6 +128,12 @@ DUAL_CATEGORY_MAPPINGS = {
                 "Cheese Dips": "Dips",
             },
             "dual_category": "Snacks & Candy",
+        },
+        "Cheese": {
+            "product_type_to_subcategory": {"ALL": "Cheese"},
+            "dual_category": "Dairy & Eggs",
+            # The special handling for "Cheese" subcategory in get_dual_categorization
+            # will ensure LLM is used for product_type if this mapping is hit.
         },
     },
     # Wine mappings
@@ -146,32 +161,11 @@ DUAL_CATEGORY_MAPPINGS = {
             "dual_category": "Baking Essentials",
         },
     },
-    # Snacks & Candy mappings
-    "Snacks & Candy": {
-        "Snack Bars": {
-            "product_type_to_subcategory": {"Breakfast Bars": "Breakfast Bars"},
-            "dual_category": "Breakfast",
-        }
-    },
     # Baking Essentials mappings
     "Baking Essentials": {
         "Honey, Syrup, & Sweeteners": {
             "product_type_to_subcategory": {"Maple Syrup": "Maple Syrup"},
             "dual_category": "Breakfast",
-        }
-    },
-    "Deli": {
-        "Cheese": {
-            "product_type_to_subcategory": {"ALL": "Cheese"},
-            "dual_category": "Dairy & Eggs",
-            # No direct product type mappings - let LLM decide
-        }
-    },
-    "Dairy & Eggs": {
-        "Cheese": {
-            "product_type_to_subcategory": {"ALL": "Cheese"},
-            "dual_category": "Deli",
-            # No direct product type mappings - let LLM decide
         }
     },
 }
@@ -263,6 +257,18 @@ def get_dual_categorization(category, subcategory, product_type):
     # Check if this category is in our dual category mappings
     if category in DUAL_CATEGORY_MAPPINGS:
         logger.info(f"✅ Found category '{category}' in mappings")
+
+        current_category_mappings = DUAL_CATEGORY_MAPPINGS[category]
+        logger.info(
+            f"ℹ️ Subcategories available in DUAL_CATEGORY_MAPPINGS['{category}']: {list(current_category_mappings.keys())}"
+        )
+        logger.info(
+            f"ℹ️ Comparing input subcategory '[{subcategory}]' (type: {type(subcategory)}) with available keys."
+        )
+        for key in current_category_mappings.keys():
+            logger.info(
+                f"  - Key: '[{key}]' (type: {type(key)}), Match: {subcategory == key}"
+            )
 
         # Check if the subcategory has dual mapping rules
         if subcategory in DUAL_CATEGORY_MAPPINGS[category]:

@@ -101,7 +101,7 @@ pub fn get_products_by_hashes(hashes: Vec<ActionHash>) -> ExternResult<SearchRes
 
 fn get_records_from_hashes(hashes: Vec<ActionHash>) -> ExternResult<Vec<Record>> {
     // Process in batches of 100 to prevent timeouts
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
     let mut all_records = Vec::new();
 
     debug!(

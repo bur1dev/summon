@@ -23,7 +23,7 @@ export class ProductStore {
   public products: any[] = [];
   private selectedCategory: string | null = null;
   private selectedSubcategory: string | null = null;
-  private visibleItems: number = 100;
+  private visibleItems: number = 1000;
 
   constructor(
     private client: any,
@@ -158,7 +158,6 @@ export class ProductStore {
         loading: false
       }));
       window.allProductsData = null;
-      this.products = await this.getStoredProducts();
 
     } catch (error) {
       this.state.update(state => ({
@@ -180,6 +179,7 @@ export class ProductStore {
 
     let totalProductsFromFile = 0;
     let successfullyUploadedProducts = 0;
+    let totalGroupsCreated = 0;
 
     try {
       const response = await fetch('http://localhost:3000/api/load-categorized-products');
@@ -191,24 +191,36 @@ export class ProductStore {
       const data = await response.json();
       totalProductsFromFile = data.length;
 
-      console.log(`[LOG] Load Saved Data: Found ${totalProductsFromFile} products in the saved data file.`);
+      // Group products by product type
+      const productsByType = data.reduce((groups, product) => {
+        const category = product.category;
+        const subcategory = product.subcategory || null;
+        const productType = product.product_type === "All" || !product.product_type ? null : product.product_type;
+        const key = `${category}|||${subcategory}|||${productType}`;
+
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(product);
+        return groups;
+      }, {});
+
+      const productTypesCount = Object.keys(productsByType).length;
+      console.log(`[LOG] Load Saved Data: Found ${totalProductsFromFile} products in ${productTypesCount} product types.`);
 
       this.state.update(state => ({
         ...state,
         error: `Starting upload: 0/${totalProductsFromFile} products (0%)`
       }));
 
-      const BATCH_SIZE = 400;
+      let processedTypes = 0;
 
-      for (let i = 0; i < data.length; i += BATCH_SIZE) {
-        const batch = data.slice(i, Math.min(i + BATCH_SIZE, data.length));
-        const batchEnd = Math.min(i + BATCH_SIZE, data.length);
-        const currentBatchNumber = Math.floor(i / BATCH_SIZE) + 1;
-        const totalBatches = Math.ceil(totalProductsFromFile / BATCH_SIZE);
+      // Process each product type group
+      for (const [key, products] of Object.entries(productsByType)) {
+        const [category, subcategory, productType] = key.split('|||');
+        processedTypes++;
 
-        console.log(`[LOG] Load Saved Data: Processing Batch ${currentBatchNumber}/${totalBatches} (Products ${i + 1}-${batchEnd} of ${totalProductsFromFile})`);
+        console.log(`[LOG] Load Saved Data: Processing Product Type ${processedTypes}/${productTypesCount}: "${productType || 'None'}" (${products.length} products)`);
 
-        const processedBatch = batch.map(product => ({
+        const processedBatch = products.map(product => ({
           product: {
             name: product.description || "",
             price: product.items?.[0]?.price?.regular || 0,
@@ -219,17 +231,12 @@ export class ProductStore {
             subcategory: product.subcategory || null,
             product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,
             image_url: product.images?.find((img) => img.perspective === "front")?.sizes?.find((size) => size.size === "large")?.url || null,
-            sold_by: product.items?.[0]?.soldBy || null,  // Add sold_by field
+            sold_by: product.items?.[0]?.soldBy || null,
           },
           main_category: product.category,
           subcategory: product.subcategory || null,
           product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,
           additional_categorizations: product.additional_categorizations || []
-        }));
-
-        this.state.update(state => ({
-          ...state,
-          error: `Processing batch ${i + 1}-${batchEnd} of ${totalProductsFromFile} (${successfullyUploadedProducts} uploaded so far)`
         }));
 
         let success = false;
@@ -238,8 +245,6 @@ export class ProductStore {
         while (!success && attempts < 3) {
           try {
             attempts++;
-            console.log(`[LOG] Load Saved Data: Attempt ${attempts}/3 for Batch ${currentBatchNumber}...`);
-
             const records = await this.store.service.client.callZome({
               role_name: "grocery",
               zome_name: "products",
@@ -247,75 +252,73 @@ export class ProductStore {
               payload: processedBatch,
             });
 
-            const uploadedInThisBatch = records.length;
-            successfullyUploadedProducts += uploadedInThisBatch;
+            successfullyUploadedProducts += products.length;
+            totalGroupsCreated += records.length;
             success = true;
 
-            console.log(`[LOG] Load Saved Data: ✅ Batch ${currentBatchNumber} Successful (Attempt ${attempts}). Uploaded ${uploadedInThisBatch} products.`);
-            console.log(`[LOG] Load Saved Data: 📊 Progress: ${successfullyUploadedProducts} / ${totalProductsFromFile} products uploaded.`);
+            console.log(`[LOG] Load Saved Data: ✅ Uploaded ${products.length} products, created ${records.length} groups. Total: ${successfullyUploadedProducts}/${totalProductsFromFile} products (${totalGroupsCreated} groups)`);
 
             this.state.update(state => ({
               ...state,
-              error: `Uploaded ${successfullyUploadedProducts}/${totalProductsFromFile} products (${Math.round((successfullyUploadedProducts / totalProductsFromFile) * 100)}%)`
+              error: `Uploaded ${successfullyUploadedProducts}/${totalProductsFromFile} products (${Math.round((successfullyUploadedProducts / totalProductsFromFile) * 100)}%) - ${totalGroupsCreated} groups created`
             }));
 
           } catch (batchError) {
-            console.error(`[LOG] Load Saved Data: ❌ Batch ${currentBatchNumber} Error (Attempt ${attempts}) for products ${i + 1}-${batchEnd}:`, batchError);
+            console.error(`[LOG] Load Saved Data: ❌ Attempt ${attempts}/3 failed for "${productType || 'None'}":`, batchError);
 
             if (attempts >= 3) {
-              console.warn(`[LOG] Load Saved Data: ⚠️ Failed to upload Batch ${currentBatchNumber} after ${attempts} attempts. Skipping to next batch.`);
+              console.warn(`[LOG] Load Saved Data: ⚠️ Skipping product type after 3 failed attempts.`);
               break;
             }
 
             const delayMs = 3000 * Math.pow(2, attempts - 1);
-            console.log(`[LOG] Load Saved Data: Retrying Batch ${currentBatchNumber} in ${delayMs / 1000}s...`);
+            console.log(`[LOG] Load Saved Data: Retrying in ${delayMs / 1000}s...`);
 
             this.state.update(state => ({
               ...state,
-              error: `Retry ${attempts}/3: Products ${i + 1}-${batchEnd} failed - Next attempt in ${delayMs / 1000}s (${successfullyUploadedProducts}/${totalProductsFromFile} uploaded)`
+              error: `Retry ${attempts}/3: "${productType || 'None'}" failed - Retrying in ${delayMs / 1000}s (${successfullyUploadedProducts}/${totalProductsFromFile} uploaded)`
             }));
 
             await new Promise(resolve => setTimeout(resolve, delayMs));
           }
         }
 
-        if (i + BATCH_SIZE < data.length) {
-          console.log(`[LOG] Load Saved Data: Waiting 3 seconds before next batch...`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
+        // Pause between product types
+        if (processedTypes < productTypesCount) {
+          console.log(`[LOG] Load Saved Data: Waiting 2 seconds before next product type...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
 
       console.log("[LOG] Load Saved Data: --------------------------------------------------");
       console.log("[LOG] Load Saved Data: ✅ Upload Process Complete.");
-      console.log(`[LOG] Load Saved Data:   Total products found in file: ${totalProductsFromFile}`);
-      console.log(`[LOG] Load Saved Data:   Successfully uploaded:        ${successfullyUploadedProducts}`);
-      const failedCount = totalProductsFromFile - successfullyUploadedProducts;
-      console.log(`[LOG] Load Saved Data:   Failed or Skipped:          ${failedCount}`);
+      console.log(`[LOG] Load Saved Data:   Total products:      ${totalProductsFromFile}`);
+      console.log(`[LOG] Load Saved Data:   Uploaded products:   ${successfullyUploadedProducts}`);
+      console.log(`[LOG] Load Saved Data:   Failed products:     ${totalProductsFromFile - successfullyUploadedProducts}`);
+      console.log(`[LOG] Load Saved Data:   Groups created:      ${totalGroupsCreated}`);
+      console.log(`[LOG] Load Saved Data:   Product types:       ${productTypesCount}`);
       console.log("[LOG] Load Saved Data: --------------------------------------------------");
 
       this.state.update(state => ({
         ...state,
-        error: `Complete: Successfully uploaded ${successfullyUploadedProducts}/${totalProductsFromFile} products`,
+        error: `Complete: ${successfullyUploadedProducts}/${totalProductsFromFile} products in ${totalGroupsCreated} groups`,
         loading: false
       }));
 
-      console.log("[LOG] Load Saved Data: Refreshing local product list after upload...");
-      this.products = await this.getStoredProducts();
-
     } catch (error) {
-      console.error("[LOG] Load Saved Data: ❌ Critical error during the overall process:", error);
+      console.error("[LOG] Load Saved Data: ❌ Critical error:", error);
 
       console.log("[LOG] Load Saved Data: --------------------------------------------------");
       console.log("[LOG] Load Saved Data: ⚠️ Upload Process Failed.");
-      console.log(`[LOG] Load Saved Data:   Total products found in file: ${totalProductsFromFile}`);
-      console.log(`[LOG] Load Saved Data:   Successfully uploaded before error: ${successfullyUploadedProducts}`);
-      const failedCountOnError = totalProductsFromFile - successfullyUploadedProducts;
-      console.log(`[LOG] Load Saved Data:   Failed or Skipped: ${failedCountOnError}`);
+      console.log(`[LOG] Load Saved Data:   Total products:      ${totalProductsFromFile}`);
+      console.log(`[LOG] Load Saved Data:   Uploaded products:   ${successfullyUploadedProducts}`);
+      console.log(`[LOG] Load Saved Data:   Failed products:     ${totalProductsFromFile - successfullyUploadedProducts}`);
+      console.log(`[LOG] Load Saved Data:   Groups created:      ${totalGroupsCreated}`);
       console.log("[LOG] Load Saved Data: --------------------------------------------------");
 
       this.state.update(state => ({
         ...state,
-        error: `Error loading saved products: ${error.message}`,
+        error: `Error: ${successfullyUploadedProducts}/${totalProductsFromFile} products uploaded, ${totalGroupsCreated} groups created`,
         loading: false
       }));
     }
@@ -361,7 +364,6 @@ export class ProductStore {
           });
         }
 
-        products = await getStoredProducts();
         errorMessage = `Found ${products.length} products`;
       }
     } catch (error) {
@@ -370,45 +372,7 @@ export class ProductStore {
     }
   }
 
-  async getStoredProducts() {
-    // Kept original function content
-    try {
-      // Note: Original code references this.selectedCategory etc. which might need adjustment
-      // depending on whether you want all products or category-specific ones after upload.
-      if (!this.selectedCategory) {
-        console.warn("[LOG] getStoredProducts: No category selected, returning empty. Adjust logic if all products are needed.");
-        // Returning empty based on original conditional logic.
-        // Modify if you need to fetch *all* products regardless of category selection here.
-        return { products: [], total: 0, has_more: false };
-      }
 
-
-      console.log(`[LOG] getStoredProducts: Fetching products for category: ${this.selectedCategory}, subcategory: ${this.selectedSubcategory}`);
-      const response = await this.store.service.client.callZome({
-        role_name: "grocery",
-        zome_name: "products",
-        fn_name: "get_products_by_category",
-        payload: {
-          category: this.selectedCategory,
-          subcategory: this.selectedSubcategory,
-          page: 0, // Consider pagination if fetching all products
-          per_page: this.visibleItems // Adjust per_page if needed
-        }
-      });
-      console.log(`[LOG] getStoredProducts: Received ${response?.products?.length || 0} records from DHT.`);
-
-      return {
-        ...response,
-        products: response.products.map(record => ({
-          ...decode(record.entry.Present.entry),
-          hash: record.signed_action.hashed.hash
-        }))
-      };
-    } catch (error) {
-      console.error("[LOG] getStoredProducts: Error calling product catalog:", error);
-      return { products: [], total: 0, has_more: false };
-    }
-  }
 
   async getProductByHash(hash) {
     // Kept original function content

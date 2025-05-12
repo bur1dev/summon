@@ -3,7 +3,7 @@ use products_integrity::*;
 use crate::utils::concurrent_get_records;
 
 // Define the constant here or import if defined elsewhere
-const PRODUCTS_PER_GROUP: usize = 100;
+const PRODUCTS_PER_GROUP: usize = 1000;
 
 // Updated to return product groups instead of individual products
 #[derive(Serialize, Deserialize, Debug)]

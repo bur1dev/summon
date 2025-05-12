@@ -2,6 +2,7 @@
     import { onMount, createEventDispatcher } from "svelte";
     import { AddressService, type Address } from "./AddressService";
     import AddressForm from "./AddressForm.svelte";
+    import { MapPin, NotebookPen } from "lucide-svelte";
 
     // Props
     export let client: any;
@@ -137,6 +138,9 @@
                                 : ''}"
                             on:click={() => selectAddress(hash)}
                         >
+                            <div class="address-icon">
+                                <MapPin size={18} />
+                            </div>
                             <div class="address-card-content">
                                 <div class="address-label">
                                     {address.label || "Address"}
@@ -187,7 +191,9 @@
                         ></textarea>
                         <div class="instructions-info">
                             <div class="info-item">
-                                <span class="info-icon">📋</span>
+                                <span class="info-icon">
+                                    <NotebookPen size={16} />
+                                </span>
                                 Enter gate codes, building info, or where to leave
                                 the delivery
                             </div>
@@ -201,67 +207,92 @@
 
 <style>
     .address-selector {
-        background: white;
-        border-radius: 8px;
+        background: var(--background);
+        border-radius: var(--card-border-radius);
         width: 100%;
+        box-shadow: var(--shadow-subtle);
     }
 
     .address-selector-header {
-        padding: 16px;
-        border-bottom: 1px solid #f0f0f0;
+        height: var(--component-header-height); /* Explicit height */
+        box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        padding: 0 var(--spacing-md); /* Adjust padding, left/right as needed */
+        border-bottom: var(--border-width-thin) solid var(--border);
+        background: var(--background);
+        border-radius: var(--card-border-radius) var(--card-border-radius) 0 0;
+        display: flex; /* To allow vertical alignment */
+        align-items: center; /* Vertically center content */
     }
 
     .address-selector-header h2 {
         margin: 0;
-        font-size: 20px;
-        font-weight: 600;
+        font-size: var(--spacing-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-primary);
     }
 
     .loading {
-        padding: 30px;
+        padding: var(--spacing-xxl);
         text-align: center;
-        color: #666;
+        color: var(--text-secondary);
     }
 
     .addresses-container {
-        padding: 16px;
+        padding: var(--spacing-md);
     }
 
     .no-addresses {
         text-align: center;
-        padding: 30px 0;
+        padding: var(--spacing-xxl) 0;
     }
 
     .no-addresses p {
-        margin-bottom: 20px;
-        color: #666;
+        margin-bottom: var(--spacing-lg);
+        color: var(--text-secondary);
     }
 
     .address-list {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: var(--spacing-sm);
     }
 
     .address-card {
         display: flex;
         align-items: center;
-        padding: 12px 16px;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
+        padding: var(--spacing-sm) var(--spacing-md);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
         cursor: pointer;
-        transition:
-            border-color 0.2s,
-            background-color 0.2s;
+        transition: var(--btn-transition);
+        background: var(--background);
     }
 
     .address-card:hover {
-        background-color: #f9f9f9;
+        transform: translateY(var(--hover-lift));
+        border-color: var(--primary);
+        box-shadow: var(--shadow-subtle);
     }
 
     .address-card.selected {
-        border-color: rgb(61, 61, 61);
-        background-color: rgba(26, 139, 81, 0.05);
+        border-color: var(--primary);
+        background: linear-gradient(
+            135deg,
+            rgba(86, 98, 189, 0.1),
+            rgba(112, 70, 168, 0.1)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
+    }
+
+    .address-icon {
+        margin-right: var(--spacing-sm);
+        color: var(--primary);
+    }
+
+    :global(.address-icon svg) {
+        color: var(--primary);
+        stroke: var(--primary);
     }
 
     .address-card-content {
@@ -269,25 +300,30 @@
     }
 
     .address-label {
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         margin-bottom: 4px;
         display: flex;
         align-items: center;
+        color: var(--text-primary);
     }
 
     .default-badge {
-        background-color: #e8f5e9;
-        color: rgb(61, 61, 61);
-        font-size: 12px;
+        background: linear-gradient(
+            135deg,
+            rgba(86, 98, 189, 0.2),
+            rgba(112, 70, 168, 0.2)
+        );
+        color: var(--primary);
+        font-size: var(--font-size-sm);
         padding: 2px 6px;
-        border-radius: 4px;
-        margin-left: 8px;
-        font-weight: normal;
+        border-radius: var(--btn-border-radius);
+        margin-left: var(--spacing-xs);
+        font-weight: var(--font-weight-semibold);
     }
 
     .address-line {
-        color: #666;
-        font-size: 14px;
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
         line-height: 1.4;
     }
 
@@ -296,19 +332,20 @@
     }
 
     .address-card-selector {
-        margin-left: 16px;
+        margin-left: var(--spacing-md);
     }
 
     .radio-circle {
         width: 20px;
         height: 20px;
-        border: 2px solid #e0e0e0;
+        border: var(--border-width) solid var(--border);
         border-radius: 50%;
         position: relative;
+        transition: var(--btn-transition);
     }
 
     .radio-circle.checked {
-        border-color: rgb(61, 61, 61);
+        border-color: var(--primary);
     }
 
     .radio-circle.checked::after {
@@ -320,66 +357,78 @@
         width: 12px;
         height: 12px;
         border-radius: 50%;
-        background-color: rgb(61, 61, 61);
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
     }
 
     .add-address-btn {
         display: block;
         width: 100%;
-        padding: 12px;
-        margin-top: 12px;
-        background-color: transparent;
-        border: 1px dashed rgb(61, 61, 61);
-        border-radius: 8px;
-        color: rgb(61, 61, 61);
-        font-weight: 500;
+        height: var(--btn-height-md);
+        margin-top: var(--spacing-sm);
+        background-color: var(--surface);
+        border: var(--border-width-thin) dashed var(--primary);
+        border-radius: var(--btn-border-radius);
+        color: var(--primary);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: var(--btn-transition);
     }
 
     .add-address-btn:hover {
-        background-color: rgba(26, 139, 81, 0.05);
+        background-color: rgba(86, 98, 189, 0.1);
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-subtle);
     }
 
     .instructions-container {
-        margin-top: 24px;
-        padding-top: 16px;
-        border-top: 1px solid #f0f0f0;
+        margin-top: var(--spacing-xl);
+        padding-top: var(--spacing-md);
+        border-top: var(--border-width-thin) solid var(--border);
     }
 
     .instructions-container h3 {
-        font-size: 16px;
+        font-size: var(--font-size-md);
         margin-top: 0;
-        margin-bottom: 8px;
+        margin-bottom: var(--spacing-xs);
+        color: var(--text-primary);
     }
 
     textarea {
         width: 100%;
-        padding: 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: var(--spacing-sm);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--font-size-sm);
         resize: vertical;
+        background: var(--background);
+        color: var(--text-primary);
+        transition: var(--btn-transition);
+        box-sizing: border-box;
     }
 
     textarea:focus {
-        border-color: rgb(61, 61, 61);
+        border-color: var(--primary);
         outline: none;
-        box-shadow: 0 0 0 2px rgba(26, 139, 81, 0.1);
+        box-shadow: 0 0 0 2px rgba(86, 98, 189, 0.2);
     }
 
     .instructions-info {
-        margin-top: 12px;
+        margin-top: var(--spacing-sm);
     }
 
     .info-item {
         display: flex;
         align-items: center;
-        font-size: 13px;
-        color: #666;
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
     }
 
     .info-icon {
-        margin-right: 8px;
+        margin-right: var(--spacing-xs);
+    }
+
+    :global(.info-icon svg) {
+        color: var(--text-secondary);
+        stroke: var(--text-secondary);
     }
 </style>

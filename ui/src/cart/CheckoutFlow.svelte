@@ -13,6 +13,7 @@
     import DeliveryTimeSelector from "./DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";
     import { decode } from "@msgpack/msgpack";
+    import { ChevronLeft } from "lucide-svelte";
 
     // Import agent-avatar component
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
@@ -328,7 +329,7 @@
             class="back-button"
             on:click={currentStep > 1 ? goBack : onClose}
         >
-            ←
+            <ChevronLeft size={20} />
         </button>
         <h2>
             {#if currentStep === 1}
@@ -452,56 +453,86 @@
 
 <style>
     .checkout-flow {
-        background: white;
+        background: var(--background);
         height: 100%;
         display: flex;
         flex-direction: column;
     }
 
     .checkout-header {
-        padding: 16px;
-        border-bottom: 1px solid #e0e0e0;
+        height: var(--component-header-height);
+        box-sizing: border-box;
+        padding: 0 var(--spacing-md);
+        border-bottom: none;
         display: flex;
         align-items: center;
         position: relative;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: var(--button-text);
     }
 
     .checkout-header h2 {
         flex-grow: 1;
         text-align: center;
         margin: 0;
-        font-size: 18px;
-        font-weight: 600;
+        font-size: var(--btn-font-size-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(--button-text);
     }
 
     .back-button {
-        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--btn-icon-size-sm);
+        height: var(--btn-icon-size-sm);
+        background: rgba(255, 255, 255, 0.2);
         border: none;
-        font-size: 18px;
+        border-radius: 50%;
         cursor: pointer;
-        padding: 4px 8px;
-        color: #333;
+        transition: var(--btn-transition);
+    }
+
+    .back-button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(var(--hover-scale));
+    }
+
+    :global(.back-button svg) {
+        color: var(--button-text);
+        stroke: var(--button-text);
     }
 
     .steps-indicator {
-        font-size: 14px;
-        color: #666;
+        font-size: var(--font-size-sm);
+        color: rgba(255, 255, 255, 0.8);
+        padding: 4px var(--spacing-xs);
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: var(--btn-border-radius);
     }
 
     .avatar-overlay {
         position: absolute;
-        top: 10px;
-        right: 20px;
-        z-index: 10;
+        top: 14px;
+        right: var(--spacing-lg);
+        z-index: var(--z-index-sticky);
         display: flex;
     }
 
     .avatar-container {
-        border: 1px solid #e0e0e0;
+        border: var(--border-width) solid var(--primary);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: var(--background);
+        box-shadow: var(--shadow-subtle);
+        transition: var(--btn-transition);
+    }
+
+    .avatar-container:hover {
+        transform: scale(var(--hover-scale));
+        box-shadow: var(--shadow-medium);
     }
 
     .checkout-content {
@@ -514,55 +545,77 @@
     }
 
     .nav-buttons {
-        padding: 20px;
-        background: white;
-        border-top: 1px solid #f0f0f0;
+        padding: var(--spacing-lg);
+        background: var(--background);
+        border-top: var(--border-width-thin) solid var(--border);
         margin-top: auto;
     }
 
     .continue-btn {
         width: 100%;
-        padding: 14px;
-        background: rgb(61, 61, 61);
+        height: var(--btn-height-lg);
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
         border: none;
-        color: white;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
+        color: var(--button-text);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--btn-font-size-md);
+        font-weight: var(--font-weight-semibold);
         cursor: pointer;
         text-align: center;
-        transition: background-color 0.2s;
+        transition: var(--btn-transition);
+        box-shadow: var(--shadow-button);
     }
 
     .continue-btn:hover:not(:disabled) {
-        background: rgb(98, 98, 98);
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
     }
 
     .continue-btn:disabled {
         opacity: 0.7;
         cursor: not-allowed;
+        background: var(--surface);
+        color: var(--text-secondary);
+        border: var(--border-width-thin) solid var(--border);
+        box-shadow: none;
     }
 
     .checkout-error {
-        margin: 16px;
-        padding: 12px;
-        background-color: #ffebee;
-        color: #c62828;
-        border-radius: 4px;
-        font-size: 14px;
+        margin: var(--spacing-md);
+        padding: var(--spacing-sm);
+        background-color: rgba(211, 47, 47, 0.1);
+        color: var(--error);
+        border-radius: var(--card-border-radius);
+        font-size: var(--font-size-sm);
+        border-left: 3px solid var(--error);
     }
 
     .missing-info {
-        padding: 30px;
+        padding: var(--spacing-xxl);
         text-align: center;
+        color: var(--text-primary);
     }
 
     .back-btn {
-        padding: 10px 18px;
-        background: #f5f5f5;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        margin-top: 16px;
+        padding: var(--btn-padding-md);
+        background: var(--surface);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
+        margin-top: var(--spacing-md);
         cursor: pointer;
+        transition: var(--btn-transition);
+        color: var(--text-primary);
+    }
+
+    .back-btn:hover {
+        background: var(--background);
+        border-color: var(--primary);
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-subtle);
     }
 </style>

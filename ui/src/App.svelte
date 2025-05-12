@@ -124,103 +124,261 @@
   }
 </script>
 
-<svelte:head></svelte:head>
+<svelte:head>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+</svelte:head>
 
 {#if connected}
   <profiles-context store={profilesStore}>
     {#if !prof || $prof.status === "pending"}
-      <div class="loading"><div class="loader"></div></div>
+      <div class="loading-container">
+        <div class="loading-wrapper">
+          <div class="pulse-ring"></div>
+          <div class="loader"></div>
+          <p class="loading-text">Connecting to the network...</p>
+        </div>
+      </div>
     {:else if $prof.status === "complete" && !$prof.value}
-      <div class="create-profile">
-        <div class="welcome-header">
-          <h1 class="welcome-text">Welcome to</h1>
-          <div class="logo-container">
-            <img src="./logo.png" alt="SUMN." class="app-logo" />
+      <div class="welcome-container">
+        <div class="welcome-card">
+          <div class="welcome-header">
+            <h1 class="welcome-title">Welcome to</h1>
+            <span class="app-logo">SUMN.</span>
+          </div>
+          <p class="welcome-subtitle">
+            Please create your profile to continue.
+          </p>
+          <div class="profile-creator">
+            <create-profile on:profile-created={handleProfileCreated}
+            ></create-profile>
           </div>
         </div>
-        <p>Please create your profile to continue.</p>
-        <create-profile on:profile-created={handleProfileCreated}
-        ></create-profile>
       </div>
     {:else}
       <Controller {client} {roleName}></Controller>
     {/if}
   </profiles-context>
 {:else}
-  <div class="loading"><div class="loader"></div></div>
+  <div class="loading-container">
+    <div class="loading-wrapper">
+      <div class="pulse-ring"></div>
+      <div class="loader"></div>
+      <p class="loading-text">Initializing application...</p>
+    </div>
+  </div>
 {/if}
 
 <style>
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: var(
+      --font-family,
+      "Plus Jakarta Sans",
+      -apple-system,
+      BlinkMacSystemFont,
+      sans-serif
+    );
+    background: var(--background, #f7fff7);
+    color: var(--text-primary, #2f353a);
+  }
+
+  /* Loading screen styling */
+  .loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    width: 100%;
+    background: linear-gradient(
+      135deg,
+      var(--background, #f7fff7) 0%,
+      var(--surface, #ffffff) 100%
+    );
+  }
+
+  .loading-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+  }
+
+  .pulse-ring {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      var(--primary, #00cfbb) 0%,
+      transparent 70%
+    );
+    opacity: 0.2;
+    animation: pulse 2s infinite;
+  }
+
+  .loader {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 4px solid var(--primary, #00cfbb);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    animation: spin 1.5s linear infinite;
+    z-index: 2;
+    background: var(--surface, #ffffff);
+  }
+
+  .loading-text {
+    margin-top: var(--spacing-lg, 20px);
+    font-size: var(--font-size-md, 16px);
+    color: var(--text-secondary, #5a7a7a);
+    font-weight: var(--font-weight-semibold, 600);
+    text-align: center;
+  }
+
+  /* Welcome screen styling */
+  .welcome-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: var(--spacing-lg, 20px);
+    background: linear-gradient(
+      135deg,
+      var(--background, #f2fffe) 0%,
+      var(--surface, #ffffff) 100%
+    );
+  }
+
+  .welcome-card {
+    background: var(--surface, #ffffff);
+    border-radius: var(--card-border-radius, 12px);
+    box-shadow: var(--shadow-medium, 0 4px 12px rgba(0, 0, 0, 0.15));
+    padding: var(--spacing-xxl, 32px);
+    max-width: 500px;
+    width: 100%;
+    animation: scaleIn var(--transition-normal, 300ms) ease forwards;
+  }
+
   .welcome-header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: var(--spacing-xl, 24px);
   }
 
-  .logo-container {
-    margin-bottom: 10px;
+  .welcome-title {
+    font-size: 32px;
+    font-weight: var(--font-weight-bold, 700);
+    color: var(--text-primary, #1e3a3a);
+    margin: 0 0 var(--spacing-md, 16px) 0;
+    text-align: center;
   }
 
+  /* Styled text logo (replacing PNG image) */
   .app-logo {
-    height: 80px;
-    width: auto;
-  }
-
-  .welcome-text {
-    margin-bottom: 20px;
-    text-align: center;
-    font-size: 36px;
-    line-height: 1.2;
-    color: #333;
-  }
-
-  .create-profile {
-    padding-top: 100px;
-    margin-left: auto;
-    margin-right: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  create-profile {
-    box-shadow: 0px 10px 10px rgba(0, 0, 0, 0.15);
-  }
-
-  :global(body) {
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  :global(.loading) {
-    text-align: center;
-    padding-top: 100px;
-    display: flex;
-    margin-left: auto;
-    margin-right: auto;
-    align-items: center;
-  }
-
-  :global(.loader) {
-    border: 8px solid #f3f3f3;
-    border-radius: 50%;
-    border-top: 8px solid #3498db;
-    width: 50px;
-    height: 50px;
-    -webkit-animation: spin 2s linear infinite; /* Safari */
-    animation: spin 2s linear infinite;
+    font-size: 45px;
+    font-weight: var(--font-weight-bold, 700);
+    color: var(--text-primary, #ffffff);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform var(--transition-normal, 300ms) ease;
     display: inline-block;
   }
 
-  @-webkit-keyframes spin {
-    0% {
-      -webkit-transform: rotate(0deg);
-    }
-    100% {
-      -webkit-transform: rotate(360deg);
-    }
+  .welcome-subtitle {
+    text-align: center;
+    font-size: var(--font-size-md, 16px);
+    color: var(--text-secondary, #5a7a7a);
+    margin-bottom: var(--spacing-xl, 24px);
+  }
+
+  .profile-creator {
+    width: 100%;
+  }
+
+  /* Enhanced Shoelace component styling */
+  :global(create-profile) {
+    width: 100%;
+    box-shadow: none;
+
+    /* Input styling */
+    --sl-input-height-medium: var(--btn-height-md, 50px);
+    --sl-input-color: var(--text-primary, #1e3a3a);
+    --sl-input-placeholder-color: var(--text-secondary, #5a7a7a);
+    --sl-input-background-color: var(--surface, #ffffff);
+    --sl-input-border-color: var(--border, #ccf2ee);
+    --sl-input-border-color-hover: var(--primary, #00cfbb);
+    --sl-input-border-color-focus: var(--primary, #00cfbb);
+    --sl-input-border-radius-medium: var(--btn-border-radius, 50px);
+    --sl-focus-ring-color: var(--primary, #00cfbb);
+    --sl-panel-background-color: var(--background, #f2fffe);
+    --sl-font-family: var(--font-family, "Plus Jakarta Sans", sans-serif);
+
+    /* Button styling - correct variable names for Shoelace */
+    --sl-button-font-size-medium: var(--font-size-md, 16px);
+    --sl-button-height-medium: var(--btn-height-md, 50px);
+    --sl-button-border-radius-medium: var(--btn-border-radius, 50px);
+    --sl-button-font-weight-medium: var(--font-weight-semibold, 600);
+
+    /* Primary button styling */
+    --sl-color-primary-500: var(--primary, #00cfbb) !important;
+    --sl-color-primary-600: var(--primary-dark, #00b3a1) !important;
+    --sl-color-primary-950: var(--primary-dark, #00b3a1) !important;
+    --sl-color-primary-text: var(--button-text, #ffffff) !important;
+
+    /* Default button */
+    --sl-color-neutral-0: var(--surface, #ffffff) !important;
+    --sl-color-neutral-400: var(--border, #ccf2ee) !important;
+    --sl-color-neutral-700: var(--text-primary, #1e3a3a) !important;
+  }
+
+  /* Direct styling of Shoelace button parts for gradient and effects */
+  :global(create-profile) ::part(button) {
+    transition: all 0.25s ease !important;
+  }
+
+  :global(create-profile form) sl-button[variant="primary"]::part(base) {
+    background: linear-gradient(
+      135deg,
+      var(--primary, #00cfbb),
+      var(--secondary, #8d72e1)
+    ) !important;
+    border-color: transparent !important;
+    box-shadow: var(--shadow-button, 0 4px 5px rgba(0, 0, 0, 0.2)) !important;
+    transition: all 0.25s ease !important;
+  }
+
+  :global(create-profile form) sl-button[variant="primary"]::part(base):hover {
+    background: linear-gradient(
+      135deg,
+      var(--primary-dark, #00b3a1),
+      var(--secondary, #8d72e1)
+    ) !important;
+    transform: translateY(var(--hover-lift, -2px)) !important;
+    box-shadow: var(--shadow-medium, 0 4px 12px rgba(0, 0, 0, 0.15)) !important;
+  }
+
+  :global(create-profile form) sl-button[variant="default"]::part(base) {
+    background: var(--background, #f2fffe) !important;
+    color: var(--text-primary, #1e3a3a) !important;
+    border: var(--border-width-thin, 1px) solid var(--border, #ccf2ee) !important;
+    box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0, 0, 0, 0.08)) !important;
+    transition: all 0.25s ease !important;
+  }
+
+  :global(create-profile form) sl-button[variant="default"]::part(base):hover {
+    background: var(--surface, #ffffff) !important;
+    border-color: var(--primary, #00cfbb) !important;
+    transform: translateY(var(--hover-lift, -2px)) !important;
+    box-shadow: var(--shadow-medium, 0 4px 12px rgba(0, 0, 0, 0.15)) !important;
   }
 
   @keyframes spin {
@@ -229,6 +387,32 @@
     }
     100% {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      opacity: 0.2;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 0.1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0.2;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
 </style>

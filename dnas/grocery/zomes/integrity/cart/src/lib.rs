@@ -15,6 +15,8 @@ pub enum EntryTypes {
     PrivateCart(PrivateCart),
     #[entry_type(visibility = "private")]
     Address(Address),
+    #[entry_type(visibility = "private")]
+    ProductPreference(ProductPreference),
 }
 
 #[hdk_link_types]
@@ -23,4 +25,5 @@ pub enum LinkTypes {
     AgentToCheckedOutCart,
     AgentToAddress,
     AgentToPrivateCart,
+    AgentToPreference,
 }

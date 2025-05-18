@@ -1,7 +1,15 @@
 <script>
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import { mainCategories } from "./categoryData";
     import { getContext } from "svelte";
+    import {
+        X,
+        Check,
+        X as XIcon,
+        AlertCircle,
+        Database,
+        RefreshCw,
+    } from "lucide-svelte";
 
     // This must be at the top level
     const { getStore } = getContext("store");
@@ -14,28 +22,38 @@
     let error = null;
     let selectedReport = null;
     let showApproveDialog = false;
-    let rebuildingIndex = false;
-    let convertingFailures = false;
-    let convertedCount = 0;
 
     let approvingAll = false;
     let approvedCount = 0;
     let totalToApprove = 0;
 
-    // Category selection variables (added for system-detected failures)
+    // Category selection variables (for system-detected failures)
     let selectedCategory = null;
     let selectedSubcategory = null;
     let selectedProductType = null;
     let subcategories = [];
     let productTypes = [];
 
+    // Recategorization variables
+    let queueingForRecategorization = false;
+    let processingQueue = false;
+
+    // Sync DHT variables
+    let syncStatusModalOpen = false;
+
     onMount(async () => {
         await loadReports();
     });
 
-    async function loadReports() {
+    async function loadReports(preserveScroll = false) {
         try {
+            // Save scroll position if preserving
+            const scrollPosition = preserveScroll
+                ? document.querySelector(".table-container")?.scrollTop
+                : 0;
+
             loading = true;
+            error = null; // Clear previous errors
             const response = await fetch(
                 "http://localhost:3000/api/category-reports",
             );
@@ -43,108 +61,145 @@
                 reports = await response.json();
             } else {
                 error = "Failed to load reports";
+                console.error("Failed to load reports:", await response.text());
+            }
+
+            // Restore scroll position if needed
+            if (preserveScroll && scrollPosition) {
+                setTimeout(() => {
+                    const container =
+                        document.querySelector(".table-container");
+                    if (container) container.scrollTop = scrollPosition;
+                }, 10);
             }
         } catch (err) {
             error = err.message;
+            console.error("Error in loadReports:", err);
         } finally {
             loading = false;
         }
     }
 
     function viewReport(report) {
-        selectedReport = report;
-        showApproveDialog = true;
+        // Make a full copy to ensure reactivity
+        selectedReport = JSON.parse(JSON.stringify(report));
+        error = null; // Clear error when opening new dialog
 
-        // For negative examples, just show the current category
+        // Force reactivity with a setTimeout
+        setTimeout(() => {
+            showApproveDialog = true;
+            console.log(
+                "Dialog should be visible now, showApproveDialog =",
+                showApproveDialog,
+            );
+        }, 0);
+
         if (report.type === "negative_example") {
-            // No need to set category variables for negative examples
-        }
-        // Initialize category variables if this is a system-detected failure
-        else if (report.source === "system" || !report.suggestedCategory) {
-            selectedCategory = report.currentCategory.category;
+            selectedCategory = null;
             selectedSubcategory = null;
             selectedProductType = null;
+        } else if (report.source === "system" || !report.suggestedCategory) {
+            selectedCategory = report.currentCategory.category;
+            selectedSubcategory = null; // Keep null, user must select for system reports
+            selectedProductType = null;
         } else {
-            // For user reports, use the suggested category
             selectedCategory = report.suggestedCategory.category;
             selectedSubcategory = report.suggestedCategory.subcategory;
             selectedProductType = report.suggestedCategory.product_type;
         }
     }
 
-    // Reactive statements for category selection (similar to ReportCategoryDialog)
+    // Reactive statements for category selection
     $: {
-        subcategories =
-            mainCategories.find((c) => c.name === selectedCategory)
-                ?.subcategories || [];
-        // Reset subcategory when category changes
-        if (
-            selectedSubcategory &&
-            !subcategories.find((s) => s.name === selectedSubcategory)
-        ) {
+        if (selectedCategory) {
+            const categoryData = mainCategories.find(
+                (c) => c.name === selectedCategory,
+            );
+            subcategories = categoryData?.subcategories || [];
+            if (
+                selectedSubcategory &&
+                !subcategories.find((s) => s.name === selectedSubcategory)
+            ) {
+                selectedSubcategory = null;
+                selectedProductType = null;
+            }
+        } else {
+            subcategories = [];
             selectedSubcategory = null;
-        }
-    }
-
-    $: {
-        const subcategory = subcategories.find(
-            (s) => s.name === selectedSubcategory,
-        );
-        productTypes = subcategory?.productTypes || [];
-
-        // Check if this is a gridOnly subcategory
-        if (subcategory?.gridOnly) {
-            // For gridOnly subcategories, set product_type to subcategory name
-            selectedProductType = selectedSubcategory;
-        }
-        // Otherwise reset product type when subcategory changes if it's not in the available options
-        else if (
-            selectedProductType &&
-            !productTypes.includes(selectedProductType)
-        ) {
             selectedProductType = null;
         }
     }
 
-    async function approveReport() {
-        try {
-            console.log("Approving report with ID:", selectedReport.id);
-
-            // For system-detected failures, ensure user has selected categories
-            if (
-                (selectedReport.source === "system" ||
-                    !selectedReport.suggestedCategory) &&
-                (!selectedCategory || !selectedSubcategory)
+    $: {
+        if (selectedSubcategory) {
+            const subcategoryData = subcategories.find(
+                (s) => s.name === selectedSubcategory,
+            );
+            productTypes = subcategoryData?.productTypes || [];
+            if (subcategoryData?.gridOnly) {
+                selectedProductType = selectedSubcategory; // Auto-set for gridOnly
+            } else if (
+                selectedProductType &&
+                !productTypes.includes(selectedProductType)
             ) {
-                error = "Please select a category and subcategory";
-                return;
+                selectedProductType = null;
             }
+        } else {
+            productTypes = [];
+            selectedProductType = null;
+        }
+    }
 
-            // Update the suggestedCategory if this is a system-detected failure
-            if (
-                selectedReport.source === "system" ||
-                !selectedReport.suggestedCategory
-            ) {
-                // For gridOnly subcategories, set product_type to subcategory name
+    async function approveReport(reportId = null) {
+        const reportToApprove = reportId
+            ? reports.find((r) => r.id === reportId)
+            : selectedReport;
+
+        if (!reportToApprove || reportToApprove.id === undefined) {
+            error = "No report selected or report ID is missing.";
+            console.error(
+                "approveReport error: report is invalid",
+                reportToApprove,
+            );
+            return;
+        }
+
+        const reportIdForProcessing = reportToApprove.id; // Capture the ID safely
+        error = null; // Clear previous errors
+
+        try {
+            console.log("Approving report with ID:", reportIdForProcessing);
+
+            const needsUserSelection =
+                reportToApprove.source === "system" ||
+                !reportToApprove.suggestedCategory;
+            const isNegativeExample =
+                reportToApprove.type === "negative_example";
+
+            // For quick approval directly from table, we don't modify categories
+            let categoryToUpdateWith = reportToApprove.suggestedCategory;
+
+            if (!isNegativeExample && needsUserSelection && showApproveDialog) {
+                // Only do the full category selection if we're in the dialog
+                if (!selectedCategory || !selectedSubcategory) {
+                    error =
+                        "Please select at least a category and subcategory.";
+                    return;
+                }
                 const isGridOnly = subcategories.find(
                     (s) => s.name === selectedSubcategory,
                 )?.gridOnly;
-                const effectiveProductType = isGridOnly
-                    ? selectedSubcategory
-                    : selectedProductType;
-
-                const updatedCategory = {
+                categoryToUpdateWith = {
                     category: selectedCategory,
                     subcategory: selectedSubcategory,
-                    product_type: effectiveProductType,
+                    product_type: isGridOnly
+                        ? selectedSubcategory
+                        : selectedProductType,
                 };
 
-                selectedReport.suggestedCategory = updatedCategory;
-
-                // First update the report in the file before approval
                 console.log(
-                    "Updating report before approval:",
-                    updatedCategory,
+                    "Updating report category before approval:",
+                    categoryToUpdateWith,
                 );
                 const updateResponse = await fetch(
                     "http://localhost:3000/api/update-report-category",
@@ -152,215 +207,357 @@
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            reportId: selectedReport.id,
-                            suggestedCategory: updatedCategory,
+                            reportId: reportIdForProcessing,
+                            suggestedCategory: categoryToUpdateWith,
                         }),
                     },
                 );
-
                 if (!updateResponse.ok) {
-                    const updateText = await updateResponse.text();
-                    throw new Error(`Failed to update report: ${updateText}`);
+                    const updateErrorText = await updateResponse.text();
+                    error = `Failed to update report category: ${updateErrorText}`;
+                    console.error(
+                        "Failed to update report category:",
+                        updateErrorText,
+                    );
+                    return;
+                }
+                // Update local report if it matches the selected one
+                if (
+                    selectedReport &&
+                    selectedReport.id === reportIdForProcessing
+                ) {
+                    selectedReport.suggestedCategory = categoryToUpdateWith;
+                }
+
+                // Also update the reports array
+                const reportIndex = reports.findIndex(
+                    (r) => r.id === reportIdForProcessing,
+                );
+                if (reportIndex !== -1) {
+                    reports[reportIndex].suggestedCategory =
+                        categoryToUpdateWith;
+                    reports = [...reports]; // Trigger reactivity
+                }
+            } else if (
+                isNegativeExample &&
+                !reportToApprove.suggestedCategory
+            ) {
+                // For negative examples without admin selection, ensure a placeholder suggestedCategory exists
+                categoryToUpdateWith = {
+                    category: reportToApprove.currentCategory.category,
+                    subcategory: reportToApprove.currentCategory.subcategory,
+                    product_type: reportToApprove.currentCategory.product_type,
+                };
+                // Optionally update the report file with this placeholder
+                await fetch(
+                    "http://localhost:3000/api/update-report-category",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            reportId: reportIdForProcessing,
+                            suggestedCategory: categoryToUpdateWith,
+                        }),
+                    },
+                );
+                // Update local report if it matches the selected one
+                if (
+                    selectedReport &&
+                    selectedReport.id === reportIdForProcessing
+                ) {
+                    selectedReport.suggestedCategory = categoryToUpdateWith;
+                }
+
+                // Also update the reports array
+                const reportIndex = reports.findIndex(
+                    (r) => r.id === reportIdForProcessing,
+                );
+                if (reportIndex !== -1) {
+                    reports[reportIndex].suggestedCategory =
+                        categoryToUpdateWith;
+                    reports = [...reports]; // Trigger reactivity
                 }
             }
 
-            // Now approve the report
-            const response = await fetch(
+            // Now approve the report (updates status and correction map on backend)
+            const approveResponse = await fetch(
                 "http://localhost:3000/api/approve-category-report",
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        reportId: selectedReport.id,
+                        reportId: reportIdForProcessing,
                         approve: true,
                     }),
                 },
             );
 
-            const responseText = await response.text();
-            console.log("API response:", response.status, responseText);
+            if (!approveResponse.ok) {
+                const approveErrorText = await approveResponse.text();
+                error = `Failed to approve report: ${approveErrorText}`;
+                console.error("Failed to approve report:", approveErrorText);
+                return;
+            }
 
-            if (response.ok) {
-                // Update UI
-                const index = reports.findIndex(
-                    (r) => r.id === selectedReport.id,
-                );
-                if (index !== -1) {
-                    reports[index].status = "approved";
-                    reports[index].suggestedCategory =
-                        selectedReport.suggestedCategory;
-                    reports = [...reports]; // Trigger Svelte reactivity
+            // Report is approved on backend, now queue it for recategorization
+            const queuedSuccessfully = await queueForRecategorization(
+                reportIdForProcessing,
+                false,
+            );
+
+            if (queuedSuccessfully) {
+                if (showApproveDialog) {
+                    showApproveDialog = false;
+                    selectedReport = null; // Clear selection
                 }
 
-                // ADDED: Recategorize the product in Holochain
-                console.log(
-                    "Report approved, checking product for recategorization",
-                    selectedReport,
+                // Update local state
+                const reportIndex = reports.findIndex(
+                    (r) => r.id === reportIdForProcessing,
                 );
-                // In the approveReport function in CategoryReportsAdmin.svelte:
-                if (selectedReport.product && selectedReport.product.hash) {
-                    try {
-                        console.log(
-                            "Found product hash:",
-                            selectedReport.product.hash,
-                        );
-
-                        // Convert object back to Uint8Array
-                        const hashArray = new Uint8Array(
-                            Object.values(selectedReport.product.hash),
-                        );
-                        console.log("Converted hash to Uint8Array:", hashArray);
-
-                        const recatResult = await store.service.client.callZome(
-                            {
-                                role_name: "grocery",
-                                zome_name: "products",
-                                fn_name: "recategorize_product",
-                                payload: {
-                                    product_hash: hashArray,
-                                    new_category:
-                                        selectedReport.suggestedCategory
-                                            .category,
-                                    new_subcategory:
-                                        selectedReport.suggestedCategory
-                                            .subcategory,
-                                    new_product_type:
-                                        selectedReport.suggestedCategory
-                                            .product_type,
-                                },
-                            },
-                        );
-
-                        console.log(
-                            "Recategorization successful:",
-                            recatResult,
-                        );
-                    } catch (recatErr) {
-                        console.error(
-                            "Failed to recategorize product:",
-                            recatErr,
-                        );
-                        error = `Report approved, but product recategorization failed: ${recatErr.message}`;
-                    }
-                } else {
-                    console.warn(
-                        "Product has no hash property:",
-                        selectedReport.product,
-                    );
-                    // Check what properties are available
-                    console.log(
-                        "Available product properties:",
-                        Object.keys(selectedReport.product || {}),
-                    );
+                if (reportIndex !== -1) {
+                    reports[reportIndex].status = "approved";
+                    reports = [...reports]; // Trigger reactivity
                 }
 
-                // Close dialog
-                showApproveDialog = false;
-                selectedReport = null;
+                // Load reports in the background without disrupting UI
+                setTimeout(() => {
+                    loadReports(true);
+                }, 100);
             } else {
-                error = `Failed to approve report: ${responseText}`;
+                // Error message should have been set by queueForRecategorization
+                // Keep dialog open for user to see the error.
+                // The report is 'approved' on the backend, but not yet 'queued'.
+                // User might need to retry queuing or admin intervention.
+                console.log(
+                    "Report approved, but failed to queue. Dialog remains open.",
+                );
+                // Force a reload to show 'approved' status from server if queueing failed.
+                setTimeout(() => {
+                    loadReports(true);
+                }, 100);
             }
         } catch (err) {
-            console.error("Error in approveReport:", err);
             error = err.message;
+            console.error("Error in approveReport:", err);
+        }
+    }
+
+    async function queueForRecategorization(
+        reportIdToQueue, // Expecting the actual ID (e.g., array index or unique DB ID)
+        showMessages = true,
+    ) {
+        if (reportIdToQueue === null || reportIdToQueue === undefined) {
+            const errMessage =
+                "Cannot queue report: Invalid report ID provided.";
+            console.error(
+                "queueForRecategorization error:",
+                errMessage,
+                "reportIdToQueue was:",
+                reportIdToQueue,
+            );
+            if (showMessages) error = errMessage;
+            return false; // Indicate failure
+        }
+
+        if (showMessages) queueingForRecategorization = true;
+        error = null; // Clear previous errors if showing messages
+
+        try {
+            console.log(
+                "Queueing report for recategorization, ID:",
+                reportIdToQueue,
+            );
+            const response = await fetch(
+                "http://localhost:3000/api/queue-for-recategorization",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reportId: reportIdToQueue }),
+                },
+            );
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Update UI for the specific report to "queued_for_recategorization"
+                const index = reports.findIndex(
+                    (r) => r.id === reportIdToQueue,
+                );
+                if (index !== -1) {
+                    reports[index].status = "queued_for_recategorization";
+                    if (!reports[index].queued_at)
+                        reports[index].queued_at = new Date().toISOString(); // Add if not present
+                    reports = [...reports]; // Trigger Svelte reactivity
+                } else {
+                    // This case means the local 'reports' array is out of sync or ID is wrong
+                    console.warn(
+                        `queueForRecategorization: Report ID ${reportIdToQueue} not found in local 'reports' array for UI status update. A full reload might be needed.`,
+                    );
+                }
+
+                if (showMessages) {
+                    error = "Product queued for recategorization successfully.";
+                    // If called standalone with showMessages=true, and it's from the dialog context:
+                    if (
+                        selectedReport &&
+                        selectedReport.id === reportIdToQueue
+                    ) {
+                        showApproveDialog = false;
+                        selectedReport = null;
+                        await loadReports(); // Reload if standalone queueing from dialog
+                    }
+                }
+                return true; // Indicate success
+            } else {
+                const errMessage = `Failed to queue for recategorization: ${result.error || "Unknown error"}`;
+                console.error(errMessage, "(ID:", reportIdToQueue, ")");
+                if (showMessages) error = errMessage;
+                return false; // Indicate failure
+            }
+        } catch (err) {
+            const errMessage = `Error in queueForRecategorization: ${err.message}`;
+            console.error(errMessage, "(ID:", reportIdToQueue, ")", err);
+            if (showMessages) error = errMessage;
+            return false; // Indicate failure
+        } finally {
+            if (showMessages) queueingForRecategorization = false;
+        }
+    }
+
+    // Process recategorization queue
+    async function processRecategorizationQueue() {
+        try {
+            processingQueue = true;
+            error = "Processing recategorization queue...";
+
+            const response = await fetch(
+                "http://localhost:3000/api/process-recategorization-queue",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                },
+            );
+
+            const result = await response.json();
+
+            if (response.ok) {
+                error = `Successfully processed ${result.processed} products from recategorization queue`;
+                await loadReports();
+            } else {
+                error = `Failed to process recategorization queue: ${result.error || "Unknown error"}`;
+            }
+        } catch (err) {
+            console.error("Error processing recategorization queue:", err);
+            error = err.message;
+        } finally {
+            processingQueue = false;
         }
     }
 
     async function approveAllReports() {
-        try {
-            // Filter reports that are pending and have a suggestedCategory
-            const pendingReports = reports.filter(
-                (r) =>
-                    (!r.status || r.status === "pending") &&
-                    r.suggestedCategory &&
-                    r.source !== "system",
-            );
+        approvingAll = true;
+        error = null;
+        const pendingReports = reports.filter(
+            (r) =>
+                (!r.status || r.status === "pending") &&
+                r.suggestedCategory && // Only those with suggestions
+                r.source !== "system", // Exclude system reports for bulk approve
+        );
 
-            if (pendingReports.length === 0) {
-                error = "No reports available for bulk approval.";
-                return;
-            }
-
-            approvingAll = true;
-            totalToApprove = pendingReports.length;
-            approvedCount = 0;
-            error = `Approving ${totalToApprove} reports...`;
-
-            for (const report of pendingReports) {
-                try {
-                    // Approve the report
-                    const response = await fetch(
-                        "http://localhost:3000/api/approve-category-report",
-                        {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                reportId: report.id,
-                                approve: true,
-                            }),
-                        },
-                    );
-
-                    if (response.ok) {
-                        // Update UI
-                        const index = reports.findIndex(
-                            (r) => r.id === report.id,
-                        );
-                        if (index !== -1) {
-                            reports[index].status = "approved";
-                            reports = [...reports]; // Trigger Svelte reactivity
-                        }
-
-                        // Recategorize the product in Holochain
-                        if (report.product && report.product.hash) {
-                            try {
-                                // Convert object back to Uint8Array
-                                const hashArray = new Uint8Array(
-                                    Object.values(report.product.hash),
-                                );
-
-                                await store.service.client.callZome({
-                                    role_name: "grocery",
-                                    zome_name: "products",
-                                    fn_name: "recategorize_product",
-                                    payload: {
-                                        product_hash: hashArray,
-                                        new_category:
-                                            report.suggestedCategory.category,
-                                        new_subcategory:
-                                            report.suggestedCategory
-                                                .subcategory,
-                                        new_product_type:
-                                            report.suggestedCategory
-                                                .product_type,
-                                    },
-                                });
-                            } catch (recatErr) {
-                                console.error(
-                                    `Failed to recategorize product ${report.id}:`,
-                                    recatErr,
-                                );
-                            }
-                        }
-
-                        approvedCount++;
-                        error = `Approved ${approvedCount} of ${totalToApprove} reports...`;
-                    }
-                } catch (err) {
-                    console.error(`Error approving report ${report.id}:`, err);
-                    // Continue with next report
-                }
-            }
-
-            error = `Successfully approved ${approvedCount} of ${totalToApprove} reports.`;
-        } catch (err) {
-            error = `Error in bulk approval: ${err.message}`;
-        } finally {
+        if (pendingReports.length === 0) {
+            error = "No user-suggested reports available for bulk approval.";
             approvingAll = false;
+            return;
         }
+
+        totalToApprove = pendingReports.length;
+        approvedCount = 0;
+        let bulkErrorOccurred = false;
+
+        for (const report of pendingReports) {
+            if (report.id === undefined) {
+                console.error(
+                    "Bulk approve: Skipping report with undefined ID",
+                    report,
+                );
+                totalToApprove--; // Adjust total since we're skipping
+                continue;
+            }
+            error = `Approving ${approvedCount + 1} of ${totalToApprove} reports...`;
+            try {
+                const approveResponse = await fetch(
+                    "http://localhost:3000/api/approve-category-report",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            reportId: report.id,
+                            approve: true,
+                        }),
+                    },
+                );
+
+                if (approveResponse.ok) {
+                    // Attempt to queue immediately after successful approval
+                    const queuedSuccessfully = await queueForRecategorization(
+                        report.id,
+                        false,
+                    );
+                    if (queuedSuccessfully) {
+                        approvedCount++;
+                    } else {
+                        console.warn(
+                            `Bulk approve: Report ${report.id} approved but failed to queue.`,
+                        );
+                        bulkErrorOccurred = true;
+                        // The report status in UI will be 'approved' but not 'queued'.
+                        // loadReports() at the end will refresh this.
+                    }
+                } else {
+                    console.error(
+                        `Bulk approve: Error approving report ${report.id}:`,
+                        await approveResponse.text(),
+                    );
+                    bulkErrorOccurred = true;
+                }
+            } catch (err) {
+                console.error(
+                    `Bulk approve: Exception for report ${report.id}:`,
+                    err,
+                );
+                bulkErrorOccurred = true;
+            }
+        }
+
+        if (bulkErrorOccurred) {
+            error = `Bulk approval: ${approvedCount}/${totalToApprove} reports successfully approved and queued. Some errors occurred.`;
+        } else if (approvedCount > 0) {
+            error = `Successfully approved and queued ${approvedCount} of ${totalToApprove} reports.`;
+        } else {
+            error = "Bulk approval: No reports were processed successfully.";
+        }
+
+        await loadReports(); // Refresh list to show all status updates
+        approvingAll = false;
     }
 
-    async function rejectReport() {
+    async function rejectReport(reportId = null) {
+        const reportToReject = reportId
+            ? reports.find((r) => r.id === reportId)
+            : selectedReport;
+
+        if (!reportToReject || reportToReject.id === undefined) {
+            error = "No report selected or report ID is missing for rejection.";
+            console.error(
+                "rejectReport error: report is invalid",
+                reportToReject,
+            );
+            return;
+        }
+        const reportIdToReject = reportToReject.id;
+        error = null;
+
         try {
             const response = await fetch(
                 "http://localhost:3000/api/approve-category-report",
@@ -368,105 +565,132 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        reportId: selectedReport.id,
-                        approve: false,
+                        reportId: reportIdToReject,
+                        approve: false, // false means reject
                     }),
                 },
             );
 
             if (response.ok) {
-                // Update UI and close dialog
-                const index = reports.findIndex(
-                    (r) => r.id === selectedReport.id,
+                // Update the local reports array immediately
+                const reportIndex = reports.findIndex(
+                    (r) => r.id === reportIdToReject,
                 );
-                if (index !== -1) {
-                    reports[index].status = "rejected";
-                    reports = [...reports]; // Trigger Svelte reactivity
+                if (reportIndex !== -1) {
+                    reports[reportIndex].status = "rejected";
+                    reports = [...reports]; // Trigger reactivity
                 }
 
-                showApproveDialog = false;
-                selectedReport = null;
+                if (showApproveDialog) {
+                    showApproveDialog = false;
+                    selectedReport = null;
+                }
+
+                // Load reports in the background without disrupting UI
+                setTimeout(() => {
+                    loadReports(true);
+                }, 100);
             } else {
-                error = "Failed to reject report";
+                error = `Failed to reject report: ${await response.text()}`;
+                console.error(
+                    "Failed to reject report:",
+                    await response.text(),
+                );
             }
         } catch (err) {
             error = err.message;
-        }
-    }
-
-    async function rebuildCategorizer() {
-        try {
-            rebuildingIndex = true;
-            error = null;
-
-            const response = await fetch(
-                "http://localhost:3000/api/rebuild-categorizer",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                },
-            );
-
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success) {
-                    // Show success message as a temporary error (it's not really an error)
-                    error =
-                        "Categorization index rebuilt successfully! Changes will apply to new categorizations.";
-                } else {
-                    error = "Failed to rebuild categorization index";
-                }
-            } else {
-                error = "Failed to connect to rebuild endpoint";
-            }
-        } catch (err) {
-            error = `Error rebuilding index: ${err.message}`;
-        } finally {
-            rebuildingIndex = false;
-        }
-    }
-
-    async function convertFailedCategorizations() {
-        try {
-            convertingFailures = true;
-            error = null;
-
-            const response = await fetch(
-                "http://localhost:3000/api/convert-failed-categorizations",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                },
-            );
-
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success) {
-                    convertedCount = result.converted;
-                    error = `Successfully converted ${result.converted} failed categorizations to reports.`;
-                    // Reload reports to show the new ones
-                    await loadReports();
-                } else {
-                    error = "Failed to convert failed categorizations";
-                }
-            } else {
-                error = "Failed to connect to conversion endpoint";
-            }
-        } catch (err) {
-            error = `Error converting failures: ${err.message}`;
-        } finally {
-            convertingFailures = false;
+            console.error("Error in rejectReport:", err);
         }
     }
 
     function getStatusBadgeClass(status) {
         if (status === "approved") return "badge-success";
         if (status === "rejected") return "badge-danger";
+        if (status === "queued_for_recategorization") return "badge-info";
+        if (status === "recategorized") return "badge-warning";
         return "badge-pending";
     }
 
     function getSourceBadgeClass(source) {
         return source === "system" ? "badge-system" : "badge-user";
+    }
+
+    function getReportTypeBadgeClass(type) {
+        if (type === "negative_example") return "badge-negative";
+        if (type === "suggestion") return "badge-suggestion";
+        return "badge-default";
+    }
+
+    function portal(node) {
+        const target = document.body;
+
+        // We need to ensure we only append once and track it properly
+        let appended = false;
+
+        function update() {
+            if (!appended) {
+                target.appendChild(node);
+                appended = true;
+            }
+        }
+
+        function destroy() {
+            if (appended && node.parentNode) {
+                node.parentNode.removeChild(node);
+                appended = false;
+            }
+        }
+
+        update();
+
+        return {
+            update,
+            destroy,
+        };
+    }
+
+    // Control body overflow
+    $: if (showApproveDialog) {
+        document.body.style.overflow = "hidden"; // Disable scrolling when dialog open
+    } else {
+        document.body.style.overflow = ""; // Re-enable scrolling when closed
+    }
+
+    onDestroy(() => {
+        // Ensure scrolling is re-enabled if component is destroyed while dialog is open
+        document.body.style.overflow = "";
+    });
+
+    // Function to trigger DHT synchronization (MOVED FROM SIDEBAR)
+    async function syncDht() {
+        syncStatusModalOpen = true;
+
+        try {
+            await store.productStore.syncDht();
+        } catch (error) {
+            console.error("Error during DHT sync:", error);
+        }
+    }
+
+    // Get sync status from the store (MOVED FROM SIDEBAR)
+    $: syncStatus = store.productStore?.getState()?.syncStatus || {
+        inProgress: false,
+        message: "",
+        progress: 0,
+        totalToUpdate: 0,
+        completedUpdates: 0,
+    };
+
+    // Close modal when sync completes (MOVED FROM SIDEBAR)
+    $: if (
+        syncStatusModalOpen &&
+        !syncStatus.inProgress &&
+        syncStatus.message &&
+        syncStatus.message.includes("completed")
+    ) {
+        setTimeout(() => {
+            syncStatusModalOpen = false;
+        }, 3000);
     }
 </script>
 
@@ -476,59 +700,63 @@
         <button class="close-btn" on:click={onClose}>✕</button>
     </div>
 
+    <!-- NEW DATA ADMIN SECTION - Added from SidebarMenu.svelte -->
+    <div class="data-admin-actions">
+        <h2 class="data-admin-title">Data Controls</h2>
+        <div class="data-admin-buttons">
+            <button
+                class="data-admin-btn"
+                on:click={() => store.productStore?.loadFromSavedData()}
+            >
+                <span class="btn-icon">
+                    <Database size={18} />
+                </span>
+                Load Saved Data
+            </button>
+
+            <button class="data-admin-btn" on:click={syncDht}>
+                <span class="btn-icon">
+                    <RefreshCw size={18} />
+                </span>
+                Sync DHT
+            </button>
+        </div>
+    </div>
+
     <div class="admin-actions">
-        <div class="action-group">
-            <button
-                class="rebuild-btn"
-                on:click={rebuildCategorizer}
-                disabled={rebuildingIndex}
-            >
-                {rebuildingIndex
-                    ? "Rebuilding..."
-                    : "Rebuild Categorization Index"}
-            </button>
-            <p class="hint">
-                Refresh the categorizer with the latest approved corrections
-            </p>
-        </div>
-
-        <div class="action-group">
-            <button
-                class="convert-btn"
-                on:click={convertFailedCategorizations}
-                disabled={convertingFailures}
-            >
-                {convertingFailures
-                    ? "Converting..."
-                    : "Import Failed Categorizations"}
-            </button>
-            <p class="hint">
-                Import failed categorizations as system-detected reports
-            </p>
-        </div>
-
-        <!-- Add this new action group for bulk approval -->
         <div class="action-group">
             <button
                 class="approve-all-btn"
                 on:click={approveAllReports}
-                disabled={approvingAll}
+                disabled={approvingAll || loading}
             >
                 {approvingAll
                     ? `Approving ${approvedCount}/${totalToApprove}...`
-                    : "Approve All Reports"}
+                    : "Approve All User Suggestions"}
             </button>
             <p class="hint">
-                Approve all pending reports with suggested categories
+                Approve pending reports with user-suggested categories
+            </p>
+        </div>
+
+        <div class="action-group">
+            <button
+                class="process-queue-btn"
+                on:click={processRecategorizationQueue}
+                disabled={processingQueue || loading}
+            >
+                {processingQueue
+                    ? "Processing queue..."
+                    : "Process Recategorization Queue"}
+            </button>
+            <p class="hint">
+                Recategorize products that have been queued for processing
             </p>
         </div>
     </div>
 
     {#if error}
-        <div
-            class="error-message"
-            style="margin-top: 15px; margin-left: 20px; margin-right: 20px;"
-        >
+        <div class="error-message">
             {error}
         </div>
     {/if}
@@ -542,49 +770,59 @@
             <table class="reports-table">
                 <thead>
                     <tr>
+                        <th>Image</th>
                         <th>Product</th>
                         <th>Current Category</th>
                         <th>Suggested Category</th>
-                        <th>Reported On</th>
                         <th>Status</th>
                         <th>Source</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {#each reports as report}
+                    {#each reports as report, i (report.id)}
                         <tr
                             class={report.source === "system"
                                 ? "system-row"
                                 : ""}
                         >
+                            <td class="image-cell">
+                                {#if report.product.image_url}
+                                    <img
+                                        src={report.product.image_url}
+                                        alt={report.product.name}
+                                        class="product-thumbnail"
+                                    />
+                                {:else}
+                                    <div class="no-image-placeholder">
+                                        No image
+                                    </div>
+                                {/if}
+                            </td>
                             <td>{report.product.name}</td>
                             <td>
-                                {report.currentCategory.category} →
-                                {report.currentCategory.subcategory} →
-                                {report.currentCategory.product_type}
+                                {report.currentCategory.category || "N/A"} →
+                                {report.currentCategory.subcategory || "N/A"} →
+                                {report.currentCategory.product_type || "N/A"}
                             </td>
                             <td>
                                 {#if report.type === "negative_example"}
                                     <span class="negative-example"
                                         >Incorrect Category Report</span
                                     >
-                                {:else if report.suggestedCategory}
+                                {:else if report.suggestedCategory && report.suggestedCategory.category}
                                     {report.suggestedCategory.category} →
-                                    {report.suggestedCategory.subcategory} →
+                                    {report.suggestedCategory.subcategory ||
+                                        "N/A"} →
                                     {report.suggestedCategory.product_type ||
-                                        report.suggestedCategory.subcategory}
+                                        report.suggestedCategory.subcategory ||
+                                        "N/A"}
                                 {:else}
                                     <span class="needs-review"
                                         >Needs Admin Review</span
                                     >
                                 {/if}
                             </td>
-                            <td
-                                >{new Date(
-                                    report.timestamp,
-                                ).toLocaleString()}</td
-                            >
                             <td>
                                 <span
                                     class="badge {getStatusBadgeClass(
@@ -603,15 +841,49 @@
                                     {report.source || "user"}
                                 </span>
                             </td>
-                            <td>
-                                <button
-                                    class="view-btn"
-                                    on:click={() => viewReport(report)}
-                                    disabled={report.status === "approved" ||
-                                        report.status === "rejected"}
-                                >
-                                    Review
-                                </button>
+                            <td class="actions-cell">
+                                {#if !report.status || report.status === "pending"}
+                                    <div class="action-buttons">
+                                        {#if report.source !== "system" && report.suggestedCategory && report.suggestedCategory.category}
+                                            <button
+                                                class="approve-quick-btn"
+                                                on:click={() =>
+                                                    approveReport(report.id)}
+                                                title="Approve"
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                            <button
+                                                class="reject-quick-btn"
+                                                on:click={() =>
+                                                    rejectReport(report.id)}
+                                                title="Reject"
+                                            >
+                                                <XIcon size={16} />
+                                            </button>
+                                        {/if}
+                                        <button
+                                            class="view-btn"
+                                            on:click={() => viewReport(report)}
+                                            title="Review Details"
+                                        >
+                                            {report.source === "system" ||
+                                            !report.suggestedCategory
+                                                ? "Review"
+                                                : "Details"}
+                                        </button>
+                                    </div>
+                                {:else}
+                                    <button
+                                        class="view-btn"
+                                        on:click={() => viewReport(report)}
+                                        disabled={report.status ===
+                                            "recategorized" ||
+                                            report.status === "rejected"}
+                                    >
+                                        View
+                                    </button>
+                                {/if}
                             </td>
                         </tr>
                     {/each}
@@ -622,9 +894,17 @@
 </div>
 
 {#if showApproveDialog && selectedReport}
-    <div class="overlay">
+    <div
+        class="overlay"
+        style="background-color: rgba(0,0,0,0.7); z-index: 9999;"
+        on:click|self={() => {
+            showApproveDialog = false;
+            selectedReport = null;
+        }}
+        use:portal
+    >
         <div class="dialog">
-            <h2>Review Category Report</h2>
+            <h2>Review Category Report ({selectedReport.id})</h2>
 
             <div class="report-details">
                 <div class="report-section">
@@ -655,30 +935,46 @@
                     <ul>
                         <li>
                             <strong>Category:</strong>
-                            {selectedReport.currentCategory.category}
+                            {selectedReport.currentCategory.category || "N/A"}
                         </li>
                         <li>
                             <strong>Subcategory:</strong>
-                            {selectedReport.currentCategory.subcategory}
+                            {selectedReport.currentCategory.subcategory ||
+                                "N/A"}
                         </li>
                         <li>
                             <strong>Product Type:</strong>
-                            {selectedReport.currentCategory.product_type}
+                            {selectedReport.currentCategory.product_type ||
+                                "N/A"}
                         </li>
                     </ul>
                 </div>
 
-                {#if selectedReport.source === "system" || !selectedReport.suggestedCategory}
-                    <!-- System-detected failure or missing suggested category -->
+                {#if selectedReport.source === "system" || !selectedReport.suggestedCategory?.category || selectedReport.type === "negative_example"}
                     <div class="report-section system-section">
-                        <h3>Select Correct Category</h3>
-                        <p class="system-note">
-                            This report requires admin categorization
-                        </p>
+                        <h3>
+                            {#if selectedReport.type === "negative_example"}
+                                Flagged as Incorrect
+                            {:else}
+                                Select Correct Category
+                            {/if}
+                        </h3>
+                        {#if selectedReport.type !== "negative_example"}
+                            <p class="system-note">
+                                This report requires you to select the correct
+                                category.
+                            </p>
+                        {/if}
 
                         <div class="form-group">
                             <label for="category">Category:</label>
-                            <select id="category" bind:value={selectedCategory}>
+                            <select
+                                id="category"
+                                bind:value={selectedCategory}
+                                class="form-select"
+                                disabled={selectedReport.type ===
+                                    "negative_example"}
+                            >
                                 <option value={null}>Select Category</option>
                                 {#each mainCategories as category}
                                     <option value={category.name}
@@ -693,7 +989,9 @@
                             <select
                                 id="subcategory"
                                 bind:value={selectedSubcategory}
-                                disabled={!selectedCategory}
+                                disabled={!selectedCategory ||
+                                    selectedReport.type === "negative_example"}
+                                class="form-select"
                             >
                                 <option value={null}>Select Subcategory</option>
                                 {#each subcategories as subcategory}
@@ -712,24 +1010,33 @@
                                 disabled={!selectedSubcategory ||
                                     subcategories.find(
                                         (s) => s.name === selectedSubcategory,
-                                    )?.gridOnly}
+                                    )?.gridOnly ||
+                                    selectedReport.type === "negative_example"}
+                                class="form-select"
                             >
                                 {#if subcategories.find((s) => s.name === selectedSubcategory)?.gridOnly}
                                     <option value={selectedSubcategory}
                                         >{selectedSubcategory}</option
                                     >
                                 {:else if productTypes && productTypes.length > 0}
+                                    <option value={null}
+                                        >Select Product Type</option
+                                    >
                                     {#each productTypes as type}
                                         <option value={type}>{type}</option>
                                     {/each}
+                                {:else if selectedSubcategory}
+                                    <option value={null}
+                                        >No product types defined</option
+                                    >
                                 {/if}
                             </select>
                         </div>
                     </div>
                 {:else}
-                    <!-- User-suggested category -->
+                    <!-- User-suggested category, already reviewed by user -->
                     <div class="report-section">
-                        <h3>Suggested Categorization</h3>
+                        <h3>Suggested Categorization (by User)</h3>
                         <ul>
                             <li>
                                 <strong>Category:</strong>
@@ -737,11 +1044,16 @@
                             </li>
                             <li>
                                 <strong>Subcategory:</strong>
-                                {selectedReport.suggestedCategory.subcategory}
+                                {selectedReport.suggestedCategory.subcategory ||
+                                    "N/A"}
                             </li>
                             <li>
                                 <strong>Product Type:</strong>
-                                {selectedReport.suggestedCategory.product_type}
+                                {selectedReport.suggestedCategory
+                                    .product_type ||
+                                    selectedReport.suggestedCategory
+                                        .subcategory ||
+                                    "N/A"}
                             </li>
                         </ul>
                     </div>
@@ -755,18 +1067,81 @@
                 {/if}
 
                 <div class="action-buttons">
-                    <button class="reject-btn" on:click={rejectReport}
-                        >Reject</button
+                    <button class="reject-btn" on:click={() => rejectReport()}>
+                        Reject
+                    </button>
+
+                    <button
+                        class="approve-btn"
+                        on:click={() => approveReport()}
                     >
-                    <button class="approve-btn" on:click={approveReport}
-                        >Approve</button
-                    >
+                        {selectedReport.type === "negative_example"
+                            ? "Confirm as Incorrect & Re-evaluate"
+                            : "Approve Suggestion"}
+                    </button>
+
                     <button
                         class="cancel-btn"
-                        on:click={() => (showApproveDialog = false)}
-                        >Cancel</button
+                        on:click={() => {
+                            showApproveDialog = false;
+                            selectedReport = null;
+                        }}
                     >
+                        Cancel
+                    </button>
                 </div>
+            </div>
+        </div>
+    </div>
+{/if}
+
+<!-- Sync Status Modal (MOVED FROM SIDEBAR) -->
+{#if syncStatusModalOpen}
+    <div
+        class="sync-modal-overlay"
+        on:click={() => !syncStatus.inProgress && (syncStatusModalOpen = false)}
+    >
+        <div class="sync-modal" on:click|stopPropagation>
+            <div class="sync-modal-header">
+                <h3>DHT Synchronization Status</h3>
+                {#if !syncStatus.inProgress}
+                    <button
+                        class="close-button"
+                        on:click={() => (syncStatusModalOpen = false)}
+                    >
+                        <X size={20} />
+                    </button>
+                {/if}
+            </div>
+
+            <div class="sync-modal-content">
+                {#if syncStatus.inProgress}
+                    <div class="sync-status">
+                        <div class="sync-spinner"></div>
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+
+                    <div class="progress-container">
+                        <div
+                            class="progress-bar"
+                            style="width: {syncStatus.progress}%"
+                        ></div>
+                    </div>
+
+                    <p class="sync-count">
+                        {syncStatus.completedUpdates} / {syncStatus.totalToUpdate}
+                        product types processed
+                    </p>
+                {:else if syncStatus.message.includes("error") || syncStatus.message.includes("Error")}
+                    <div class="sync-error">
+                        <AlertCircle size={32} color="#ff5555" />
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+                {:else}
+                    <div class="sync-success">
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+                {/if}
             </div>
         </div>
     </div>
@@ -774,163 +1149,379 @@
 
 <style>
     .admin-container {
+        width: 100vw;
+        height: 100vh;
         padding: 0;
-        max-width: 1200px;
-        margin: 0 auto;
-        max-height: 90vh;
+        margin: 0;
         display: flex;
         flex-direction: column;
-        overflow-y: hidden;
+        overflow: hidden;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background-color: var(--background, white);
+        z-index: var(--z-index-overlay, 2000);
     }
 
     .table-container {
+        flex: 1;
         overflow-y: auto;
-        max-height: calc(90vh - 200px);
-        margin-top: 0px;
+        overflow-x: hidden;
+        width: 100%;
+        box-sizing: border-box;
     }
+
+    /* NEW DATA ADMIN SECTION STYLES */
+    .data-admin-actions {
+        margin: 0;
+        padding: var(--spacing-md, 15px) var(--spacing-lg, 20px);
+        background-color: var(--surface-variant, #e8eaf6);
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0, 0, 0, 0.08));
+        border-bottom: var(--border-width-thin, 1px) solid var(--border, #eee);
+    }
+
+    .data-admin-title {
+        font-size: var(--font-size-lg, 18px);
+        margin: 0 0 var(--spacing-sm, 10px) 0;
+        color: var(--text-primary);
+        font-weight: var(--font-weight-semibold);
+    }
+
+    .data-admin-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-md, 15px);
+    }
+
+    .data-admin-btn {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm, 8px);
+        padding: var(--spacing-sm, 8px) var(--spacing-md, 15px);
+        border: none;
+        border-radius: var(--btn-border-radius, 4px);
+        background-color: var(--primary, #3f51b5);
+        color: white;
+        cursor: pointer;
+        font-weight: var(--font-weight-semibold);
+        transition: var(--btn-transition, 0.2s);
+    }
+
+    .data-admin-btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+    }
+
+    .btn-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* END NEW STYLES */
 
     .admin-actions {
         margin: 0;
-        padding: 15px 20px;
-        background-color: #f8f9fa;
-        border-radius: 0;
+        padding: var(--spacing-md, 15px) var(--spacing-lg, 20px);
+        background-color: var(--surface, #f8f9fa);
+        border-radius: 0; /* No border radius for a bar look */
         display: flex;
-        align-items: flex-start;
-        gap: 40px;
+        align-items: flex-start; /* Align items to the start */
+        gap: var(--spacing-xl, 40px); /* Increased gap */
         position: sticky;
-        top: 45px;
+        top: 72px; /* Height of the admin-header */
         z-index: 9;
+        flex-wrap: wrap; /* Allow actions to wrap on smaller screens */
+        box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0, 0, 0, 0.08));
     }
 
     .action-group {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: var(--spacing-xs, 10px); /* Spacing within group */
+        min-width: 200px; /* Ensure buttons don't get too squished */
     }
 
-    .rebuild-btn,
+    .approve-all-btn,
+    .process-queue-btn,
     .convert-btn {
-        padding: 8px 16px;
-        background-color: #6c757d;
+        padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: var(--btn-border-radius, 4px);
         cursor: pointer;
-        font-weight: bold;
+        font-weight: var(--font-weight-bold, bold);
+        transition: var(--btn-transition, 0.2s);
     }
 
+    .approve-all-btn {
+        background-color: var(--primary, #28a745);
+    }
+    .process-queue-btn {
+        background-color: var(--secondary, #007bff);
+    }
     .convert-btn {
-        background-color: #28a745;
+        background-color: var(--accent, #17a2b8);
     }
 
-    .rebuild-btn:hover:not(:disabled),
+    .approve-all-btn:hover:not(:disabled),
+    .process-queue-btn:hover:not(:disabled),
     .convert-btn:hover:not(:disabled) {
         opacity: 0.9;
     }
 
-    .rebuild-btn:disabled,
+    .approve-all-btn:disabled,
+    .process-queue-btn:disabled,
     .convert-btn:disabled {
-        background-color: #adb5bd;
+        background-color: var(--btn-disabled, #adb5bd);
         cursor: not-allowed;
     }
 
     .hint {
-        color: #6c757d;
-        font-size: 14px;
+        color: var(--text-secondary, #6c757d);
+        font-size: var(--font-size-sm, 14px);
         margin: 0;
     }
 
     .error-message {
-        background-color: #ffecec;
-        color: #721c24;
-        padding: 10px;
-        border-radius: 4px;
-        margin-bottom: 20px;
+        background-color: var(--error-light, #ffecec);
+        color: var(--error, #721c24); /* Darker red for text */
+        padding: var(--spacing-sm, 10px);
+        border-radius: var(--card-border-radius, 4px);
+        margin: var(--spacing-md, 15px) var(--spacing-lg, 20px); /* Consistent margins */
     }
 
     .reports-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 20px;
+        table-layout: fixed;
     }
 
     .reports-table th,
     .reports-table td {
-        padding: 10px;
-        border: 1px solid #ddd;
+        padding: var(--spacing-sm, 10px);
+        border: var(--border-width-thin, 1px) solid var(--border, #ddd);
         text-align: left;
+        vertical-align: middle; /* Better alignment for multi-line content */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        word-wrap: break-word;
     }
 
     .reports-table th {
-        background-color: #f5f5f5;
-        font-weight: bold;
+        background-color: var(
+            --surface,
+            #f5f5f5
+        ); /* Slightly lighter than default SvelteKit */
+        font-weight: var(--font-weight-bold, bold);
     }
 
     .reports-table thead {
         position: sticky;
-        top: -2px;
-        background-color: #f5f5f5;
+        top: 0; /* Stick to the top of the container */
+        background-color: var(--surface, #f5f5f5); /* Match th background */
         z-index: 5;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); /* Subtle shadow for separation */
     }
 
     .reports-table tr:nth-child(even) {
-        background-color: #f9f9f9;
+        background-color: var(
+            --surface-hover,
+            #f9f9f9
+        ); /* Lighter for even rows */
     }
 
     .system-row {
-        background-color: #f8f9ff !important;
+        background-color: var(
+            --system-row,
+            #f0f4ff
+        ) !important; /* Distinct color for system rows */
+    }
+
+    /* Column widths */
+    .reports-table th:nth-child(1) {
+        /* Image column */
+        width: 80px;
+    }
+
+    .reports-table th:nth-child(2) {
+        /* Product column */
+        width: 15%;
+    }
+
+    .reports-table th:nth-child(3),
+    .reports-table th:nth-child(4) {
+        /* Category columns */
+        width: 25%;
+    }
+
+    .reports-table th:nth-child(5),
+    .reports-table th:nth-child(6) {
+        /* Status & Source columns */
+        width: 10%;
+    }
+
+    .reports-table th:nth-child(7) {
+        /* Actions column */
+        width: 15%;
+    }
+
+    .image-cell {
+        text-align: center;
+        width: 80px;
+    }
+
+    .product-thumbnail {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+        background-color: white;
+        border: 1px solid var(--border);
+        border-radius: var(--card-border-radius, 4px);
+    }
+
+    .no-image-placeholder {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--surface-hover);
+        color: var(--text-secondary);
+        font-size: 12px;
+        border-radius: var(--card-border-radius, 4px);
+        margin: 0 auto;
     }
 
     .badge {
         display: inline-block;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
+        padding: 4px 8px; /* Slightly more padding */
+        border-radius: var(--badge-border-radius, 12px); /* More pill-shaped */
+        font-size: var(--font-size-xs, 12px);
+        font-weight: var(--font-weight-semibold, 500); /* Slightly bolder */
+        line-height: 1.2; /* Ensure text fits well */
+        white-space: nowrap;
     }
 
+    /* Badge color definitions (using more distinct colors) */
     .badge-pending {
-        background-color: #ffeeba;
-        color: #856404;
+        background-color: #fff3cd;
+        color: #664d03;
+        border: 1px solid #ffecb5;
     }
-
     .badge-success {
-        background-color: #d4edda;
-        color: #155724;
+        background-color: #d1e7dd;
+        color: #0a3622;
+        border: 1px solid #badbcc;
     }
-
     .badge-danger {
         background-color: #f8d7da;
-        color: #721c24;
+        color: #58151c;
+        border: 1px solid #f1c2c7;
     }
+    .badge-info {
+        background-color: #cff4fc;
+        color: #055160;
+        border: 1px solid #b6effb;
+    }
+    .badge-warning {
+        background-color: #fff3cd;
+        color: #664d03;
+        border: 1px solid #ffecb5;
+    } /* Same as pending for now */
 
     .badge-system {
-        background-color: #e2e3ff;
-        color: #3f51b5;
+        background-color: #e2e3fe;
+        color: #303655;
+        border: 1px solid #d3d5fd;
+    }
+    .badge-user {
+        background-color: #cfe2ff;
+        color: #042f66;
+        border: 1px solid #b9d3ff;
     }
 
-    .badge-user {
-        background-color: #e7f5ff;
-        color: #0d6efd;
+    .badge-negative {
+        background-color: #f5c6cb;
+        color: #721c24;
+        border: 1px solid #f1b0b7;
+    }
+    .badge-suggestion {
+        background-color: #b6d7a8;
+        color: #274e13;
+        border: 1px solid #a2c896;
+    }
+    .badge-default {
+        background-color: #e9ecef;
+        color: #495057;
+        border: 1px solid #dee2e6;
     }
 
     .needs-review {
-        color: #dc3545;
-        font-weight: bold;
+        color: var(--warning, #dc3545); /* Bootstrap warning color */
+        font-weight: var(--font-weight-bold, bold);
+    }
+
+    .actions-cell {
+        text-align: center;
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: var(--spacing-xs, 5px);
     }
 
     .view-btn {
-        padding: 5px 10px;
-        background-color: #007bff;
+        padding: var(--spacing-xs, 5px) var(--spacing-sm, 10px);
+        background-color: var(--secondary, #007bff); /* Bootstrap secondary */
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: var(--btn-border-radius, 4px);
         cursor: pointer;
+        transition: var(--btn-transition, 0.2s);
+    }
+
+    .view-btn:hover:not(:disabled) {
+        opacity: 0.9;
     }
 
     .view-btn:disabled {
-        background-color: #cccccc;
+        background-color: var(--btn-disabled, #cccccc);
         cursor: not-allowed;
+    }
+
+    .approve-quick-btn,
+    .reject-quick-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        transition: var(--btn-transition);
+    }
+
+    .approve-quick-btn {
+        background-color: var(--success, #28a745);
+        color: white;
+    }
+
+    .reject-quick-btn {
+        background-color: var(--error, #dc3545);
+        color: white;
+    }
+
+    .approve-quick-btn:hover,
+    .reject-quick-btn:hover {
+        opacity: 0.85;
+        transform: scale(1.05);
     }
 
     .overlay {
@@ -939,119 +1530,179 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
+        background-color: var(
+            --overlay-dark,
+            rgba(0, 0, 0, 0.6)
+        ); /* Darker overlay */
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 1000;
+        z-index: var(--z-index-modal, 1050); /* Bootstrap modal z-index */
+        touch-action: none; /* Prevent touch scrolling */
     }
 
     .dialog {
-        background-color: white;
-        padding: 20px;
-        border-radius: 8px;
+        background-color: var(--background, white);
+        padding: var(--spacing-lg, 20px);
+        border-radius: var(--card-border-radius, 8px);
         width: 90%;
-        max-width: 800px;
+        max-width: 800px; /* Max width for larger screens */
         max-height: 90vh;
         overflow-y: auto;
+        box-shadow: var(
+            --shadow-lg,
+            0 0.5rem 1rem rgba(0, 0, 0, 0.15)
+        ); /* Larger shadow */
+    }
+
+    .dialog h2 {
+        margin-top: 0;
+        margin-bottom: var(--spacing-lg, 20px);
+        font-size: var(--font-size-lg, 22px); /* Larger dialog title */
     }
 
     .report-details {
         display: flex;
         flex-direction: column;
-        gap: 20px;
+        gap: var(--spacing-lg, 20px);
     }
 
     .report-section {
-        padding: 15px;
-        background-color: #f9f9f9;
-        border-radius: 4px;
+        padding: var(--spacing-md, 15px);
+        background-color: var(--surface, #f9f9f9);
+        border-radius: var(--card-border-radius, 4px);
+        border: var(--border-width-thin, 1px) solid var(--border, #eee);
+    }
+
+    .report-section h3 {
+        margin-top: 0;
+        margin-bottom: var(--spacing-md, 10px);
+        font-size: var(--font-size-md, 18px);
     }
 
     .system-section {
-        background-color: #f2f4ff;
-        border-left: 4px solid #3f51b5;
+        background-color: var(--system-section-bg, #f0f4ff);
+        border-left: 4px solid var(--system-section-border, #3f51b5);
     }
 
     .system-note {
-        color: #3f51b5;
+        color: var(--system-section-text, #3f51b5);
         font-style: italic;
-        margin-bottom: 15px;
+        margin-bottom: var(--spacing-md, 15px);
+        font-size: var(--font-size-sm, 14px);
     }
 
     .form-group {
-        margin-bottom: 15px;
+        margin-bottom: var(--spacing-md, 15px);
     }
 
     .form-group label {
         display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
+        margin-bottom: var(--spacing-xs, 5px);
+        font-weight: var(
+            --font-weight-semibold,
+            600
+        ); /* Slightly less than bold */
     }
 
-    .form-group select {
+    .form-select {
         width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+        padding: var(--spacing-sm, 8px) var(--spacing-md, 12px); /* More padding */
+        border: var(--border-width-thin, 1px) solid var(--border, #ced4da); /* Bootstrap form control border */
+        border-radius: var(--form-border-radius, 4px);
+        background-color: var(--background, white);
+        height: auto; /* Allow natural height based on padding */
+        line-height: 1.5;
+        font-size: var(--font-size-base, 16px);
+    }
+
+    .form-select:disabled {
+        background-color: var(
+            --input-disabled,
+            #e9ecef
+        ); /* Bootstrap disabled color */
+        cursor: not-allowed;
+        opacity: 0.7;
     }
 
     .product-img {
         max-width: 200px;
         max-height: 200px;
         object-fit: contain;
-        margin-top: 10px;
+        margin-top: var(--spacing-sm, 10px);
+        border: var(--border-width-thin, 1px) solid var(--border, #ddd);
+        border-radius: var(--card-border-radius, 4px);
+        padding: var(--spacing-xs, 5px);
+        background-color: white; /* Ensure background for transparent images */
     }
 
     .no-image {
         width: 200px;
         height: 200px;
-        background-color: #f0f0f0;
-        border: 1px dashed #ccc;
+        background-color: var(--surface-hover, #f0f0f0);
+        border: var(--border-width-thin, 1px) dashed var(--border, #ccc);
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        padding: 10px;
-        margin-top: 10px;
+        padding: var(--spacing-sm, 10px);
+        margin-top: var(--spacing-sm, 10px);
         text-align: center;
+        border-radius: var(--card-border-radius, 4px);
+    }
+    .no-image p {
+        margin: 5px 0;
     }
 
-    .no-image .product-name {
-        font-weight: bold;
-        margin-top: 10px;
-        font-size: 14px;
-        color: #666;
+    .product-name {
+        /* Used inside .no-image */
+        font-weight: var(--font-weight-bold, bold);
+        margin-top: var(--spacing-xs, 10px);
+        font-size: var(--font-size-sm, 14px);
+        color: var(--text-secondary, #666);
     }
 
     .action-buttons {
         display: flex;
         justify-content: flex-end;
-        gap: 10px;
-        margin-top: 20px;
+        gap: var(--spacing-sm, 10px);
+        margin-top: var(--spacing-lg, 20px);
+        flex-wrap: wrap; /* Ensure buttons wrap on small screens */
     }
 
     .approve-btn,
     .reject-btn,
     .cancel-btn {
-        padding: 8px 16px;
+        padding: var(--spacing-sm, 10px) var(--spacing-md, 20px); /* Larger buttons */
         border: none;
-        border-radius: 4px;
+        border-radius: var(--btn-border-radius, 4px);
         cursor: pointer;
+        transition: var(--btn-transition, 0.2s);
+        font-weight: var(--font-weight-semibold, 500);
     }
 
     .approve-btn {
-        background-color: #28a745;
+        background-color: var(--primary, #28a745);
         color: white;
+    }
+    .approve-btn:hover {
+        opacity: 0.85;
     }
 
     .reject-btn {
-        background-color: #dc3545;
+        background-color: var(--error, #dc3545);
         color: white;
+    }
+    .reject-btn:hover {
+        opacity: 0.85;
     }
 
     .cancel-btn {
-        background-color: #f1f1f1;
+        background-color: var(--light-gray, #6c757d);
+        color: white;
+    } /* Bootstrap secondary-like */
+    .cancel-btn:hover {
+        background-color: #5a6268;
     }
 
     .admin-header {
@@ -1059,52 +1710,157 @@
         justify-content: space-between;
         align-items: center;
         margin: 0;
-        width: 100%;
+        width: 100%; /* Ensure it spans full width */
         position: sticky;
         top: 0;
-        background: white;
+        background: var(--background, white); /* Ensure it has a background */
         z-index: 10;
-        padding: 10px 20px 0 20px;
+        padding: var(--spacing-lg, 20px);
+        height: 72px; /* Fixed height to match your app's header */
+        box-sizing: border-box;
+        border-bottom: var(--border-width-thin, 1px) solid var(--border, #eee);
+        box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0, 0, 0, 0.08));
     }
 
     .admin-header h1 {
         margin: 0;
         padding: 0;
+        font-size: var(--font-size-xl, 24px);
     }
 
     .close-btn {
         background: none;
         border: none;
-        font-size: 24px;
+        font-size: var(--font-size-xl, 24px); /* Make it larger */
         cursor: pointer;
-        padding: 5px 10px;
+        padding: var(--spacing-xs, 5px) var(--spacing-sm, 10px);
+        border-radius: var(--btn-border-radius, 4px);
+        line-height: 1; /* Prevent extra space */
     }
-
     .close-btn:hover {
-        background-color: #f1f1f1;
+        background-color: var(--surface-hover, #f1f1f1);
     }
 
     .negative-example {
-        color: #dc3545;
-        font-weight: bold;
+        color: var(--error, #dc3545); /* Use error color */
+        font-weight: var(--font-weight-bold, bold);
     }
 
-    .approve-all-btn {
-        padding: 8px 16px;
-        background-color: #28a745;
-        color: white;
-        border: none;
+    .loading,
+    .no-data {
+        padding: var(--spacing-xl, 40px) var(--spacing-lg, 20px); /* More padding */
+        text-align: center;
+        color: var(--text-secondary, #6c757d);
+        font-size: var(--font-size-lg, 18px); /* Larger text */
+    }
+    .no-data {
+        font-style: italic;
+    }
+
+    /* Sync Modal Styles (MOVED FROM SIDEBAR) */
+    .sync-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 3000;
+    }
+
+    .sync-modal {
+        background: var(--background);
+        border-radius: var(--border-radius);
+        width: 90%;
+        max-width: 500px;
+        box-shadow: var(--shadow-large);
+    }
+
+    .sync-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--spacing-md) var(--spacing-lg);
+        border-bottom: var(--border-width-thin) solid var(--border);
+    }
+
+    .sync-modal-header h3 {
+        margin: 0;
+        color: var(--text-primary);
+    }
+
+    .sync-modal-content {
+        padding: var(--spacing-lg);
+    }
+
+    .sync-status {
+        display: flex;
+        align-items: center;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .sync-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top-color: var(--primary);
+        animation: spin 1s linear infinite;
+        margin-right: var(--spacing-md);
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .sync-message {
+        font-size: var(--font-size-md);
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .progress-container {
+        height: 8px;
+        background-color: var(--border);
         border-radius: 4px;
+        margin: var(--spacing-md) 0;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background-color: var(--primary);
+        transition: width 0.3s ease;
+    }
+
+    .sync-count {
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+    }
+
+    .sync-error,
+    .sync-success {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: var(--spacing-md);
+    }
+
+    .close-button {
+        background: none;
+        border: none;
         cursor: pointer;
-        font-weight: bold;
+        color: var(--text-secondary);
     }
 
-    .approve-all-btn:hover:not(:disabled) {
-        opacity: 0.9;
-    }
-
-    .approve-all-btn:disabled {
-        background-color: #adb5bd;
-        cursor: not-allowed;
+    .close-button:hover {
+        color: var(--text-primary);
     }
 </style>

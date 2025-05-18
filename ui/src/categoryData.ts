@@ -779,7 +779,7 @@ export const mainCategories = [
 
           "Pork",
           "Beef",
-          "seafood",
+          "Seafood",
           "Beef, Pork & Seafood"
         ]
       },

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const ProductCategorizer = require('./api_categorizer');
+const ProductCategorizer = require('../api_categorizer');
 
 // Get API key from environment or .env file
 require('dotenv').config();

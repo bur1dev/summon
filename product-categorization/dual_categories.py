@@ -45,7 +45,13 @@ DUAL_CATEGORY_MAPPINGS = {
         "Canned Tomatoes": {
             "product_type_to_subcategory": {"ALL": "Canned Tomatoes"},
             "dual_category": "Dry Goods & Pasta",
-        }
+        },
+        "Canned Fruits": {  # Added for Applesauce
+            "product_type_to_subcategory": {
+                "Applesauce": "Fruit Cups & Applesauce"  # Target subcategory in Snacks & Candy
+            },
+            "dual_category": "Snacks & Candy",
+        },
     },
     # Dry Goods & Pasta mappings
     "Dry Goods & Pasta": {
@@ -58,7 +64,7 @@ DUAL_CATEGORY_MAPPINGS = {
                 "Tomato Based Sauces": "Pasta Sauces",
                 "Alfredo Sauce": "Pasta Sauces",
                 "Pesto": "Pasta Sauces",
-                # Pizza Sauce excluded intentionally
+                # Pizza Sauce: See discussion below
             },
             "dual_category": "Condiments & Sauces",
         },
@@ -70,7 +76,7 @@ DUAL_CATEGORY_MAPPINGS = {
             "dual_category": "Dry Goods & Pasta",
         },
     },
-    # Snacks & Candy mappings
+    # Snacks & Candy mappings - MERGED
     "Snacks & Candy": {
         "Dips": {
             "product_type_to_subcategory": {
@@ -78,8 +84,8 @@ DUAL_CATEGORY_MAPPINGS = {
                 "Guacamole": "Olives, Dips, & Spreads",
                 "Cheese Dips": "Olives, Dips, & Spreads",
             },
-            "dual_category": "Condiments & Sauces",
-            "dual_category_overrides": {
+            "dual_category": "Condiments & Sauces",  # Default target
+            "dual_category_overrides": {  # Specific overrides for target main category
                 "Hummus": "Deli",
                 "Guacamole": "Deli",
                 "Cheese Dips": "Deli",
@@ -88,6 +94,16 @@ DUAL_CATEGORY_MAPPINGS = {
         "Snack Bars": {
             "product_type_to_subcategory": {"Breakfast Bars": "Breakfast Bars"},
             "dual_category": "Breakfast",
+        },
+        "Cookies & Sweet Treats": {  # Added from your previous paste
+            "product_type_to_subcategory": {
+                "Brownies": "Cookies & Brownies",
+            },
+            "dual_category": "Bakery",
+        },
+        "Fruit Cups & Applesauce": {  # Added for Applesauce
+            "product_type_to_subcategory": {"Applesauce": "Canned Fruits"},
+            "dual_category": "Canned Goods & Soups",
         },
     },
     # Liquor mappings
@@ -115,7 +131,6 @@ DUAL_CATEGORY_MAPPINGS = {
         }
     },
     # Deli mappings
-    # Deli mappings
     "Deli": {
         "Tofu & Meat Alternatives": {
             "product_type_to_subcategory": {"Tofu": "Plant-Based Meat"},
@@ -132,8 +147,6 @@ DUAL_CATEGORY_MAPPINGS = {
         "Cheese": {
             "product_type_to_subcategory": {"ALL": "Cheese"},
             "dual_category": "Dairy & Eggs",
-            # The special handling for "Cheese" subcategory in get_dual_categorization
-            # will ensure LLM is used for product_type if this mapping is hit.
         },
     },
     # Wine mappings
@@ -166,36 +179,87 @@ DUAL_CATEGORY_MAPPINGS = {
         "Honey, Syrup, & Sweeteners": {
             "product_type_to_subcategory": {"Maple Syrup": "Maple Syrup"},
             "dual_category": "Breakfast",
-        }
+        },
+        "Cookies & Brownies": {  # Added from your previous paste
+            "product_type_to_subcategory": {
+                "Brownies": "Cookies & Sweet Treats",
+            },
+            "dual_category": "Snacks & Candy",
+        },
+        # "Pie Crusts & Fillings" - NO DUAL MAPPING for "Pie Crusts" due to Frozen/Non-Frozen rule
     },
+    # "Frozen" - NO DUAL MAPPING for "Pie Crusts" due to Frozen/Non-Frozen rule
 }
 
 MULTI_CATEGORY_MAPPINGS = {
-    "Condiments & Sauces": {
-        "Salsa": {
-            "product_type_to_subcategory": {"ALL": "Dips"},
-            "additional_categories": [
-                {"main_category": "Snacks & Candy", "subcategory": "Dips"},
-                {"main_category": "Deli", "subcategory": "Olives, Dips, & Spreads"},
-            ],
+    # Rule: If a product's primary category is "Condiments & Sauces / Salsa / Salsa"
+    "Condiments & Sauces": {  # Incoming primary category
+        "Salsa": {  # Incoming primary subcategory
+            "Salsa": {  # Incoming primary product_type that triggers these additional categories
+                "additional_categories": [
+                    {
+                        "main_category": "Snacks & Candy",
+                        "subcategory": "Dips",
+                        "product_type": "Salsa",  # Target product_type for this additional category
+                    },
+                    {
+                        "main_category": "Deli",
+                        "subcategory": "Olives, Dips, & Spreads",
+                        "product_type": "Salsa",  # Target product_type for this additional category
+                    },
+                ]
+            }
+            # If other product_types under "Condiments & Sauces / Salsa" had multi-cats, they'd be here:
+            # "Hot Salsa": { "additional_categories": [...] },
         }
     },
-    "Snacks & Candy": {
-        "Dips": {
-            "product_type_to_subcategory": {"Salsa": "Salsa"},
-            "additional_categories": [
-                {"main_category": "Condiments & Sauces", "subcategory": "Salsa"},
-                {"main_category": "Deli", "subcategory": "Olives, Dips, & Spreads"},
-            ],
+    # Rule: If a product's primary category is "Snacks & Candy / Dips / Salsa"
+    "Snacks & Candy": {  # Incoming primary category
+        "Dips": {  # Incoming primary subcategory
+            "Salsa": {  # Incoming primary product_type that triggers these additional categories
+                "additional_categories": [
+                    {
+                        "main_category": "Condiments & Sauces",
+                        "subcategory": "Salsa",
+                        "product_type": "Salsa",  # Target product_type for this additional category
+                    },
+                    {
+                        "main_category": "Deli",
+                        "subcategory": "Olives, Dips, & Spreads",
+                        "product_type": "Salsa",  # Target product_type for this additional category
+                    },
+                ]
+            }
+            # IMPORTANT: If "Hummus" (or other product_types under "Snacks & Candy / Dips")
+            # were to have *multi-categorizations*, their rules would be defined here.
+            # For example (hypothetical, as Hummus currently uses DUAL_CATEGORY_MAPPINGS):
+            # "Hummus": {
+            #     "additional_categories": [
+            #         {"main_category": "SomeCategory", "subcategory": "SomeSub", "product_type": "Hummus"}
+            #     ]
+            # }
+            # Since Hummus, Guacamole, etc., do NOT have entries here, they will NOT trigger
+            # any rules from MULTI_CATEGORY_MAPPINGS when their primary category is "Snacks & Candy / Dips".
+            # They will correctly fall through to DUAL_CATEGORY_MAPPINGS.
         }
     },
-    "Deli": {
-        "Olives, Dips, & Spreads": {
-            "product_type_to_subcategory": {"Salsa": "Salsa"},
-            "additional_categories": [
-                {"main_category": "Condiments & Sauces", "subcategory": "Salsa"},
-                {"main_category": "Snacks & Candy", "subcategory": "Dips"},
-            ],
+    # Rule: If a product's primary category is "Deli / Olives, Dips, & Spreads / Salsa"
+    "Deli": {  # Incoming primary category
+        "Olives, Dips, & Spreads": {  # Incoming primary subcategory
+            "Salsa": {  # Incoming primary product_type that triggers these additional categories
+                "additional_categories": [
+                    {
+                        "main_category": "Condiments & Sauces",
+                        "subcategory": "Salsa",
+                        "product_type": "Salsa",  # Target product_type for this additional category
+                    },
+                    {
+                        "main_category": "Snacks & Candy",
+                        "subcategory": "Dips",
+                        "product_type": "Salsa",  # Target product_type for this additional category
+                    },
+                ]
+            }
         }
     },
 }
@@ -390,67 +454,110 @@ def get_categorizations(category, subcategory, product_type):
     Returns an array of categorizations (can be empty, single, or multiple).
     """
     logger.info(
-        f"🔍 Checking categorizations for: {category}/{subcategory}/{product_type}"
+        f"🔍 Checking ALL categorizations for: {category}/{subcategory}/{product_type}"  # Changed log message slightly for clarity
     )
 
     categorizations = []
 
-    # First check MULTI_CATEGORY_MAPPINGS
+    # First check MULTI_CATEGORY_MAPPINGS based on incoming category, subcategory, AND product_type
     if category in MULTI_CATEGORY_MAPPINGS:
         logger.info(f"✅ Found category '{category}' in MULTI mappings")
-
         if subcategory in MULTI_CATEGORY_MAPPINGS[category]:
             logger.info(
                 f"✅ Found subcategory '{subcategory}' in MULTI mappings for category '{category}'"
             )
-            mapping = MULTI_CATEGORY_MAPPINGS[category][subcategory]
+            # NOW, check if the specific incoming product_type has multi-category rules
+            if product_type in MULTI_CATEGORY_MAPPINGS[category][subcategory]:
+                logger.info(
+                    f"✅ Found product_type '{product_type}' triggering MULTI mappings for '{category}/{subcategory}'"
+                )
+                mapping_rules = MULTI_CATEGORY_MAPPINGS[category][subcategory][
+                    product_type
+                ]
 
-            if "additional_categories" in mapping:
-                logger.info(f"📊 Processing additional_categories")
+                if "additional_categories" in mapping_rules:
+                    logger.info(
+                        f"📊 Processing additional_categories from MULTI_CATEGORY_MAPPINGS"
+                    )  # Updated log
 
-                for i, additional in enumerate(mapping["additional_categories"]):
-                    target_category = additional["main_category"]
-                    target_subcategory = additional["subcategory"]
+                    for i, additional_def in enumerate(
+                        mapping_rules["additional_categories"]
+                    ):
+                        target_main_category = additional_def["main_category"]
+                        target_subcategory = additional_def["subcategory"]
+                        # The 'product_type' in additional_def is the TARGET product_type
+                        target_product_type_from_def = additional_def.get(
+                            "product_type"
+                        )
+
+                        logger.info(
+                            f"🎯 MULTI Additional mapping #{i}: {target_main_category} → {target_subcategory} (Target PT: {target_product_type_from_def})"  # Updated log
+                        )
+
+                        current_additional_cat_entry = {
+                            "main_category": target_main_category,
+                            "subcategory": target_subcategory,
+                        }
+
+                        # If a target product_type is defined in the mapping AND it exists in the taxonomy, use it.
+                        # Otherwise, the LLM will determine it later.
+                        if target_product_type_from_def and product_type_exists(
+                            target_main_category,
+                            target_subcategory,
+                            target_product_type_from_def,
+                        ):
+                            current_additional_cat_entry["product_type"] = (
+                                target_product_type_from_def
+                            )
+                            logger.info(
+                                f"✨ MULTI Direct mapping: Product type '{target_product_type_from_def}' exists in target, assigned."  # Updated log
+                            )
+                        elif (
+                            target_product_type_from_def
+                        ):  # Defined but doesn't exist (or gridOnly mismatch)
+                            logger.info(
+                                f"⚡ MULTI Target product type '{target_product_type_from_def}' defined but not valid in target. LLM will determine."  # Updated log
+                            )
+                        else:  # Not defined in mapping
+                            logger.info(
+                                f"⚡ MULTI No target product_type in definition for {target_main_category}/{target_subcategory}. LLM will determine."  # Updated log
+                            )
+
+                        categorizations.append(current_additional_cat_entry)
 
                     logger.info(
-                        f"🎯 Additional mapping #{i}: {target_category} → {target_subcategory}"
+                        f"🌟 Applied multi-categorization: {len(categorizations)} mappings. Returning these."  # Updated log
                     )
-
-                    # Check if product type exists in target
-                    if product_type_exists(
-                        target_category, target_subcategory, product_type
-                    ):
-                        logger.info(
-                            f"✨ Direct 1:1 mapping possible! Product type '{product_type}' exists in target"
-                        )
-                        categorizations.append(
-                            {
-                                "main_category": target_category,
-                                "subcategory": target_subcategory,
-                                "product_type": product_type,
-                            }
-                        )
-                    else:
-                        logger.info(
-                            f"⚡ Product type '{product_type}' doesn't exist in target, LLM will determine"
-                        )
-                        categorizations.append(
-                            {
-                                "main_category": target_category,
-                                "subcategory": target_subcategory,
-                            }
-                        )
-
+                    return categorizations  # If multi-mappings were applied, we're done with this product.
+            else:
                 logger.info(
-                    f"🌟 Found multi-categorization: {len(categorizations)} mappings"
+                    f"ℹ️ Product_type '{product_type}' NOT a trigger in MULTI mappings for '{category}/{subcategory}'. Proceeding to DUAL."  # New log
                 )
-                return categorizations
+        else:
+            logger.info(
+                f"ℹ️ Subcategory '{subcategory}' NOT in MULTI mappings for '{category}'. Proceeding to DUAL."  # New log
+            )
+    else:
+        logger.info(
+            f"ℹ️ Category '{category}' NOT in MULTI mappings. Proceeding to DUAL."  # New log
+        )
 
-    # Fall back to dual categorization check
+    # If no multi-categorization was applied, fall back to DUAL categorization check
+    logger.info(
+        f"🔄 No MULTI mappings applied. Checking DUAL categorization for {category}/{subcategory}/{product_type}"
+    )  # New log
     dual_result = get_dual_categorization(category, subcategory, product_type)
     if dual_result:
-        logger.info(f"🔄 Using legacy dual categorization")
+        logger.info(
+            f"👍 Found DUAL categorization: {dual_result}"
+        )  # Changed log message
         categorizations.append(dual_result)
+    else:
+        logger.info(
+            f"🚫 No DUAL categorization found either for {category}/{subcategory}/{product_type}"
+        )  # New log
 
-    logger.info(f"📋 Returning {len(categorizations)} categorizations")
+    logger.info(
+        f"📋 Returning a total of {len(categorizations)} categorizations"
+    )  # Changed log message
     return categorizations

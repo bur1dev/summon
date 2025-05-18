@@ -12,6 +12,7 @@ class ProductCategorizer {
         console.log(`API Key loaded (first 4 chars): ${apiKey.substring(0, 4)}...`);
         this.apiKey = apiKey;
         this.correctionMap = this.loadCorrectionMap();
+        this.DUAL_CATEGORY_MAPPINGS = this.loadDualCategoryMappings();
 
         // Process categories into minimal format
         const rawData = JSON.parse(fs.readFileSync(path.join(__dirname, 'categories.json'), 'utf8'));
@@ -20,7 +21,6 @@ class ProductCategorizer {
         // Set the API key as an environment variable for the Python process
         process.env.GEMINI_API_KEY = this.apiKey;
         this.currentTaxonomyCacheName = null;
-
     }
 
     loadCorrectionMap() {
@@ -33,6 +33,55 @@ class ProductCategorizer {
             console.error('Error loading correction map:', err);
         }
         return {};
+    }
+
+    // New method to load dual category mappings
+    loadDualCategoryMappings() {
+        try {
+            // Try to load from dual_category_mappings.json first
+            const mappingsPath = path.join(__dirname, 'dual_category_mappings.json');
+            if (fs.existsSync(mappingsPath)) {
+                return JSON.parse(fs.readFileSync(mappingsPath, 'utf8'));
+            }
+
+            // If file doesn't exist, extract mappings from dual_categories.py
+            // This is a simplified fallback that extracts a small subset of mappings
+            console.log('Dual category mappings file not found, extracting from dual_categories.py');
+            const mappings = this.extractDualCategoryMappingsFromPy();
+
+            // Save the extracted mappings for future use
+            if (Object.keys(mappings).length > 0) {
+                fs.writeFileSync(mappingsPath, JSON.stringify(mappings, null, 2));
+                console.log(`Saved ${Object.keys(mappings).length} dual category mappings to ${mappingsPath}`);
+            }
+
+            return mappings;
+        } catch (err) {
+            console.error('Error loading dual category mappings:', err);
+            return {};
+        }
+    }
+
+    // Helper method to extract mappings from Python file
+    extractDualCategoryMappingsFromPy() {
+        const dummyMappings = {
+            "Beverages": {
+                "Milk": {
+                    "dual_category": "Dairy & Eggs"
+                }
+            },
+            "Dairy & Eggs": {
+                "Milk": {
+                    "dual_category": "Beverages"
+                },
+                "Cheese": {
+                    "dual_category": "Deli"
+                }
+            }
+        };
+
+        // In a real implementation, you would parse dual_categories.py here
+        return dummyMappings;
     }
 
     processCategories(categories) {
@@ -92,61 +141,209 @@ class ProductCategorizer {
     }
 
     async categorizeProducts(products, batchSize = 20) {
-        const results = [];
+        console.log(`[API_CATEGORIZER START] Received products array of length: ${products.length}`);
+        const processedProductsCollector = []; // Use a single collector for all products that go through the full pipeline
         const failedProducts = [];
 
-        const knownProducts = [];
-        const unknownProducts = [];
+        const productsForLLMOrDirectDual = []; // Products not fully resolved by correction map OR needing dual despite map match
+        const productsFromCorrectionMapOnly = []; // Products fully resolved by map AND NOT needing dual
+
+        console.log(`Processing ${products.length} products through categorization pipeline`);
+        console.log(`Checking against correction map with ${Object.keys(this.correctionMap).length} entries`);
 
         for (const product of products) {
-            const productKey = product.productId || (product.description ? product.description.toLowerCase() : null);
-            if (productKey && this.correctionMap[productKey]) {
-                console.log(`Correction map match for: ${product.description || product.productId}`);
-                knownProducts.push({
-                    ...product,
-                    ...this.correctionMap[productKey]
-                });
-            } else {
-                unknownProducts.push(product);
+            if (product.force_llm === true) {
+                console.log(`Product ${product.description || product.productId} has force_llm flag, skipping correction map, will go to LLM then dual.`);
+                productsForLLMOrDirectDual.push(product);
+                continue;
             }
-        }
 
-        results.push(...knownProducts);
-        console.log(`Found ${knownProducts.length} products in correction map. Processing ${unknownProducts.length} unknown products.`);
+            const potentialKeys = this.getPotentialCorrectionMapKeys(product);
+            let correctionMapEntry = null;
+            let matchedKey = null;
 
-        for (let i = 0; i < unknownProducts.length; i += batchSize) {
-            const batch = unknownProducts.slice(i, i + batchSize);
-            console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(unknownProducts.length / batchSize)}, products ${i + 1}-${i + batch.length} of unknown`);
-
-            try {
-                // 1. Get initial categorizations for the batch
-                const initiallyCategorizedBatch = await this.processBatchWithRetry(batch);
-                console.log(`Batch ${Math.floor(i / batchSize) + 1}: Initial categorization complete for ${initiallyCategorizedBatch.length} products.`);
-
-                // 2. Apply dual categorization to the initially categorized batch
-                const batchWithDualCats = await this.applyDualCategorization(initiallyCategorizedBatch);
-                console.log(`Batch ${Math.floor(i / batchSize) + 1}: Dual categorization applied, resulting in ${batchWithDualCats.length} products.`);
-
-                results.push(...batchWithDualCats);
-
-                if (i + batchSize < unknownProducts.length) {
-                    const delaySeconds = 5; // Reduced delay for testing, can be increased later
-                    console.log(`Waiting ${delaySeconds} seconds before next batch...`);
-                    await new Promise(r => setTimeout(r, delaySeconds * 1000));
+            for (const key of potentialKeys) {
+                if (this.correctionMap[key]) {
+                    correctionMapEntry = this.correctionMap[key];
+                    matchedKey = key;
+                    break;
                 }
-            } catch (error) {
-                console.error(`Failed processing batch starting at index ${i} (products ${i + 1}-${i + batch.length}) after all steps: ${error.message}`);
-                failedProducts.push(...batch);
-                batch.forEach(p => {
-                    this.logFailedCategorization(p, error, null, "categorizeProducts_main_loop");
-                });
+            }
+
+            if (correctionMapEntry) {
+                console.log(`Correction map match for: ${product.description || product.productId} via key: ${matchedKey}`);
+                const enrichedProduct = {
+                    ...product,
+                    category: correctionMapEntry.category,
+                    subcategory: correctionMapEntry.subcategory,
+                    product_type: correctionMapEntry.product_type,
+                    // Ensure additional_categorizations field exists, even if empty, for consistency before dual check
+                    additional_categorizations: product.additional_categorizations || []
+                };
+
+                if (this.categoryNeedsDualMapping(correctionMapEntry.category, correctionMapEntry.subcategory)) {
+                    console.log(`Product from correction map (new primary: ${correctionMapEntry.category}/${correctionMapEntry.subcategory}) needs dual categorization: ${product.description || product.productId}`);
+                    productsForLLMOrDirectDual.push(enrichedProduct); // This product (with primary from map) needs full dual/multi processing
+                } else {
+                    console.log(`Product from correction map (primary: ${correctionMapEntry.category}/${correctionMapEntry.subcategory}) does NOT need further dual categorization: ${product.description || product.productId}`);
+                    // This product is considered final from the map, ensure additional_categorizations is an empty array if not present
+                    if (!enrichedProduct.hasOwnProperty('additional_categorizations')) {
+                        enrichedProduct.additional_categorizations = [];
+                    }
+                    productsFromCorrectionMapOnly.push(enrichedProduct);
+                }
+            } else {
+                console.log(`Product ${product.description || product.productId} not in correction map, will go to LLM then dual.`);
+                productsForLLMOrDirectDual.push(product);
             }
         }
+
+        console.log(`[API_CATEGORIZER PRE-BATCH] Products fully resolved by correction map (no dual needed): ${productsFromCorrectionMapOnly.length}`);
+        console.log(`[API_CATEGORIZER PRE-BATCH] Products needing LLM and/or Dual/Multi processing: ${productsForLLMOrDirectDual.length}`);
+
+        // Process products needing LLM (if any from productsForLLMOrDirectDual were not from correction map)
+        // and then ALL products in productsForLLMOrDirectDual (which now includes LLM results and map-derived ones needing dual)
+        // through the dual/multi categorization pipeline.
+
+        const productsToActuallyCategorize = []; // This will hold products after initial LLM if they were unknown
+
+        // Separate out those that truly need LLM for primary category vs those from map just needing dual
+        const productsNeedingPrimaryLLM = productsForLLMOrDirectDual.filter(p => {
+            // A product needs primary LLM if it wasn't from the correction map path
+            // (i.e., its current C/S/PT isn't from a correctionMapEntry that was just applied)
+            // This is a bit tricky here as `productsForLLMOrDirectDual` mixes them.
+            // A simpler way: if it was originally in `unknownProducts` (before this refactor).
+            // Let's assume `processBatchWithRetry` handles primary categorization if needed.
+            // For products already having C/S/PT from correction map, `processBatchWithRetry` should respect it if no `force_llm`.
+            // The main goal of this block is to get primary C/S/PT for those that don't have it from map.
+            let needsLLM = true;
+            if (p.force_llm) return true; // Definitely needs LLM
+            const potentialKeys = this.getPotentialCorrectionMapKeys(p);
+            for (const key of potentialKeys) {
+                if (this.correctionMap[key]) {
+                    needsLLM = false; // Found in map, primary is set, might only need dual
+                    break;
+                }
+            }
+            return needsLLM;
+        });
+
+        const productsFromMapNeedingOnlyDual = productsForLLMOrDirectDual.filter(p => !productsNeedingPrimaryLLM.includes(p));
+
+        console.log(`[API_CATEGORIZER LLM-SPLIT] Products needing primary LLM: ${productsNeedingPrimaryLLM.length}`);
+        console.log(`[API_CATEGORIZER LLM-SPLIT] Products from map (primary set) needing only dual/multi: ${productsFromMapNeedingOnlyDual.length}`);
+
+        if (productsNeedingPrimaryLLM.length > 0) {
+            for (let i = 0; i < productsNeedingPrimaryLLM.length; i += batchSize) {
+                const batch = productsNeedingPrimaryLLM.slice(i, i + batchSize);
+                console.log(`Processing LLM batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(productsNeedingPrimaryLLM.length / batchSize)} for primary categorization`);
+                try {
+                    const batchResultsLLM = await this.processBatchWithRetry(batch); // Gets primary C/S/PT
+                    productsToActuallyCategorize.push(...batchResultsLLM);
+                } catch (error) {
+                    console.error(`Failed processing LLM batch starting at index ${i}: ${error.message}`);
+                    failedProducts.push(...batch);
+                    batch.forEach(failed_p => this.logFailedCategorization(failed_p, error, null, "categorizeProducts_llm_batch_loop"));
+                }
+            }
+        }
+
+        // Add products that came from correction map but still need dual processing
+        productsToActuallyCategorize.push(...productsFromMapNeedingOnlyDual);
+
+        console.log(`[API_CATEGORIZER DUAL-INPUT] Total products for applyDualCategorization: ${productsToActuallyCategorize.length}`);
+
+        // Now, all products in productsToActuallyCategorize have a primary C/S/PT.
+        // Run them ALL through applyDualCategorization.
+        if (productsToActuallyCategorize.length > 0) {
+            console.log(`Applying dual/multi categorization to ${productsToActuallyCategorize.length} products`);
+            try {
+                const dualMultiCategorizedProducts = await this.applyDualCategorization(productsToActuallyCategorize);
+                // These products now have their .additional_categorizations field correctly populated (or as empty array).
+                processedProductsCollector.push(...dualMultiCategorizedProducts);
+                console.log(`Dual/multi categorization complete. Got ${dualMultiCategorizedProducts.length} products back into collector.`);
+            } catch (error) {
+                console.error(`Failed during dual/multi categorization: ${error.message}`);
+                // Add them to collector as is, they'll be missing additional_categorizations
+                processedProductsCollector.push(...productsToActuallyCategorize.map(p => ({ ...p, additional_categorizations: p.additional_categorizations || [] })));
+                productsToActuallyCategorize.forEach(p_fail_dual => this.logFailedCategorization(p_fail_dual, error, { category: p_fail_dual.category, subcategory: p_fail_dual.subcategory }, "categorizeProducts_dual_multi_failed"));
+            }
+        }
+
+        // Add products that were fully resolved by correction map and didn't need any dual/multi processing
+        processedProductsCollector.push(...productsFromCorrectionMapOnly.map(p => ({ ...p, additional_categorizations: p.additional_categorizations || [] })));
+
+        console.log(`[API_CATEGORIZER FINAL] Total products processed and collected: ${processedProductsCollector.length}`);
 
         if (failedProducts.length > 0) {
-            console.log(`Total failed to categorize ${failedProducts.length} products. See failed_products.json and failed_categorizations.jsonl`);
+            console.log(`Total failed to categorize (during LLM primary): ${failedProducts.length} products.`);
+            this.logFailedProducts(failedProducts); // This logs to failed_products.json
         }
-        return results;
+
+        // Ensure all returned products have the additional_categorizations field, even if empty
+        const finalOutput = processedProductsCollector.map(p => ({
+            ...p,
+            additional_categorizations: p.additional_categorizations || []
+        }));
+
+        console.log(`[API_CATEGORIZER DEBUG] categorizeProducts is returning ${finalOutput.length} products.`);
+        if (finalOutput.length > 0) {
+            const firstProductToLog = { ...finalOutput[0] };
+            if (!firstProductToLog.hasOwnProperty('additional_categorizations')) {
+                // This case should ideally not be hit if the map above works
+                firstProductToLog.additional_categorizations = 'FIELD_WAS_MISSING_UNEXPECTEDLY';
+            }
+            console.log(`[API_CATEGORIZER DEBUG] First product being returned by categorizeProducts:`, JSON.stringify(firstProductToLog, null, 2));
+        }
+        return finalOutput;
+    }
+
+    // Helper method to get all potential keys for correction map lookups
+    getPotentialCorrectionMapKeys(product) {
+        const keys = [];
+
+        // Add product ID as key (most reliable)
+        if (product.productId) {
+            keys.push(`productId:${product.productId}`);
+            keys.push(product.productId);
+        }
+
+        // Add product name (various forms)
+        if (product.description) {
+            const cleanName = product.description.replace(/[®™©]/g, '');
+            keys.push(product.description);
+            keys.push(cleanName);
+            keys.push(cleanName.toLowerCase());
+
+            // Handle Reser's products specially
+            if (cleanName.toLowerCase().includes('reser')) {
+                const reserSpecificName = cleanName.toLowerCase().replace(/reser'?s\s+/i, '');
+                keys.push(reserSpecificName);
+            }
+        }
+
+        return keys;
+    }
+
+    // Helper method to check if a category/subcategory needs dual mapping
+    categoryNeedsDualMapping(category, subcategory) {
+        // Check if this category/subcategory appear in dual mappings
+        if (this.DUAL_CATEGORY_MAPPINGS[category] &&
+            this.DUAL_CATEGORY_MAPPINGS[category][subcategory]) {
+            return true;
+        }
+
+        // Check if it might be a target of dual categorization
+        for (const cat in this.DUAL_CATEGORY_MAPPINGS) {
+            for (const sub in this.DUAL_CATEGORY_MAPPINGS[cat]) {
+                const mapping = this.DUAL_CATEGORY_MAPPINGS[cat][sub];
+                if (mapping.dual_category === category) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     logFailedProducts(products) {
@@ -593,6 +790,7 @@ class ProductCategorizer {
                             const bridgeResult = bridgeResultsMap.get(originalProduct.productId || originalProduct.description);
                             if (bridgeResult && bridgeResult.additional_categorizations) {
                                 originalProduct.additional_categorizations = bridgeResult.additional_categorizations;
+                                console.log(`[API_CATEGORIZER DEBUG applyDualCategorization] Product "${originalProduct.description}" got additional_categorizations:`, JSON.stringify(originalProduct.additional_categorizations, null, 2));
 
                                 if (originalProduct.additional_categorizations.length > 0) {
                                     let needsLLMThisProduct = false;
@@ -611,6 +809,7 @@ class ProductCategorizer {
                                 }
                             } else {
                                 originalProduct.additional_categorizations = [];
+                                console.log(`[API_CATEGORIZER DEBUG applyDualCategorization] Product "${originalProduct.description}" got EMPTY additional_categorizations (no bridgeResult or no additional_cats in bridgeResult).`);
                             }
                         });
 

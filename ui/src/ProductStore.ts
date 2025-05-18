@@ -1,10 +1,9 @@
 // ProductStore.ts
 
-import { writable, type Writable } from "svelte/store";
+import { writable, type Writable, get } from "svelte/store";
 import { type AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
 import { ShopStore } from "./store";
-import { get } from 'svelte/store';
 
 interface StoreState {
   loading: boolean;
@@ -13,6 +12,33 @@ interface StoreState {
   allCategoryProducts: any[];
   currentRanges: Record<string, { start: number; end: number }>;
   totalProducts: Record<string, number>;
+  syncStatus: {
+    inProgress: boolean;
+    message: string;
+    progress: number;
+    totalToUpdate: number;
+    completedUpdates: number;
+  };
+}
+
+// Add this function near the top with other utility functions
+function normalizeStockStatus(status) {
+  if (!status) return "UNKNOWN"; // Changed from "HIGH" to "UNKNOWN"
+  const normalized = String(status).toUpperCase();
+  if (normalized === "HIGH" || normalized === "IN_STOCK") return "HIGH";
+  if (normalized === "LOW" || normalized === "LIMITED") return "LOW";
+  return "UNKNOWN"; // Changed from "HIGH" to "UNKNOWN" - more honest
+}
+
+// Add this function to normalize promo prices during DHT sync
+function normalizePromoPrice(promoPrice: number | null | undefined, regularPrice: number | null | undefined): number | null {
+  if (promoPrice === null || promoPrice === undefined || promoPrice === 0 ||
+    typeof promoPrice !== 'number' || isNaN(promoPrice) ||
+    typeof regularPrice !== 'number' || isNaN(regularPrice) ||
+    promoPrice >= regularPrice) {
+    return null;
+  }
+  return promoPrice;
 }
 
 export class ProductStore {
@@ -40,133 +66,25 @@ export class ProductStore {
       totalProducts: {},
       loading: false,
       error: null,
-      lastUploadedIndex: 0 // Kept from original file
+      lastUploadedIndex: 0, // Kept from original file
+      syncStatus: {
+        inProgress: false,
+        message: "",
+        progress: 0,
+        totalToUpdate: 0,
+        completedUpdates: 0
+      }
     });
   }
 
-  async fetchAllProducts(forceRefresh = false) {
-    console.log("⚡ Starting product fetch");
-    this.state.update(state => ({
-      ...state,
-      error: "Fetching all products...",
-      loading: true
-    }));
-    const BATCH_SIZE = 50;
+  // Get the current state
+  getState() {
+    return get(this.state);
+  }
 
-    try {
-      if (forceRefresh || !window.allProductsData) {
-        const response = await fetch(`http://localhost:3000/api/all-products?locationId=${this.selectedLocationId}`);
-
-        if (!response.ok) {
-          throw new Error(`API returned status ${response.status}: ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
-
-        if (!Array.isArray(responseData)) {
-          console.error("API did not return an array:", responseData);
-          throw new Error("Invalid data format: Expected an array of products");
-        }
-
-        window.allProductsData = responseData;
-      }
-
-      const data = window.allProductsData;
-
-      if (!Array.isArray(data)) {
-        throw new Error("Product data is not an array");
-      }
-
-      const krogerCategories = new Set();
-      const drinkBrands = {};
-
-      data.forEach(product => {
-        if (product.categories && product.categories.length) {
-          product.categories.forEach(cat => krogerCategories.add(cat));
-        }
-
-        if (product.categories &&
-          (product.categories.includes("Beverages") ||
-            product.categories.includes("Soft Drinks"))) {
-          const potentialBrand = product.description.split(/®|\s/)[0];
-
-          if (!drinkBrands[potentialBrand]) {
-            drinkBrands[potentialBrand] = [];
-          }
-
-          if (drinkBrands[potentialBrand].length < 5) {
-            drinkBrands[potentialBrand].push(product.description);
-          }
-        }
-      });
-
-      console.log("All Kroger categories:", [...krogerCategories]);
-      console.log("=== DRINK BRANDS ===");
-      console.log(JSON.stringify(drinkBrands, null, 2));
-      console.log("===================");
-
-      for (let i = 0; i < data.length; i += BATCH_SIZE) {
-        const batch = data.slice(i, Math.min(i + BATCH_SIZE, data.length));
-
-        console.log("Sending batch:", batch);
-        const categorizationResponse = await fetch('http://localhost:3000/api/categorize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(batch)
-        });
-
-        const categorizations = await categorizationResponse.json();
-        console.log("Received categorizations:", categorizations);
-
-        const processedBatch = categorizations;
-        console.log('Sample product being sent to DHT:', JSON.stringify(processedBatch[0], null, 2));
-
-        try {
-          console.log("Creating entries for batch", processedBatch.length);
-          const records = await this.store.service.client.callZome({
-            role_name: "grocery",
-            zome_name: "products",
-            fn_name: "create_product_batch",
-            payload: processedBatch,
-          });
-
-          records.forEach(record => {
-            const product = decode(record.entry.Present.entry);
-            console.log(`Categorized: ${product.name}`, {
-              main: product.category,
-              sub: product.subcategory,
-              type: product.product_type || 'All'
-            });
-          });
-
-          this.state.update(state => ({
-            ...state,
-            error: `Processing products: ${Math.min(i + BATCH_SIZE, data.length)} / ${data.length} (${Math.round((Math.min(i + BATCH_SIZE, data.length) / data.length) * 100)}%)`
-          }));
-
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-        } catch (batchError) {
-          console.error(`Batch error at ${i}-${i + BATCH_SIZE}:`, batchError);
-          continue;
-        }
-      }
-
-      this.state.update(state => ({
-        ...state,
-        error: "All products uploaded successfully",
-        loading: false
-      }));
-      window.allProductsData = null;
-
-    } catch (error) {
-      this.state.update(state => ({
-        ...state,
-        error: "Error fetching/storing products",
-        loading: false
-      }));
-      console.error(error);
-    }
+  // Allow components to subscribe to the store
+  subscribe(callback: (value: any) => void) {
+    return this.state.subscribe(callback);
   }
 
   loadFromSavedData = async () => {
@@ -223,15 +141,16 @@ export class ProductStore {
         const processedBatch = products.map(product => ({
           product: {
             name: product.description || "",
-            price: product.items?.[0]?.price?.regular || 0,
-            promo_price: (product.items?.[0]?.price?.promo && product.items?.[0]?.price?.promo !== 0) ? product.items?.[0]?.price?.promo : null,
+            price: (typeof product.price === 'number') ? product.price : (product.items?.[0]?.price?.regular ?? 0),
+            promo_price: normalizePromoPrice(product.promo_price, product.price),
             size: product.items?.[0]?.size || "",
-            stocks_status: product.items?.[0]?.inventory?.stockLevel || "",
+            stocks_status: normalizeStockStatus(product.stocks_status),
             category: product.category,
             subcategory: product.subcategory || null,
             product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,
-            image_url: product.images?.find((img) => img.perspective === "front")?.sizes?.find((size) => size.size === "large")?.url || null,
+            image_url: product.image_url || null, // Prioritize the direct image_url field
             sold_by: product.items?.[0]?.soldBy || null,
+            productId: product.productId,
           },
           main_category: product.category,
           subcategory: product.subcategory || null,
@@ -285,8 +204,8 @@ export class ProductStore {
 
         // Pause between product types
         if (processedTypes < productTypesCount) {
-          console.log(`[LOG] Load Saved Data: Waiting 2 seconds before next product type...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log(`[LOG] Load Saved Data: Waiting 1 seconds before next product type...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
@@ -304,6 +223,9 @@ export class ProductStore {
         error: `Complete: ${successfullyUploadedProducts}/${totalProductsFromFile} products in ${totalGroupsCreated} groups`,
         loading: false
       }));
+
+      // Delete the DHT upload flag after a successful full load
+      await this.deleteDhtUploadFlag();
 
     } catch (error) {
       console.error("[LOG] Load Saved Data: ❌ Critical error:", error);
@@ -324,54 +246,36 @@ export class ProductStore {
     }
   }
 
-  async searchProducts() {
-    // Kept original function content
-    if (!searchTerm) return;
-
+  // New method to check if DHT upload flag exists
+  async checkDhtUploadFlag() {
     try {
-      const response = await fetch(
-        `http://localhost:3000/api/products?searchTerm=${searchTerm}&locationId=${selectedLocationId}`
-      );
-
-      const data = await response.json();
-
-      if (data?.length > 0) {
-        for (const product of data) {
-          const { main_category, subcategory } = categorizeProduct({
-            name: product.description || "",
-            category: product.categories?.[0] || ""
-          });
-
-          await store.service.client.callZome({
-            role_name: "grocery",
-            zome_name: "products",
-            fn_name: "create_product",
-            payload: {
-              name: product.description || "",
-              price: product.items?.[0]?.price?.regular || 0,
-              promo_price: (product.items?.[0]?.price?.promo && product.items?.[0]?.price?.promo !== 0) ? product.items?.[0]?.price?.promo : null,
-              size: product.items?.[0]?.size || "",
-              stocks_status: product.items?.[0]?.inventory?.stockLevel || "",
-              category: main_category,
-              subcategory: subcategory,
-              image_url: product.images?.find((img) => img.perspective === "front")?.sizes?.find((size) => size.size === "large")?.url || null,
-            },
-          });
-
-          console.log(`Categorized: ${product.description}`, {
-            main: main_category,
-            sub: subcategory
-          });
-        }
-
-        errorMessage = `Found ${products.length} products`;
+      const response = await fetch('http://localhost:3000/api/check-dht-upload-flag');
+      if (!response.ok) {
+        throw new Error(`Failed to check DHT upload flag: ${response.status} ${response.statusText}`);
       }
+      const data = await response.json();
+      return data.flagExists;
     } catch (error) {
-      errorMessage = "Error fetching products";
-      console.error(error);
+      console.error("Error checking DHT upload flag:", error);
+      return false;
     }
   }
 
+  // New method to delete DHT upload flag
+  async deleteDhtUploadFlag() {
+    try {
+      const response = await fetch('http://localhost:3000/api/delete-dht-upload-flag', {
+        method: 'POST'
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to delete DHT upload flag: ${response.status} ${response.statusText}`);
+      }
+      return true;
+    } catch (error) {
+      console.error("Error deleting DHT upload flag:", error);
+      return false;
+    }
+  }
 
 
   async getProductByHash(hash) {
@@ -403,5 +307,412 @@ export class ProductStore {
       console.error("Error getting product by hash:", error);
       return null;
     }
+  }
+
+  // Main synchronization method - checks flag and either does selective or full update
+  async syncDht() {
+    console.log("[LOG] 🔄 Starting DHT synchronization");
+    this.state.update(state => ({
+      ...state,
+      error: "Checking for changes to sync...",
+      loading: true,
+      syncStatus: { // Initialize syncStatus
+        inProgress: true,
+        message: "Preparing for sync...",
+        progress: 0,
+        totalToUpdate: 0,
+        completedUpdates: 0
+      }
+    }));
+
+    try {
+      const flagExists = await this.checkDhtUploadFlag();
+      if (!flagExists) {
+        console.log("[LOG] Sync: No DHT upload flag found, no sync initiated by backend.");
+        this.state.update(state => ({
+          ...state,
+          error: "No sync cycle initiated by backend.",
+          loading: false,
+          syncStatus: { // Reset syncStatus
+            ...this.getState().syncStatus,
+            inProgress: false,
+            message: "No sync cycle initiated by backend."
+          }
+        }));
+        return;
+      }
+
+      console.log("[LOG] Sync: DHT upload flag exists. Checking changed_product_types.json");
+      // syncStatus message is already "Preparing for sync..."
+
+      const changedTypesResponse = await fetch('http://localhost:3000/api/load-changed-product-types');
+      if (!changedTypesResponse.ok) {
+        const errorText = await changedTypesResponse.text();
+        console.error(`[LOG] Sync: Failed to load changed_product_types.json. Status: ${changedTypesResponse.status}. Response: ${errorText}`);
+        throw new Error(`Failed to load changed_product_types.json: ${changedTypesResponse.status} ${errorText}`);
+      }
+      const changedTypes = await changedTypesResponse.json();
+
+      if (!Array.isArray(changedTypes)) {
+        console.error("[LOG] Sync: `changed_product_types.json` did not return an array. Content:", changedTypes);
+        throw new Error("Invalid format for changed_product_types.json: Expected an array.");
+      }
+
+
+      if (changedTypes.length === 0) {
+        console.log("[LOG] Sync: `changed_product_types.json` is empty. Backend indicates no types require DHT update for this cycle.");
+        this.state.update(state => ({
+          ...state,
+          error: "No product types require DHT update this cycle.",
+          loading: false,
+          syncStatus: {
+            ...this.getState().syncStatus,
+            inProgress: false,
+            message: "No types to update.",
+            progress: 100, // Indicate completion of this check
+            totalToUpdate: 0,
+            completedUpdates: 0
+          }
+        }));
+        await this.deleteDhtUploadFlag();
+        console.log("[LOG] Sync: Deleted DHT upload flag as no types required update.");
+        // No need to call reset-change-flags if no types were processed for DHT update
+        return;
+      }
+
+      // If changedTypes is NOT empty, proceed with the selective sync
+      console.log(`[LOG] Sync: Found ${changedTypes.length} changed product types. Proceeding with selective sync.`);
+      this.state.update(state => ({ // Update totalToUpdate here
+        ...state,
+        syncStatus: {
+          ...this.getState().syncStatus,
+          message: `Found ${changedTypes.length} product types to update.`,
+          totalToUpdate: changedTypes.length,
+        }
+      }));
+      await this.performSelectiveSync(changedTypes);
+
+    } catch (error) {
+      console.error("[LOG] Sync: ❌ Error during DHT synchronization:", error);
+      this.state.update(state => ({
+        ...state,
+        error: `Sync error: ${error.message}`,
+        loading: false,
+        syncStatus: {
+          ...this.getState().syncStatus,
+          inProgress: false,
+          message: `Error: ${error.message}`
+        }
+      }));
+    }
+  }
+
+  // NEW private method to contain the selective sync logic
+  private async performSelectiveSync(changedTypes: any[]) {
+    console.log(`[LOG] Sync (Selective): Starting selective sync for ${changedTypes.length} types.`);
+    this.state.update(state => ({
+      ...state,
+      syncStatus: {
+        ...this.getState().syncStatus,
+        message: `Starting selective sync for ${changedTypes.length} types...`,
+        totalToUpdate: changedTypes.length,
+        completedUpdates: 0,
+        progress: 0,
+      }
+    }));
+
+    const productsResponse = await fetch('http://localhost:3000/api/load-categorized-products');
+    if (!productsResponse.ok) {
+      const errorText = await productsResponse.text();
+      console.error(`[LOG] Sync (Selective): Failed to load categorized products. Status: ${productsResponse.status}. Response: ${errorText}`);
+      throw new Error(`Failed to load categorized products for selective sync: ${productsResponse.status} ${errorText}`);
+    }
+    const allProducts: any[] = await productsResponse.json(); // Ensure type for allProducts
+    if (!Array.isArray(allProducts)) {
+      console.error("[LOG] Sync (Selective): `load-categorized-products` did not return an array. Content:", allProducts);
+      throw new Error("Invalid format from load-categorized-products: Expected an array.");
+    }
+    console.log(`[LOG] Sync (Selective): Loaded ${allProducts.length} total products for diffing.`);
+
+    let updatedGroupOperations = 0;
+    let processedTypeCount = 0;
+    const processedProductIds = new Set<string>(); // For resetting _categoryChanged flags
+
+    for (const productType of changedTypes) { // productType here represents a path {category, subcategory, product_type}
+      processedTypeCount++;
+      const targetPathCategory = productType.category;
+      const targetPathSubcategory = productType.subcategory || null;
+      const targetPathProductType = productType.product_type || null;
+
+      const typeKey = `${targetPathCategory}/${targetPathSubcategory || "null"}/${targetPathProductType || "null"}`;
+
+      this.state.update(state => ({
+        ...state,
+        syncStatus: {
+          ...this.getState().syncStatus,
+          message: `Updating ${typeKey} (${processedTypeCount}/${changedTypes.length})`,
+          progress: Math.round((processedTypeCount / changedTypes.length) * 100),
+          completedUpdates: processedTypeCount - 1,
+        }
+      }));
+      console.log(`[LOG] Sync (Selective): Processing product type (targetPath) ${processedTypeCount}/${changedTypes.length}: ${typeKey}`);
+
+      // --- MODIFICATION START: Gather all products relevant to this targetPath ---
+      const primaryMatches = allProducts.filter(product => {
+        const matches = product.category === targetPathCategory &&
+          ((product.subcategory || null) === targetPathSubcategory) &&
+          ((product.product_type || null) === targetPathProductType);
+
+        // Logic for processedProductIds: Add if this targetPath IS the product's (new) primary path
+        // AND its _categoryChanged flag is true.
+        if (matches && product._categoryChanged === true && product.productId) {
+          processedProductIds.add(product.productId);
+          console.log(`[LOG] Sync (Selective): Product ${product.productId} (${product.description}) matches primary path ${typeKey} AND has _categoryChanged=true. Added to processedProductIds.`);
+        }
+        return matches;
+      });
+
+      const additionalMatches = allProducts.filter(product => {
+        if (!product.additional_categorizations || product.additional_categorizations.length === 0) {
+          return false;
+        }
+        return product.additional_categorizations.some((addCat: any) =>
+          addCat.main_category === targetPathCategory &&
+          ((addCat.subcategory || null) === targetPathSubcategory) &&
+          ((addCat.product_type || null) === targetPathProductType)
+        );
+      });
+
+      // Combine and ensure uniqueness (productId is the most reliable unique key here)
+      const combinedProductsMap = new Map<string, any>();
+      primaryMatches.forEach(p => p.productId && combinedProductsMap.set(p.productId, p));
+      additionalMatches.forEach(p => p.productId && combinedProductsMap.set(p.productId, p)); // Will overwrite if already present, which is fine.
+
+      // If some products don't have productId (should be rare for categorized_products.json), use description as fallback key
+      // This part is less critical if productIds are always present and unique.
+      primaryMatches.forEach(p => !p.productId && p.description && combinedProductsMap.set(p.description, p));
+      additionalMatches.forEach(p => !p.productId && p.description && combinedProductsMap.set(p.description, p));
+
+      const combinedProductsForPath = Array.from(combinedProductsMap.values());
+
+      console.log(`[LOG] Sync (Selective): For targetPath ${typeKey}: Found ${primaryMatches.length} primary matches, ${additionalMatches.length} additional matches. Total unique relevant products: ${combinedProductsForPath.length}.`);
+      if (combinedProductsForPath.length > 0 && combinedProductsForPath.length < 10) {
+        console.log(`[LOG] Sync (Selective): Relevant products for ${typeKey}:`, combinedProductsForPath.map(p => ({ id: p.productId, name: p.description, cat: p.category, addCats: p.additional_categorizations?.length || 0 })));
+      }
+      // --- MODIFICATION END ---
+
+      try {
+        const existingGroupsResponse = await this.store.service.client.callZome({
+          role_name: "grocery",
+          zome_name: "products",
+          fn_name: "get_products_by_category", // This gets groups linked to the path
+          payload: {
+            category: targetPathCategory,
+            subcategory: targetPathSubcategory,
+            product_type: targetPathProductType,
+            offset: 0,
+            limit: 200 // Fetch a larger number to ensure all old groups for the path are found
+          }
+        });
+        console.log(`[LOG] Sync (Selective): Found ${existingGroupsResponse.product_groups.length} existing DHT groups linked to path ${typeKey}`);
+
+        let deletedLinksCount = 0;
+        let createdGroupsInLoop = 0;
+
+        // --- REVISED DELETION/PRESERVATION LOGIC ---
+        if (combinedProductsForPath.length > 0) {
+          // SCENARIO A: The targetPath is active (products are primary or additionally categorized here).
+          // Refresh this path: Delete all old groups/links at this targetPath before creating new ones.
+          if (existingGroupsResponse.product_groups.length > 0) {
+            console.log(`[LOG] Sync (Selective): Path ${typeKey} is active with ${combinedProductsForPath.length} relevant products. Refreshing path: Deleting links to ${existingGroupsResponse.product_groups.length} existing DHT groups.`);
+            for (const group of existingGroupsResponse.product_groups) {
+              try {
+                // delete_links_to_product_group takes the group's hash and removes all links pointing TO it
+                // from various category paths. This is what we want.
+                await this.store.service.client.callZome({
+                  role_name: "grocery",
+                  zome_name: "products",
+                  fn_name: "delete_links_to_product_group",
+                  payload: group.signed_action.hashed.hash // Send the ProductGroup's ActionHash
+                });
+                deletedLinksCount++; // This counts deleted groups/link-sets, not individual links.
+              } catch (deleteError) {
+                const groupActionHashForLog = group.signed_action?.hashed?.hash || "COULD_NOT_GET_HASH_FOR_LOG";
+                console.error(`[LOG] Sync (Selective): Error deleting links to group ${groupActionHashForLog} for active path ${typeKey} during refresh:`, deleteError);
+              }
+            }
+            if (deletedLinksCount > 0) {
+              console.log(`[LOG] Sync (Selective): Deleted links to ${deletedLinksCount} old group(s) for active path ${typeKey} during refresh.`);
+            }
+          }
+        } else {
+          // SCENARIO B: No current products are associated with this targetPath (combinedProductsForPath.length === 0).
+          // This targetPath might be an old primary path of a moved product.
+          const isOldPrimaryPathOfMovedProduct = allProducts.some(p =>
+            p._categoryChanged === true &&
+            p._originalCategory === targetPathCategory &&
+            ((p._originalSubcategory || null) === targetPathSubcategory) &&
+            ((p._originalProductType || null) === targetPathProductType)
+          );
+
+          if (isOldPrimaryPathOfMovedProduct) {
+            // This path is an old primary path for a product that has moved. Clean it up.
+            if (existingGroupsResponse.product_groups.length > 0) {
+              console.log(`[LOG] Sync (Selective): Path ${typeKey} is an old primary path for a moved product. Cleaning up links to ${existingGroupsResponse.product_groups.length} DHT groups.`);
+              for (const group of existingGroupsResponse.product_groups) {
+                try {
+                  await this.store.service.client.callZome({
+                    role_name: "grocery",
+                    zome_name: "products",
+                    fn_name: "delete_links_to_product_group",
+                    payload: group.signed_action.hashed.hash
+                  });
+                  deletedLinksCount++;
+                } catch (deleteError) {
+                  const groupActionHashForLog = group.signed_action?.hashed?.hash || "COULD_NOT_GET_HASH_FOR_LOG";
+                  console.error(`[LOG] Sync (Selective): Error deleting links to group ${groupActionHashForLog} from old primary path ${typeKey}:`, deleteError);
+                }
+              }
+              if (deletedLinksCount > 0) {
+                console.log(`[LOG] Sync (Selective): Deleted links to ${deletedLinksCount} old group(s) from old primary path ${typeKey}.`);
+              }
+            } else {
+              console.log(`[LOG] Sync (Selective): Path ${typeKey} is an old primary path for a moved product, but no DHT groups found linked to it. No cleanup needed for this path.`);
+            }
+          } else {
+            // This path has no current products and is not an old primary path of a moved product.
+            // It might be an orphaned additional category path or genuinely empty.
+            // The current logic preserves links here. This is safer than aggressive deletion.
+            // If these are links to groups that *still exist* and are validly linked from other primary paths,
+            // then delete_links_to_product_group (when called for those other primary paths if they change)
+            // would be responsible for cleaning them. If the groups themselves become orphaned, that's a different cleanup.
+            if (existingGroupsResponse.product_groups.length > 0) {
+              console.log(`[LOG] Sync (Selective): Path ${typeKey} has no local products and is not an old primary path. Preserving ${existingGroupsResponse.product_groups.length} existing DHT group links (could be orphaned additional links or path is truly empty now).`);
+            } else {
+              console.log(`[LOG] Sync (Selective): Path ${typeKey} has no local products, is not an old primary path, and no DHT groups found linked. No action needed for this path.`);
+            }
+          }
+        }
+        // --- END OF REVISED DELETION/PRESERVATION LOGIC ---
+
+        // Send combinedProductsForPath to Zome if there are any
+        if (combinedProductsForPath.length > 0) {
+          console.log(`[LOG] Sync (Selective): Path ${typeKey} is active. Sending ${combinedProductsForPath.length} relevant products to create_product_batch.`);
+          const productBatchForZomeCall = combinedProductsForPath.map(product => ({
+            // Ensure the product payload for the Zome uses the product's actual primary categorization
+            // for main_category, subcategory, product_type fields, and includes its additional_categorizations.
+            product: {
+              name: product.description || product.name || "",
+              price: (typeof product.price === 'number') ? product.price : (product.items?.[0]?.price?.regular ?? 0),
+              promo_price: normalizePromoPrice(product.promo_price, product.price),
+
+              size: product.size || "",
+              stocks_status: normalizeStockStatus(product.stocks_status),
+              category: product.category, // Product's own primary category
+              subcategory: product.subcategory || null,
+              product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,
+              image_url: product.image_url || null, // Prioritize the direct image_url field
+              sold_by: product.sold_by || null,
+              productId: product.productId || null,
+            },
+            // These top-level category fields in the Zome payload for create_product_batch
+            // should represent the path for which this batch is being sent.
+            // However, the Zome's create_product_batch should ideally group by the product's *own* primary category
+            // if it's creating multiple groups, or if it's creating one group, the group's category should be
+            // derived from the products, or explicitly set to the targetPath.
+            // Given create_product_batch creates ONE group per call and links it,
+            // these should represent the targetPath.
+            main_category: targetPathCategory,
+            subcategory: targetPathSubcategory,
+            product_type: targetPathProductType,
+            additional_categorizations: product.additional_categorizations || [] // Product's own additional cats
+          }));
+
+          try {
+            console.log(`[LOG] Sync (Selective): Sending batch with ${productBatchForZomeCall.length} products for Zome processing related to path ${typeKey}`);
+            const createResult = await this.store.service.client.callZome({
+              role_name: "grocery",
+              zome_name: "products",
+              fn_name: "create_product_batch",
+              payload: productBatchForZomeCall,
+            });
+            createdGroupsInLoop += createResult.length; // Assuming result is an array of created group records/hashes
+            console.log(`[LOG] Sync (Selective): Zome call for path ${typeKey} created/updated ${createResult.length} group(s) with ${productBatchForZomeCall.length} products.`);
+          } catch (createError) {
+            console.error(`[LOG] Sync (Selective): Error in Zome call create_product_batch for path ${typeKey}:`, createError);
+          }
+        } else {
+          console.log(`[LOG] Sync (Selective): Path ${typeKey} has no relevant products after filtering (combinedProductsForPath is empty). No Zome call to create_product_batch.`);
+        }
+
+        if (deletedLinksCount > 0 || createdGroupsInLoop > 0) {
+          updatedGroupOperations++;
+        }
+        console.log(`[LOG] Sync (Selective): Path ${typeKey} processing complete. Deleted old links/groups: ${deletedLinksCount}. Created new groups: ${createdGroupsInLoop}.`);
+
+      } catch (error) {
+        console.error(`[LOG] Sync (Selective): Error processing product type ${typeKey}:`, error);
+        this.state.update(state => ({
+          ...state,
+          error: `Error updating ${typeKey}: ${error.message}. Continuing with other types...`
+        }));
+      }
+
+      if (processedTypeCount < changedTypes.length) {
+        console.log(`[LOG] Sync (Selective): Waiting 500ms before next product type...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    } // End loop over changedTypes
+
+    this.state.update(state => ({
+      ...state,
+      syncStatus: {
+        ...this.getState().syncStatus,
+        completedUpdates: changedTypes.length, // All types from changedTypes have been attempted
+      }
+    }));
+
+    if (processedProductIds.size > 0) {
+      try {
+        console.log(`[LOG] Sync (Selective): Resetting _categoryChanged flags for ${processedProductIds.size} products whose primary paths were updated.`);
+        const resetResponse = await fetch('http://localhost:3000/api/reset-change-flags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productIds: Array.from(processedProductIds) })
+        });
+
+        if (resetResponse.ok) {
+          const result = await resetResponse.json();
+          console.log(`[LOG] Sync (Selective): Successfully reset _categoryChanged flags for ${result.resetCount} products.`);
+        } else {
+          const errorText = await resetResponse.text();
+          console.warn(`[LOG] Sync (Selective): Failed to reset _categoryChanged flags: ${resetResponse.status} ${errorText}`);
+        }
+      } catch (resetError) {
+        console.error(`[LOG] Sync (Selective): Error calling API to reset _categoryChanged flags:`, resetError);
+      }
+    } else {
+      console.log(`[LOG] Sync (Selective): No products required _categoryChanged flag reset in this cycle.`);
+    }
+
+    await this.deleteDhtUploadFlag();
+    console.log("[LOG] Sync (Selective): --------------------------------------------------");
+    console.log("[LOG] Sync (Selective): ✅ Selective Update Complete");
+    console.log(`[LOG] Sync (Selective):   Total product types from changed_product_types.json processed: ${changedTypes.length}`);
+    console.log(`[LOG] Sync (Selective):   Total DHT path refresh operations (deletions or creations): ${updatedGroupOperations}`);
+    console.log(`[LOG] Sync (Selective):   Total products with _categoryChanged flags reset: ${processedProductIds.size}`);
+    console.log("[LOG] Sync (Selective): --------------------------------------------------");
+    this.state.update(state => ({
+      ...state,
+      error: `Sync complete: Processed ${changedTypes.length} product types. ${updatedGroupOperations} paths refreshed.`,
+      loading: false,
+      syncStatus: {
+        inProgress: false,
+        message: "Selective sync completed successfully.",
+        progress: 100,
+        totalToUpdate: changedTypes.length,
+        completedUpdates: changedTypes.length
+      }
+    }));
   }
 }

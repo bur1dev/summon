@@ -43,10 +43,8 @@
 
     // Set up resize observer for responsive grid layout
     let resizeObserver = new ResizeObserver((entries) => {
-        console.log(`ResizeObserver triggered for ${entries.length} entries`);
         for (const entry of entries) {
             const identifier = entry.target.getAttribute("data-subcategory");
-            console.log(`Resize entry for: ${identifier}`);
             if (identifier) {
                 handleResize(identifier, entry.target);
             }
@@ -622,13 +620,9 @@
 
         resizeObserver?.disconnect();
         resizeObserver = new ResizeObserver((entries) => {
-            console.log(
-                `ResizeObserver triggered for ${entries.length} entries`,
-            );
             for (const entry of entries) {
                 const identifier =
                     entry.target.getAttribute("data-subcategory");
-                console.log(`Resize entry for: ${identifier}`);
                 if (identifier) {
                     handleResize(identifier, entry.target);
                 }

@@ -457,9 +457,6 @@
     onMount(() => {
         // Only clear cache for this specific category/subcategory/productType
         if (selectedCategory) {
-            console.log(
-                `Initialized navigation for ${identifier} in ${selectedCategory}`,
-            );
         }
     });
 

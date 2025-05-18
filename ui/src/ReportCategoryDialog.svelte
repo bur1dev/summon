@@ -1,22 +1,25 @@
 <script>
-    import { createEventDispatcher } from "svelte";
+    import { createEventDispatcher, onMount, onDestroy } from "svelte";
     import { mainCategories } from "./categoryData";
-    import { X } from "lucide-svelte"; // Add this line or add X to existing lucide-svelte import
+    import { X } from "lucide-svelte";
+    import { lastCategorySelection } from "./categorySelectionStore";
 
     const dispatch = createEventDispatcher();
 
     export let product;
     export let isOpen = false;
 
-    let selectedCategory = product.category;
+    let selectedCategory = null;
     let selectedSubcategory = null;
     let selectedProductType = null;
+    let unsubscribeStore;
     let notes = "";
+    let reportType = "suggestion"; // Default to suggestion type (can be "suggestion" or "incorrect")
+    let isClosing = false; // Animation state for smooth closing
 
     let subcategories = [];
     let productTypes = [];
 
-    // Reactive statements to update options
     // Reactive statements to update options
     $: {
         subcategories =
@@ -32,11 +35,18 @@
     }
 
     $: {
-        productTypes =
-            subcategories.find((s) => s.name === selectedSubcategory)
-                ?.productTypes || [];
+        const subcategory = subcategories.find(
+            (s) => s.name === selectedSubcategory,
+        );
+        productTypes = subcategory?.productTypes || [];
+
+        // Check if this is a gridOnly subcategory
+        if (subcategory?.gridOnly) {
+            // For gridOnly subcategories, product_type to subcategory name
+            selectedProductType = selectedSubcategory;
+        }
         // Reset product type when subcategory changes
-        if (
+        else if (
             selectedProductType &&
             !productTypes.includes(selectedProductType)
         ) {
@@ -44,48 +54,154 @@
         }
     }
 
-    // Pre-select current subcategory ONLY when dialog first opens
-    $: if (isOpen && selectedCategory && !selectedSubcategory) {
-        selectedSubcategory = product.subcategory;
-        selectedProductType = product.product_type || product.subcategory;
-    }
+    onMount(() => {
+        if (isOpen && product) {
+            // Log the product object when the dialog opens
+            try {
+                console.log(
+                    "[ReportCategoryDialog] Received product prop:",
+                    JSON.parse(JSON.stringify(product)),
+                );
+            } catch (e) {
+                console.error(
+                    "[ReportCategoryDialog] Error stringifying received product prop:",
+                    e,
+                );
+                console.log(
+                    "[ReportCategoryDialog] Raw received product prop:",
+                    product,
+                );
+            }
+        }
 
-    function handleSubmit() {
-        dispatch("submit", {
-            product: product,
-            currentCategory: {
-                category: product.category,
-                subcategory: product.subcategory,
-                product_type: product.product_type || product.subcategory,
-            },
-            suggestedCategory: {
-                category: selectedCategory,
-                subcategory: selectedSubcategory,
-                product_type: selectedProductType || selectedSubcategory,
-            },
-            notes: notes,
-            timestamp: new Date().toISOString(),
+        // Get values from store when component mounts
+        unsubscribeStore = lastCategorySelection.subscribe((values) => {
+            if (values.category) {
+                selectedCategory = values.category;
+                selectedSubcategory = values.subcategory;
+                selectedProductType = values.productType;
+            } else {
+                // Fall back to product's category if no stored values
+                if (product) {
+                    // Ensure product exists
+                    selectedCategory = product.category;
+
+                    // Pre-select subcategory only when no stored selection
+                    if (isOpen && selectedCategory) {
+                        selectedSubcategory = product.subcategory;
+                        selectedProductType =
+                            product.product_type || product.subcategory;
+                    }
+                }
+            }
         });
 
-        isOpen = false;
-        notes = "";
+        return () => {
+            // Clean up store subscription
+            if (unsubscribeStore) unsubscribeStore();
+            if (isOpen) {
+                // Ensure overflow is reset if dialog was open
+                document.body.style.overflow = "";
+            }
+        };
+    });
+
+    function handleSubmit() {
+        // Update the store with current selection
+        lastCategorySelection.set({
+            category: selectedCategory,
+            subcategory: selectedSubcategory,
+            productType: selectedProductType || selectedSubcategory,
+        });
+
+        // Create a defensive copy of the product prop to ensure we don't modify the original
+        // and to explicitly check for productId.
+        const productPayload = product ? { ...product } : {};
+
+        // Log the product object that will be part of the dispatched event
+        try {
+            console.log(
+                "[ReportCategoryDialog] Product object being dispatched:",
+                JSON.parse(JSON.stringify(productPayload)),
+            );
+            if (productPayload.hasOwnProperty("productId")) {
+                console.log(
+                    "[ReportCategoryDialog] Dispatching with productId:",
+                    productPayload.productId,
+                );
+            } else {
+                console.warn(
+                    "[ReportCategoryDialog] Dispatching WITHOUT productId. Product object:",
+                    productPayload,
+                );
+            }
+        } catch (e) {
+            console.error(
+                "[ReportCategoryDialog] Error stringifying productPayload for dispatch log:",
+                e,
+            );
+            console.log(
+                "[ReportCategoryDialog] Raw productPayload for dispatch log:",
+                productPayload,
+            );
+        }
+
+        if (reportType === "suggestion") {
+            // Submit with suggested category
+            dispatch("submit", {
+                product: productPayload, // Use the payload
+                currentCategory: {
+                    category: productPayload.category, // Use payload's current category
+                    subcategory: productPayload.subcategory,
+                    product_type:
+                        productPayload.product_type ||
+                        productPayload.subcategory,
+                },
+                suggestedCategory: {
+                    category: selectedCategory,
+                    subcategory: selectedSubcategory,
+                    product_type: selectedProductType || selectedSubcategory,
+                },
+                notes: notes,
+                timestamp: new Date().toISOString(),
+                type: "suggestion",
+            });
+        } else {
+            // Just report as incorrect without suggestion
+            handleIncorrectReport();
+        }
+
+        closeModal();
+    }
+
+    function closeModal() {
+        isClosing = true;
+        setTimeout(() => {
+            isOpen = false;
+            isClosing = false;
+            document.body.style.overflow = ""; // Re-enable scrolling
+            notes = "";
+            reportType = "suggestion"; // Reset for next time
+        }, 300); // Match the CSS animation duration
     }
 
     function handleClose() {
-        isOpen = false;
-        notes = "";
+        closeModal();
     }
 
     function handleIncorrectReport() {
+        const productPayloadForIncorrect = product ? { ...product } : {};
         fetch("http://localhost:3000/api/report-incorrect-category", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                product: product,
+                product: productPayloadForIncorrect,
                 currentCategory: {
-                    category: product.category,
-                    subcategory: product.subcategory,
-                    product_type: product.product_type || product.subcategory,
+                    category: productPayloadForIncorrect.category,
+                    subcategory: productPayloadForIncorrect.subcategory,
+                    product_type:
+                        productPayloadForIncorrect.product_type ||
+                        productPayloadForIncorrect.subcategory,
                 },
                 timestamp: new Date().toISOString(),
             }),
@@ -102,19 +218,92 @@
                 alert("Error submitting report");
             });
 
-        isOpen = false;
+        closeModal();
     }
+
+    function setReportType(type) {
+        reportType = type;
+    }
+
+    // Portal functionality to mount dialog to body
+    function portal(node) {
+        const target = document.body;
+        let appended = false; // Track if node is appended
+
+        function update() {
+            if (!appended) {
+                // Only append if not already appended
+                target.appendChild(node);
+                appended = true;
+            }
+        }
+
+        function destroy() {
+            if (appended && node.parentNode) {
+                // Only remove if it was appended and still has a parent
+                node.parentNode.removeChild(node);
+                appended = false;
+            }
+        }
+
+        if (isOpen) {
+            // Ensure portal is active if dialog is open
+            update();
+        }
+
+        return {
+            update,
+            destroy,
+            // Svelte might call update if isOpen changes, ensure it doesn't re-append
+            update: (newIsOpen) => {
+                if (newIsOpen && !appended) {
+                    target.appendChild(node);
+                    appended = true;
+                } else if (!newIsOpen && appended && node.parentNode) {
+                    // Optional: remove when not open, but portal usually keeps it until destroy
+                    // node.parentNode.removeChild(node);
+                    // appended = false;
+                }
+            },
+        };
+    }
+
+    // Handle body overflow when dialog opens/closes
+    // This $: block will react to changes in `isOpen`
+    $: {
+        if (typeof document !== "undefined") {
+            // Ensure document is available (for SSR safety, though likely not an issue here)
+            if (isOpen) {
+                document.body.style.overflow = "hidden"; // Disable scrolling when open
+            } else {
+                // Only reset if no other modal or overlay is managing overflow
+                // This simple reset is fine if this is the only modal component
+                document.body.style.overflow = "";
+            }
+        }
+    }
+
+    // onDestroy should also ensure overflow is reset
+    onDestroy(() => {
+        if (typeof document !== "undefined") {
+            document.body.style.overflow = "";
+        }
+        if (unsubscribeStore) {
+            unsubscribeStore();
+        }
+    });
 </script>
 
 {#if isOpen}
     <div
-        class="overlay"
+        class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
         on:click|self={handleClose}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
+        use:portal
     >
-        <div class="dialog-content">
+        <div class="dialog-content {isClosing ? 'scale-out' : 'scale-in'}">
             <div class="dialog-header">
                 <h2 id="dialog-title">Report Incorrect Category</h2>
                 <button
@@ -151,73 +340,114 @@
                     {/if}
                 </div>
 
-                <div class="form-container">
-                    <div class="form-group">
-                        <label for="category-select">Suggested Category:</label>
-                        <select
-                            id="category-select"
-                            bind:value={selectedCategory}
-                            class="form-select"
-                        >
-                            {#each mainCategories as category}
-                                <option value={category.name}
-                                    >{category.name}</option
-                                >
-                            {/each}
-                        </select>
+                <div class="report-type-selector">
+                    <div class="report-option-title">
+                        What would you like to do?
                     </div>
+                    <div class="report-options">
+                        <div
+                            class="report-option {reportType === 'incorrect'
+                                ? 'selected'
+                                : ''}"
+                            on:click={() => setReportType("incorrect")}
+                        >
+                            <div class="report-option-heading">
+                                Just flag as incorrect
+                            </div>
+                            <div class="report-option-description">
+                                Report that this product is in the wrong
+                                category without suggesting the correct one.
+                            </div>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="subcategory-select"
-                            >Suggested Subcategory:</label
+                        <div
+                            class="report-option {reportType === 'suggestion'
+                                ? 'selected'
+                                : ''}"
+                            on:click={() => setReportType("suggestion")}
                         >
-                        <select
-                            id="subcategory-select"
-                            bind:value={selectedSubcategory}
-                            class="form-select"
-                        >
-                            {#each subcategories as subcategory}
-                                <option value={subcategory.name}
-                                    >{subcategory.name}</option
-                                >
-                            {/each}
-                        </select>
+                            <div class="report-option-heading">
+                                Suggest correct category
+                            </div>
+                            <div class="report-option-description">
+                                Report this product and suggest where it should
+                                be categorized.
+                            </div>
+                        </div>
                     </div>
+                </div>
 
-                    <div class="form-group">
-                        <label for="productType-select"
-                            >Suggested Product Type:</label
-                        >
-                        <select
-                            id="productType-select"
-                            bind:value={selectedProductType}
-                            class="form-select"
-                            disabled={!selectedSubcategory ||
-                                subcategories.find(
-                                    (s) => s.name === selectedSubcategory,
-                                )?.gridOnly}
-                        >
-                            {#if subcategories.find((s) => s.name === selectedSubcategory)?.gridOnly}
-                                <option value={selectedSubcategory}
-                                    >{selectedSubcategory}</option
-                                >
-                            {:else if productTypes && productTypes.length > 0}
-                                {#each productTypes as type}
-                                    <option value={type}>{type}</option>
+                {#if reportType === "suggestion"}
+                    <div class="form-container">
+                        <div class="form-group">
+                            <label for="category-select"
+                                >Suggested Category:</label
+                            >
+                            <select
+                                id="category-select"
+                                bind:value={selectedCategory}
+                                class="form-select"
+                            >
+                                {#each mainCategories as category}
+                                    <option value={category.name}
+                                        >{category.name}</option
+                                    >
                                 {/each}
-                            {/if}
-                        </select>
-                    </div>
+                            </select>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="notes-area">Notes (optional):</label>
-                        <textarea
-                            id="notes-area"
-                            bind:value={notes}
-                            class="form-textarea"
-                            placeholder="Why should this product be in a different category?"
-                        ></textarea>
+                        <div class="form-group">
+                            <label for="subcategory-select"
+                                >Suggested Subcategory:</label
+                            >
+                            <select
+                                id="subcategory-select"
+                                bind:value={selectedSubcategory}
+                                class="form-select"
+                            >
+                                {#each subcategories as subcategory}
+                                    <option value={subcategory.name}
+                                        >{subcategory.name}</option
+                                    >
+                                {/each}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="productType-select"
+                                >Suggested Product Type:</label
+                            >
+                            <select
+                                id="productType-select"
+                                bind:value={selectedProductType}
+                                class="form-select"
+                                disabled={!selectedSubcategory ||
+                                    subcategories.find(
+                                        (s) => s.name === selectedSubcategory,
+                                    )?.gridOnly}
+                            >
+                                {#if subcategories.find((s) => s.name === selectedSubcategory)?.gridOnly}
+                                    <option value={selectedSubcategory}
+                                        >{selectedSubcategory}</option
+                                    >
+                                {:else if productTypes && productTypes.length > 0}
+                                    {#each productTypes as type}
+                                        <option value={type}>{type}</option>
+                                    {/each}
+                                {/if}
+                            </select>
+                        </div>
                     </div>
+                {/if}
+
+                <div class="form-group">
+                    <label for="notes-area">Notes (optional):</label>
+                    <textarea
+                        id="notes-area"
+                        bind:value={notes}
+                        class="form-textarea"
+                        placeholder="Why should this product be in a different category?"
+                    ></textarea>
                 </div>
             </div>
 
@@ -226,15 +456,10 @@
                     >Cancel</button
                 >
                 <button
-                    class="btn btn-danger btn-md"
-                    on:click={handleIncorrectReport}
-                >
-                    Report as Incorrect
-                </button>
-                <button
                     class="btn btn-primary btn-md"
                     on:click={handleSubmit}
-                    disabled={!selectedCategory || !selectedSubcategory}
+                    disabled={reportType === "suggestion" &&
+                        (!selectedCategory || !selectedSubcategory)}
                 >
                     Submit Report
                 </button>
@@ -256,7 +481,15 @@
         align-items: center;
         z-index: var(--z-index-modal);
         padding: var(--spacing-md);
+        touch-action: none; /* Prevent touch scrolling */
+    }
+
+    .overlay.fade-in {
         animation: fadeIn var(--fade-in-duration) ease forwards;
+    }
+
+    .overlay.fade-out {
+        animation: fadeOut var(--transition-fast) ease forwards;
     }
 
     .dialog-content {
@@ -270,7 +503,14 @@
         flex-direction: column;
         box-shadow: var(--shadow-medium);
         overflow: hidden; /* Prevents content from spilling out before scroll */
+    }
+
+    .dialog-content.scale-in {
         animation: scaleIn var(--transition-normal) ease forwards;
+    }
+
+    .dialog-content.scale-out {
+        animation: scaleOut var(--transition-normal) ease forwards;
     }
 
     .dialog-header {
@@ -360,6 +600,7 @@
     .form-group {
         display: flex;
         flex-direction: column;
+        margin-bottom: var(--spacing-md);
     }
 
     .form-group label {
@@ -423,23 +664,60 @@
         background-color: var(--surface);
     }
 
-    /* Custom danger button style */
-    .btn-danger {
-        background: var(--error);
-        color: var(--button-text);
-        border: none;
-        border-radius: var(--btn-border-radius);
-        box-shadow: var(--shadow-button);
+    /* Report type selector */
+    .report-type-selector {
+        margin-bottom: var(--spacing-lg);
     }
 
-    .btn-danger:hover {
-        background: #a02424; /* Darker error color */
-        box-shadow: var(--shadow-medium);
-        transform: translateY(var(--hover-lift));
+    .report-option-title {
+        font-weight: var(--font-weight-semibold);
+        margin-bottom: var(--spacing-sm);
+        color: var(--text-primary);
     }
 
-    .btn-danger:disabled {
-        background: #e57373; /* Lighter disabled error color */
-        opacity: 0.5;
+    .report-options {
+        display: flex;
+        gap: var(--spacing-md);
+        flex-direction: column;
+    }
+
+    .report-option {
+        padding: var(--spacing-md);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--card-border-radius);
+        background-color: var(--surface);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .report-option:hover {
+        background-color: var(--surface-hover);
+    }
+
+    .report-option.selected {
+        border-color: var(--primary);
+        background-color: rgba(0, 175, 185, 0.05);
+        box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .report-option-heading {
+        font-weight: var(--font-weight-semibold);
+        margin-bottom: var(--spacing-xs);
+        color: var(--text-primary);
+    }
+
+    .report-option-description {
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+    }
+
+    @media (min-width: 768px) {
+        .report-options {
+            flex-direction: row;
+        }
+
+        .report-option {
+            flex: 1;
+        }
     }
 </style>

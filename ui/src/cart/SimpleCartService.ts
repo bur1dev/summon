@@ -70,7 +70,6 @@ export class SimpleCartService {
         this.cartTotal.set(0);
         this.cartPromoTotal.set(0);
         this.loading.set(true);
-        console.log("SimpleCartService initialized");
 
         // Add event listener for page unload to sync cart
         window.addEventListener('beforeunload', () => {
@@ -83,7 +82,6 @@ export class SimpleCartService {
 
     // Set product store reference (called from Controller)
     public setProductStore(productStore: any) {
-        console.log("Setting product store in SimpleCartService");
         this.productStore = productStore;
 
         // Force immediate recalculation
@@ -92,7 +90,6 @@ export class SimpleCartService {
 
     private async initialize() {
         try {
-            console.log("SimpleCartService: Beginning initialization");
             this.ready.set(false);
             this.loading.set(true);
 
@@ -112,7 +109,6 @@ export class SimpleCartService {
             // Signal service is ready
             this.loading.set(false);
             this.isInitialized = true;
-            console.log("SimpleCartService: Initialization complete, setting ready=true");
             this.ready.set(true);
         } catch (error) {
             console.error("Cart service initialization failed:", error);
@@ -212,7 +208,6 @@ export class SimpleCartService {
                 return;
             }
 
-            console.log("SimpleCartService: Loading cart from Holochain private entry");
             const result = await this.client.callZome({
                 role_name: 'grocery',
                 zome_name: 'cart',
@@ -238,7 +233,6 @@ export class SimpleCartService {
                 const validItems = cartItems.filter(item =>
                     item && item.groupHash && item.productIndex !== undefined);
 
-                console.log(`SimpleCartService: Loaded ${validItems.length} items from Holochain`);
 
                 // Merge with local cart if needed
                 if (this.localCartItems.length > 0) {
@@ -572,14 +566,12 @@ export class SimpleCartService {
 
     // UPDATED: Recalculate both regular and promo cart totals
     private async recalculateCartTotal() {
-        console.log("Recalculating cart total");
         if (!this.productStore) {
             console.log("Cannot calculate cart total - product store not set");
             return;
         }
 
         if (this.localCartItems.length === 0) {
-            console.log("Cart is empty, setting totals to 0");
             this.cartTotal.set(0);
             this.cartPromoTotal.set(0);
             return;
@@ -629,7 +621,6 @@ export class SimpleCartService {
                                 : product.price;
                             promoTotal += promoPrice * item.quantity;
 
-                            console.log(`Added - Regular: ${product.price * item.quantity}, Promo: ${promoPrice * item.quantity} for ${product.name} (${item.quantity}x)`);
                         }
                     }
                 }

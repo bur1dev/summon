@@ -752,7 +752,20 @@ body {
   /* thumb color, track color */
 }
 
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
 .sidebar {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+svg.lucide {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

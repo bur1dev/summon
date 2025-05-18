@@ -60,7 +60,6 @@ export class ShopStore {
     public roleName: RoleName,
     public zomeName: string = 'products'
   ) {
-    console.log("[ShopStore] Constructor initialized");
     this.client = clientIn;
     this.dnaHash = null;
     console.log("[ShopStore] DNA hash not set (profiles dependency removed)");

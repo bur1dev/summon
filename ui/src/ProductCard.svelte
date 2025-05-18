@@ -300,15 +300,50 @@
     }
   }
 
+  // Add this function
+  function normalizeStockStatus(status) {
+    if (!status) return "UNKNOWN";
+    const normalized = String(status).toUpperCase();
+    if (normalized === "HIGH" || normalized === "IN_STOCK") return "HIGH";
+    if (normalized === "LOW" || normalized === "LIMITED") return "LOW";
+    return "UNKNOWN";
+  }
+
+  // Add this function
+  function normalizePromoPrice(promoPrice, regularPrice) {
+    if (
+      promoPrice === null ||
+      promoPrice === undefined ||
+      promoPrice === 0 ||
+      typeof promoPrice !== "number" ||
+      isNaN(promoPrice) ||
+      typeof regularPrice !== "number" ||
+      promoPrice >= regularPrice
+    ) {
+      return null;
+    }
+    // Otherwise return the numeric value
+    return Number(promoPrice);
+  }
+
+  // More debugging in your getStockText function
   function getStockText(status) {
-    if (status === "HIGH") return "Many in stock";
-    if (status === "LOW") return "Low stock";
+    // Additional defensive check
+    if (!status) {
+      console.warn("Empty stock status for product:", product.name);
+      return "Maybe out";
+    }
+    const normalizedStatus = normalizeStockStatus(status);
+    if (normalizedStatus === "HIGH") return "Many in stock";
+    if (normalizedStatus === "LOW") return "Low stock";
     return "Maybe out";
   }
 
+  // Update this function
   function getStockColor(status) {
-    if (status === "HIGH") return "var(--success)";
-    if (status === "LOW") return "var(--warning)";
+    const normalizedStatus = normalizeStockStatus(status);
+    if (normalizedStatus === "HIGH") return "var(--success)";
+    if (normalizedStatus === "LOW") return "var(--warning)";
     return "var(--error)";
   }
 </script>

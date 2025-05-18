@@ -69,7 +69,6 @@
 
     // Connect the product store to cart service for price calculations
     if ($cartService && store.productStore) {
-      console.log("Setting product store in cart service");
       $cartService.setProductStore(store.productStore);
     }
 

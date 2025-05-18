@@ -135,6 +135,7 @@ pub fn create_product_group(input: CreateProductGroupInput) -> ExternResult<Acti
         product_type: input.product_type.clone(),
         products: input.products, // Consumes input.products
         chunk_id: input.chunk_id,
+        additional_categorizations: input.additional_categorizations.clone(),
     };
 
     // Create the entry and get its hash
@@ -527,189 +528,6 @@ let next_chunk_id = match latest_group_info_res {
     }
 }
 
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RecategorizeGroupInput {
-    pub group_hash: ActionHash,
-    pub new_category: String,
-    pub new_subcategory: Option<String>,
-    pub new_product_type: Option<String>,
-}
-
-// Function to recategorize a product group
-#[hdk_extern]
-pub fn recategorize_product_group(input: RecategorizeGroupInput) -> ExternResult<()> {
-
-    // Get the current product group
-    let group_record = match get(input.group_hash.clone(), GetOptions::default())? {
-         Some(record) => record,
-         None => {
-             return Err(wasm_error!(WasmErrorInner::Guest("Group not found".into())));
-         }
-    };
-
-    // Extract ProductGroup from the record
-    let mut product_group = match ProductGroup::try_from(group_record.clone()) { // Clone record for potential error reporting
-         Ok(group) => group,
-         Err(e) => {
-             return Err(wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize ProductGroup: {:?}", e))));
-         }
-    };
-
-
-    // Find all links pointing to this group to delete them
-    let mut old_paths = Vec::new();
-    let mut old_path_strings = Vec::new();
-
-    // Add current category path
-    let current_category_path_str = format!("categories/{}/chunk_1", product_group.category);
-    if let Ok(path) = Path::try_from(current_category_path_str.clone()) {
-        old_paths.push(path);
-        old_path_strings.push(current_category_path_str);
-    } else {
-    }
-
-
-    // Add current subcategory path if exists
-    if let Some(subcategory) = &product_group.subcategory {
-        let subcategory_path_str = format!(
-            "categories/{}/subcategories/{}/chunk_1",
-            product_group.category, subcategory
-        );
-         if let Ok(path) = Path::try_from(subcategory_path_str.clone()) {
-            old_paths.push(path);
-            old_path_strings.push(subcategory_path_str);
-        } else {
-        }
-
-        // Add current product type path if exists
-        if let Some(product_type) = &product_group.product_type {
-            let product_type_path_str = format!(
-                "categories/{}/subcategories/{}/types/{}/chunk_1",
-                product_group.category, subcategory, product_type
-            );
-             if let Ok(path) = Path::try_from(product_type_path_str.clone()) {
-                old_paths.push(path);
-                old_path_strings.push(product_type_path_str);
-            } else {
-            }
-        }
-    }
-
-
-    // Find and delete all existing links
-    let mut old_links_to_delete = Vec::new();
-    for path in old_paths { // Consumes old_paths
-        match path.path_entry_hash() {
-            Ok(path_hash) => {
-                 match get_links(
-                    GetLinksInputBuilder::try_new(path_hash.clone(), LinkTypes::ProductTypeToGroup)?.build(),
-                ) {
-                    Ok(links) => {
-                        for link in links {
-                            if let Some(target_hash) = link.target.into_action_hash() {
-                                if target_hash == input.group_hash {
-                                    old_links_to_delete.push(link.create_link_hash);
-                                }
-                            }
-                        }
-                    },
-                    Err(e) => {
-                    }
-                }
-            },
-            Err(e) => {
-            }
-        }
-    }
-
-    // Delete all old links found
-    let mut delete_success_count = 0;
-    let mut delete_fail_count = 0;
-    for link_hash in old_links_to_delete { // Consumes old_links_to_delete
-        match delete_link(link_hash.clone()) { // Clone hash for logging on error
-            Ok(_) => {
-                delete_success_count += 1;
-            },
-            Err(e) => {
-                 delete_fail_count += 1;
-            }
-        }
-    }
-
-
-    // Create a new product group with updated category info
-    let products = std::mem::take(&mut product_group.products); // Take ownership without moving original group
-    let chunk_id = product_group.chunk_id; // Copy chunk_id
-
-    // Get first product for path generation before moving products
-    let first_product = match products.first().cloned() { // Clone the first product
-         Some(p) => p,
-         None => {
-             return Err(wasm_error!(WasmErrorInner::Guest("Product group is empty".into())));
-         }
-    };
-
-
-    // **Important**: Update the category info within each product inside the group
-    let updated_products: Vec<Product> = products.into_iter().map(|mut p| {
-        p.category = input.new_category.clone();
-        p.subcategory = input.new_subcategory.clone();
-        p.product_type = input.new_product_type.clone();
-        p
-    }).collect();
-
-
-    let updated_group_entry = ProductGroup {
-        category: input.new_category.clone(),
-        subcategory: input.new_subcategory.clone(),
-        product_type: input.new_product_type.clone(),
-        products: updated_products, // Use the products with updated categories
-        chunk_id, // Use copied chunk_id
-    };
-
-    // Create the new entry
-    let new_group_hash = match create_entry(&EntryTypes::ProductGroup(updated_group_entry)) {
-         Ok(hash) => {
-             hash
-         },
-         Err(e) => {
-             return Err(e);
-         }
-    };
-
-    // Create mock input for path generation using the *new* category info
-    let mock_input = CreateProductInput {
-        product: first_product, // Use the cloned first product
-        main_category: input.new_category, // Use new category
-        subcategory: input.new_subcategory, // Use new subcategory
-        product_type: input.new_product_type, // Use new product type
-        additional_categorizations: Vec::new(), // Assume no dual categorization when recategorizing
-    };
-
-    // Get new paths and create links for the new group entry
-    let new_paths = match get_paths(&mock_input) {
-         Ok(p) => p,
-         Err(e) => {
-             return Err(e);
-         }
-    };
-    if let Err(e) = create_links_for_group(&new_group_hash, new_paths, chunk_id) {
-         return Err(e);
-    }
-
-    // Optionally: Delete the old product group entry?
-    // Be careful with this - ensures cleanup but makes rollback harder.
-    // match delete_entry(group_record.action_address().clone()) {
-    //     Ok(_) => warn!("recategorize_product_group: Successfully deleted old group entry {}", input.group_hash),
-    //     Err(e) => warn!("ERROR recategorize_product_group: Failed to delete old group entry {}: {:?}", input.group_hash, e),
-    // }
-
-
-    Ok(())
-}
-
-
 // Function to get an individual product group by hash
 #[hdk_extern]
 pub fn get_product_group(hash: ActionHash) -> ExternResult<Option<Record>> {
@@ -905,4 +723,186 @@ pub fn get_all_group_counts_for_path(params: GetProductsParams) -> ExternResult<
     
     
     Ok(counts)
+}
+
+#[hdk_extern]
+pub fn get_product_groups_by_path(params: GetProductGroupsParams) -> ExternResult<Vec<Record>> {
+    debug!("🔍 get_product_groups_by_path called with: category={}, subcategory={:?}, product_type={:?}",
+        params.category, params.subcategory, params.product_type);
+    
+    // Construct the path based on category/subcategory/product_type
+    let base_path = match (&params.subcategory, &params.product_type) {
+        (Some(subcategory), Some(product_type)) => format!(
+            "categories/{}/subcategories/{}/types/{}", 
+            params.category, subcategory, product_type
+        ),
+        (Some(subcategory), None) => format!(
+            "categories/{}/subcategories/{}", 
+            params.category, subcategory
+        ),
+        (None, None) => format!("categories/{}", params.category),
+        (None, Some(_)) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Cannot have product type without subcategory".into()
+            )))
+        }
+    };
+
+    debug!("🛣️ Using path: {}", base_path);
+    
+    let path = Path::try_from(base_path.clone())?;
+    let path_hash = path.path_entry_hash()?;
+
+    debug!("🔑 Path hash: {}", path_hash);
+
+    // Get links to product groups at this path
+    let links = get_links(
+        GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup)?.build()
+    )?;
+    
+    debug!("🔗 Found {} links at path", links.len());
+    
+    if links.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Extract action hashes from links
+    let target_hashes: Vec<_> = links
+        .into_iter()
+        .filter_map(|link| link.target.into_action_hash())
+        .collect();
+    
+    debug!("🎯 Retrieving {} product group records", target_hashes.len());
+    
+    // Get all product group records
+    let records = concurrent_get_records(target_hashes)?;
+    debug!("✅ Retrieved {} product group records", records.len());
+    
+    Ok(records)
+}
+
+// Parameter struct for the get_product_groups_by_path function
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetProductGroupsParams {
+    pub category: String,
+    pub subcategory: Option<String>,
+    pub product_type: Option<String>,
+}
+
+// New function to delete links to a product group
+#[hdk_extern]
+pub fn delete_links_to_product_group(group_hash: ActionHash) -> ExternResult<()> {
+    debug!("🗑️ delete_links_to_product_group called for hash: {}", group_hash);
+
+    // Get the product group to find its category info
+    let group_record = get(group_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Group not found".into()))
+    )?;
+    
+    let product_group = ProductGroup::try_from(group_record).map_err(|e| 
+        wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize ProductGroup: {:?}", e)))
+    )?;
+    
+    debug!("📦 Found product group: category={}, subcategory={:?}, product_type={:?}",
+        product_group.category, product_group.subcategory, product_group.product_type);
+    
+    // Generate all possible paths for this product group
+    // Now using the additional_categorizations stored ON the ProductGroup entry itself
+    let mock_input = CreateProductInput {
+        product: product_group.products.first().cloned().ok_or(
+            wasm_error!(WasmErrorInner::Guest("Product group is empty".into()))
+        )?,
+        main_category: product_group.category.clone(), // Use .clone() for owned String
+        subcategory: product_group.subcategory.clone(), // Use .clone() for Option<String>
+        product_type: product_group.product_type.clone(), // Use .clone() for Option<String>
+        additional_categorizations: product_group.additional_categorizations.clone(), // <-- USE STORED ADDITIONAL CATEGORIZATIONS
+    };
+
+    let paths = get_paths(&mock_input)?;
+    debug!("🛣️ Generated {} paths to check for links", paths.len());
+    
+    let mut deleted_links = 0;
+    let mut errors = 0;
+    
+    // For each path, find and delete links to this group
+    for path in paths {
+        match path.path_entry_hash() {
+            Ok(path_hash) => {
+                let links = get_links(
+                    GetLinksInputBuilder::try_new(path_hash.clone(), LinkTypes::ProductTypeToGroup)?.build()
+                )?;
+                
+                for link in links {
+                    if let Some(target_hash) = link.target.into_action_hash() {
+                        if target_hash == group_hash {
+                            match delete_link(link.create_link_hash) {
+                                Ok(_) => {
+                                    deleted_links += 1;
+                                    debug!("✅ Deleted link from path to group");
+                                },
+                                Err(e) => {
+                                    errors += 1;
+                                    debug!("❌ Failed to delete link: {:?}", e);
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                errors += 1;
+                debug!("❌ Failed to get path hash: {:?}", e);
+            }
+        }
+    }
+    
+    debug!("🗑️ Deleted {} links with {} errors", deleted_links, errors);
+    
+    if deleted_links == 0 && errors > 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Failed to delete any links to product group. Encountered {} errors", errors)
+        )));
+    }
+    
+    Ok(())
+}
+
+// New function that combines get_product_groups_by_path and delete_links_to_product_group
+#[hdk_extern]
+pub fn update_product_group(input: UpdateProductGroupInput) -> ExternResult<ActionHash> {
+    debug!("🔄 update_product_group called");
+    
+    // 1. Get existing group(s) at the path
+    let existing_groups = get_product_groups_by_path(GetProductGroupsParams {
+        category: input.old_category.clone(),
+        subcategory: input.old_subcategory.clone(),
+        product_type: input.old_product_type.clone(),
+    })?;
+    
+    if existing_groups.is_empty() {
+        debug!("⚠️ No existing groups found at the old path");
+    }
+    
+    // 2. Create new product group
+    let new_group_hash = create_product_group(input.new_group)?;
+    debug!("✅ Created new product group: {}", new_group_hash);
+    
+    // 3. Delete links to old groups
+    for record in existing_groups {
+        match delete_links_to_product_group(record.action_address().clone()) {
+            Ok(_) => debug!("✅ Deleted links to old group: {}", record.action_address()),
+            Err(e) => debug!("⚠️ Failed to delete links to old group: {:?}", e),
+        }
+    }
+    
+    Ok(new_group_hash)
+}
+
+// Parameter struct for the update_product_group function
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateProductGroupInput {
+    pub old_category: String,
+    pub old_subcategory: Option<String>,
+    pub old_product_type: Option<String>,
+    pub new_group: CreateProductGroupInput,
 }

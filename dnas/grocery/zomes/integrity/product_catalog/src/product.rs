@@ -1,6 +1,6 @@
 use hdi::prelude::*;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq)] // We only need Clone and PartialEq here if hdk_entry_helper provides the others
 #[hdk_entry_helper]
 pub struct Product {
     pub name: String,
@@ -12,7 +12,9 @@ pub struct Product {
     pub subcategory: Option<String>,
     pub product_type: Option<String>,
     pub image_url: Option<String>,
-    pub sold_by: Option<String>,  // New field
+    pub sold_by: Option<String>,
+    #[serde(rename = "productId")]
+    pub product_id: Option<String>,
 }
 
 // New ProductGroup struct that contains multiple products
@@ -23,7 +25,8 @@ pub struct ProductGroup {
     pub subcategory: Option<String>,
     pub product_type: Option<String>,
     pub products: Vec<Product>,
-    pub chunk_id: u32,  // For pagination and chunking large groups
+    pub chunk_id: u32,
+    pub additional_categorizations: Vec<DualCategorization>,  // For pagination and chunking large groups
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -46,7 +49,7 @@ pub struct CreateProductGroupInput {
     pub additional_categorizations: Vec<DualCategorization>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DualCategorization {
     pub main_category: String,
     pub subcategory: Option<String>,

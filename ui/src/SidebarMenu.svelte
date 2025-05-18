@@ -73,21 +73,6 @@
             <div class="menu-section">
                 <h3 class="section-title">Admin Tools</h3>
 
-                <!-- Data controls -->
-                <button
-                    class="btn btn-menu"
-                    on:click={() => store.productStore?.fetchAllProducts()}
-                >
-                    Fetch API
-                </button>
-
-                <button
-                    class="btn btn-menu"
-                    on:click={() => store.productStore?.loadFromSavedData()}
-                >
-                    Load Saved Data
-                </button>
-
                 <button
                     class="btn btn-menu btn-menu-gradient"
                     on:click={() => {
@@ -183,6 +168,19 @@
         align-items: center;
     }
 
+    /* Fix for the close button to prevent shifting on hover */
+    .close-button {
+        position: relative;
+        border: 1px solid transparent; /* Prevents shift on hover if border appears */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .close-button:hover {
+        border: 1px solid transparent; /* Keep consistent border on hover */
+    }
+
     :global(.close-button svg) {
         color: var(--button-text);
         stroke: var(--button-text);
@@ -251,5 +249,36 @@
         align-items: center;
         padding: var(--spacing-lg);
         overflow-y: auto;
+    }
+
+    /* Sync button styles */
+    .btn-menu {
+        display: flex;
+        align-items: center;
+        padding: var(--spacing-md) var(--spacing-lg);
+        border-radius: 999px;
+        margin-bottom: var(--spacing-sm);
+        cursor: pointer;
+        background-color: var(--bg-lighter);
+        border: none;
+        color: var(--text-primary);
+        font-size: var(--font-size-base);
+        width: 100%;
+        transition: background-color 0.2s ease;
+    }
+
+    .btn-menu:hover {
+        background-color: var(--bg-highlight);
+    }
+
+    .btn-menu span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: var(--spacing-md);
+        background-color: var(--background);
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
     }
 </style>

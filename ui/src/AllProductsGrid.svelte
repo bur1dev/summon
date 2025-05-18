@@ -49,9 +49,6 @@
                     const currentIndicesString = `${targetVisibleIndices[0]}-${targetVisibleIndices[targetVisibleIndices.length - 1]}`;
 
                     if (currentIndicesString !== prevIndicesString) {
-                        console.log(
-                            `Virtualization: Rendering ${targetVisibleIndices.length} items (indices ${currentIndicesString})`,
-                        );
                         prevIndicesString = currentIndicesString;
                     }
 
@@ -189,9 +186,6 @@
         );
 
         // Log virtualization stats
-        console.log(
-            `Virtualization: Rendering ${endIndex - startIndex} items (rows ${startRow} to ${startRow + visibleRows}) with buffer rows`,
-        );
     }
 
     function handleScroll() {
@@ -272,16 +266,9 @@
             );
             parentScrollContainer.style.willChange = "transform";
 
-            // Add immediate logging
-            console.log(
-                "Scroll handler attached to global container",
-                parentScrollContainer,
-            );
-
             // Force initial calculation
             setTimeout(() => {
                 handleScroll();
-                console.log("Initial scroll calculation forced");
             }, 100);
         } else {
             console.error("Global scroll container not found!");

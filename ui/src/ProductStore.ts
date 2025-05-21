@@ -1,9 +1,26 @@
 // ProductStore.ts
 
-import { writable, type Writable, get } from "svelte/store";
-import { type AgentPubKeyB64 } from "@holochain/client";
+import { writable, get } from "svelte/store";
+import type { Writable } from "svelte/store";
+import type { AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
-import { ShopStore } from "./store";
+import type { ShopStore } from "./store";
+
+interface DecodedSingleProductFields {
+  name: string;
+  price?: number;
+  promo_price?: number;
+  size?: string;
+  stocks_status?: string;
+  category?: string;
+  subcategory?: string;
+  product_type?: string;
+  image_url?: string;
+  sold_by?: string;
+  productId?: string;
+  embedding?: number[] | Float32Array;
+  [key: string]: any;
+}
 
 interface StoreState {
   loading: boolean;
@@ -52,7 +69,7 @@ export class ProductStore {
   private visibleItems: number = 1000;
 
   constructor(
-    private client: any,
+    public client: any, // Made public
     private myAgentKey: AgentPubKeyB64,
     store: ShopStore
   ) {
@@ -107,10 +124,15 @@ export class ProductStore {
       }
 
       const data = await response.json();
+      // Ensure data is an array before accessing length
+      if (!Array.isArray(data)) {
+        console.error("[LOG] Load Saved Data: Fetched data is not an array.", data);
+        throw new Error("Invalid data format from API: Expected an array of products.");
+      }
       totalProductsFromFile = data.length;
 
       // Group products by product type
-      const productsByType = data.reduce((groups, product) => {
+      const productsByType = data.reduce((groups: Record<string, any[]>, product: any) => {
         const category = product.category;
         const subcategory = product.subcategory || null;
         const productType = product.product_type === "All" || !product.product_type ? null : product.product_type;
@@ -119,7 +141,7 @@ export class ProductStore {
         if (!groups[key]) groups[key] = [];
         groups[key].push(product);
         return groups;
-      }, {});
+      }, {} as Record<string, any[]>); // Initialize with the correct type
 
       const productTypesCount = Object.keys(productsByType).length;
       console.log(`[LOG] Load Saved Data: Found ${totalProductsFromFile} products in ${productTypesCount} product types.`);
@@ -132,13 +154,19 @@ export class ProductStore {
       let processedTypes = 0;
 
       // Process each product type group
-      for (const [key, products] of Object.entries(productsByType)) {
-        const [category, subcategory, productType] = key.split('|||');
+      for (const [key, productList] of Object.entries(productsByType)) { // Renamed 'products' to 'productList'
+        // Ensure productList is an array before trying to use .length or .map
+        if (!Array.isArray(productList)) {
+          console.warn(`[LOG] Load Saved Data: Expected an array for key ${key} but got:`, productList);
+          continue; // Skip this iteration if not an array
+        }
+
+        const [categoryFromFile, subcategoryFromFile, productTypeFromFile] = key.split('|||'); // Renamed variables
         processedTypes++;
 
-        console.log(`[LOG] Load Saved Data: Processing Product Type ${processedTypes}/${productTypesCount}: "${productType || 'None'}" (${products.length} products)`);
+        console.log(`[LOG] Load Saved Data: Processing Product Type ${processedTypes}/${productTypesCount}: "${productTypeFromFile || 'None'}" (${productList.length} products)`);
 
-        const processedBatch = products.map(product => ({
+        const processedBatch = productList.map((product: any) => ({ // product is now known to be from an array
           product: {
             name: product.description || "",
             price: (typeof product.price === 'number') ? product.price : (product.items?.[0]?.price?.regular ?? 0),
@@ -148,7 +176,7 @@ export class ProductStore {
             category: product.category,
             subcategory: product.subcategory || null,
             product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,
-            image_url: product.image_url || null, // Prioritize the direct image_url field
+            image_url: product.image_url || null,
             sold_by: product.items?.[0]?.soldBy || null,
             productId: product.productId,
             embedding: product.embedding || null,
@@ -172,11 +200,12 @@ export class ProductStore {
               payload: processedBatch,
             });
 
-            successfullyUploadedProducts += products.length;
-            totalGroupsCreated += records.length;
+            const recordsLength = Array.isArray(records) ? records.length : 0; // Safe access to length
+            successfullyUploadedProducts += productList.length; // Use productList.length
+            totalGroupsCreated += recordsLength;
             success = true;
 
-            console.log(`[LOG] Load Saved Data: ✅ Uploaded ${products.length} products, created ${records.length} groups. Total: ${successfullyUploadedProducts}/${totalProductsFromFile} products (${totalGroupsCreated} groups)`);
+            console.log(`[LOG] Load Saved Data: ✅ Uploaded ${productList.length} products, created ${recordsLength} groups. Total: ${successfullyUploadedProducts}/${totalProductsFromFile} products (${totalGroupsCreated} groups)`);
 
             this.state.update(state => ({
               ...state,
@@ -184,7 +213,7 @@ export class ProductStore {
             }));
 
           } catch (batchError) {
-            console.error(`[LOG] Load Saved Data: ❌ Attempt ${attempts}/3 failed for "${productType || 'None'}":`, batchError);
+            console.error(`[LOG] Load Saved Data: ❌ Attempt ${attempts}/3 failed for "${productTypeFromFile || 'None'}":`, batchError);
 
             if (attempts >= 3) {
               console.warn(`[LOG] Load Saved Data: ⚠️ Skipping product type after 3 failed attempts.`);
@@ -192,11 +221,11 @@ export class ProductStore {
             }
 
             const delayMs = 3000 * Math.pow(2, attempts - 1);
-            console.log(`[LOG] Load Saved Data: Retrying in ${delayMs / 500}s...`);
+            console.log(`[LOG] Load Saved Data: Retrying in ${delayMs / 1000}s...`); // Corrected display to seconds
 
             this.state.update(state => ({
               ...state,
-              error: `Retry ${attempts}/3: "${productType || 'None'}" failed - Retrying in ${delayMs / 500}s (${successfullyUploadedProducts}/${totalProductsFromFile} uploaded)`
+              error: `Retry ${attempts}/3: "${productTypeFromFile || 'None'}" failed - Retrying in ${delayMs / 1000}s (${successfullyUploadedProducts}/${totalProductsFromFile} uploaded)`
             }));
 
             await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -205,7 +234,7 @@ export class ProductStore {
 
         // Pause between product types
         if (processedTypes < productTypesCount) {
-          console.log(`[LOG] Load Saved Data: Waiting 1 seconds before next product type...`);
+          console.log(`[LOG] Load Saved Data: Waiting 500 milliseconds before next product type...`); // Corrected log message
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
@@ -279,7 +308,7 @@ export class ProductStore {
   }
 
 
-  async getProductByHash(hash) {
+  async getProductByHash(hash: any): Promise<any | null> { // Consider changing 'any' to your 'Product' type if appropriate
     // Kept original function content
     console.log("Looking up product by hash:", hash);
 
@@ -292,16 +321,29 @@ export class ProductStore {
         payload: hash
       });
 
-      if (record) {
+      // Ensure record and its nested properties exist before trying to decode
+      if (record && record.entry && record.entry.Present && record.entry.Present.entry) {
         console.log("Found product record");
-        // Decode the entry data from the record
-        const product = decode(record.entry.Present.entry);
-        return {
-          ...product,
-          hash: record.signed_action.hashed.hash
-        };
+        // Decode the entry data from the record and assert its type
+        const productDetails = decode(record.entry.Present.entry) as DecodedSingleProductFields | null;
+
+        if (productDetails) {
+          // Construct the object to return
+          // The 'hash' property here is the ActionHash of the Holochain record itself.
+          // This might be different from the composite hash structure used elsewhere in your UI.
+          // You might need to adapt this part if your Svelte components expect 'hash' to be
+          // an object like { groupHash: ..., index: ... }.
+          // For now, it correctly assigns the record's direct hash.
+          return {
+            ...productDetails, // Spread all fields from the decoded product
+            hash: record.signed_action.hashed.hash
+          };
+        } else {
+          console.log("Product details were null after decoding.");
+          return null;
+        }
       } else {
-        console.log("Product not found by hash");
+        console.log("Product not found by hash or record structure was unexpected.");
         return null;
       }
     } catch (error) {

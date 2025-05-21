@@ -3,6 +3,8 @@
     import ProductDetailModal from "../ProductDetailModal.svelte";
     import { getContext } from "svelte";
     import { PencilLine, Plus, Minus } from "lucide-svelte";
+    import type { Writable } from "svelte/store";
+    import type { SimpleCartService } from "./SimpleCartService"; // Assuming this is the correct type/interface
 
     // Props - UPDATED FOR NEW STRUCTURE
     export let product;
@@ -13,7 +15,8 @@
     export let isUpdating = false;
 
     // Get cart service directly from the context
-    const cartService = getContext("cartService");
+    const cartServiceStore =
+        getContext<Writable<SimpleCartService | null>>("cartService");
 
     // State for modal
     let showModal = false;
@@ -30,13 +33,13 @@
 
     // Methods - UPDATED FOR NEW STRUCTURE
     const handleDecrementItem = async () => {
-        if (isUpdating || !$cartService) return;
+        if (isUpdating || !$cartServiceStore) return;
         isUpdating = true;
 
         try {
             const newQuantity = quantity - incrementValue;
             if (newQuantity > 0) {
-                await $cartService.addToCart(
+                await $cartServiceStore.addToCart(
                     groupHash,
                     productIndex,
                     newQuantity,
@@ -44,7 +47,7 @@
                 );
             } else {
                 // Setting to 0 to remove item
-                await $cartService.addToCart(groupHash, productIndex, 0);
+                await $cartServiceStore.addToCart(groupHash, productIndex, 0);
             }
         } catch (error) {
             console.error("Error decreasing quantity:", error);
@@ -54,11 +57,11 @@
     };
 
     const handleIncrementItem = async () => {
-        if (isUpdating || !$cartService) return;
+        if (isUpdating || !$cartServiceStore) return;
         isUpdating = true;
 
         try {
-            await $cartService.addToCart(
+            await $cartServiceStore.addToCart(
                 groupHash,
                 productIndex,
                 quantity + incrementValue,
@@ -72,10 +75,10 @@
     };
 
     const handleRemove = async () => {
-        if (!$cartService) return;
+        if (!$cartServiceStore) return;
 
         try {
-            await $cartService.addToCart(groupHash, productIndex, 0);
+            await $cartServiceStore.addToCart(groupHash, productIndex, 0);
         } catch (error) {
             console.error("Error removing item:", error);
         }
@@ -139,7 +142,7 @@
                 <button
                     class="quantity-btn minus-btn"
                     on:click|stopPropagation={handleDecrementItem}
-                    disabled={isUpdating || !$cartService}
+                    disabled={isUpdating || !$cartServiceStore}
                 >
                     <Minus size={16} />
                 </button>
@@ -147,7 +150,7 @@
                 <button
                     class="quantity-btn plus-btn"
                     on:click|stopPropagation={handleIncrementItem}
-                    disabled={isUpdating || !$cartService}
+                    disabled={isUpdating || !$cartServiceStore}
                 >
                     <Plus size={16} />
                 </button>
@@ -164,7 +167,7 @@
             <button
                 class="remove-item"
                 on:click|stopPropagation={handleRemove}
-                disabled={!$cartService}
+                disabled={!$cartServiceStore}
             >
                 Remove
             </button>

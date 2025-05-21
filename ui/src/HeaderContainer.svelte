@@ -1,5 +1,8 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
+  import type { StoreContext } from "./store"; // Added StoreContext
+  import type { Writable } from "svelte/store";
+  import type { SimpleCartService } from "./cart/SimpleCartService";
   import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart, Menu } from "lucide-svelte";
   import SearchBar from "./search/SearchBar.svelte";
@@ -18,11 +21,12 @@
   } from "./UiStateStore";
 
   // Get the store for UI props
-  const { getStore } = getContext("store");
+  const { getStore } = getContext<StoreContext>("store"); // Typed getContext
   const store = getStore();
 
-  // Get cart service directly from the context
-  const cartService = getContext("cartService");
+  // Get cart service store from the context
+  const cartServiceStore =
+    getContext<Writable<SimpleCartService | null>>("cartService");
 
   // Get profiles store from context
   const profilesStore = getContext("profiles-store");
@@ -37,11 +41,16 @@
   let avatarLoaded = false;
 
   // Subscribe to cart total from cart service
-  let unsubscribeCartTotal;
+  let unsubscribeCartTotal: (() => void) | null = null;
   let uniqueItemCount = 0;
+  let unsubscribeUniqueItemCount: (() => void) | null = null;
+
+  // Subscription to the cartServiceStore itself
+  let unsubscribeCartServiceStore: (() => void) | null = null;
+  let currentCartServiceInstance: SimpleCartService | null = null;
 
   onMount(() => {
-    // Wait for client to be initialized
+    // Agent pubkey logic
     if (store && store.myAgentPubKey) {
       myAgentPubKey = store.myAgentPubKey;
       myAgentPubKeyB64 = encodeHashToBase64(myAgentPubKey);
@@ -49,27 +58,45 @@
       console.log("Agent pubkey loaded:", myAgentPubKeyB64);
     }
 
-    // Subscribe to cart total
-    if ($cartService) {
-      unsubscribeCartTotal = $cartService.cartTotal.subscribe((total) => {
-        cartTotal = total;
-      });
+    // Cart service subscription logic
+    if (cartServiceStore) {
+      unsubscribeCartServiceStore = cartServiceStore.subscribe(
+        (serviceInstance) => {
+          currentCartServiceInstance = serviceInstance;
 
-      // Subscribe to unique item count
-      const unsubscribeUniqueCount = $cartService.uniqueItemCount.subscribe(
-        (count) => {
-          uniqueItemCount = count;
+          // Clean up previous subscriptions to cartTotal and uniqueItemCount
+          if (unsubscribeCartTotal) {
+            unsubscribeCartTotal();
+            unsubscribeCartTotal = null;
+          }
+          if (unsubscribeUniqueItemCount) {
+            unsubscribeUniqueItemCount();
+            unsubscribeUniqueItemCount = null;
+          }
+
+          if (currentCartServiceInstance) {
+            unsubscribeCartTotal =
+              currentCartServiceInstance.cartTotal.subscribe((total) => {
+                cartTotal = total;
+              });
+            unsubscribeUniqueItemCount =
+              currentCartServiceInstance.uniqueItemCount.subscribe((count) => {
+                uniqueItemCount = count;
+              });
+          } else {
+            // Service is not available (e.g., null), reset dependent values
+            cartTotal = 0;
+            uniqueItemCount = 0;
+          }
         },
       );
-
-      return () => {
-        if (unsubscribeCartTotal) unsubscribeCartTotal();
-        if (unsubscribeUniqueCount) unsubscribeUniqueCount();
-      };
     }
 
     return () => {
+      // Cleanup all subscriptions
+      if (unsubscribeCartServiceStore) unsubscribeCartServiceStore();
       if (unsubscribeCartTotal) unsubscribeCartTotal();
+      if (unsubscribeUniqueItemCount) unsubscribeUniqueItemCount();
     };
   });
 
@@ -103,7 +130,7 @@
     <div class="search-container">
       <SearchBar
         {store}
-        productCache={store.productCache}
+        productCache={store.productStore}
         on:select={({ detail }) =>
           setSearchState({
             searchMode: true,

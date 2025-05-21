@@ -1,9 +1,28 @@
+// search-utils.ts
 import { decode } from "@msgpack/msgpack";
 import type { Product, SearchResult, RankedSearchResult } from "./search-types";
 
 // ==========================================
 // Product Data Processing
 // ==========================================
+
+// +++ START OF ADDITION +++
+export interface DecodedProductGroupEntry {
+    products: Array<{
+        // Define the properties you expect on each product *within the groupData*
+        // This might be slightly different from your main 'Product' type if there's transformation
+        name: string;
+        category?: string;
+        subcategory?: string;
+        product_type?: string;
+        price?: number;
+        // Add any other fields that are directly in the decoded product object
+        [key: string]: any; // If products can have arbitrary other fields
+    }>;
+    // Add other properties you expect on groupData itself, if any
+    // For example: groupName?: string;
+}
+// +++ END OF ADDITION +++
 
 /**
  * Decode products from ProductGroups
@@ -14,20 +33,22 @@ export function decodeProducts(records: any[]): Product[] {
     for (const record of records) {
         try {
             const groupHash = record.signed_action.hashed.hash;
-            const groupData = decode(record.entry.Present.entry);
+            // +++ MODIFICATION HERE +++
+            const groupData = decode(record.entry.Present.entry) as DecodedProductGroupEntry | null;
 
-            if (groupData && Array.isArray(groupData.products)) {
-                groupData.products.forEach((product: any, index: number) => {
+            // Check if groupData is not null and has the products array
+            if (groupData && groupData.products && Array.isArray(groupData.products)) {
+                groupData.products.forEach((productDetails, index: number) => { // productDetails is now typed from DecodedProductGroupEntry.products
                     products.push({
-                        ...product,
+                        ...productDetails, // Spread the fields from the decoded product
                         hash: {
                             groupHash,
                             index,
                             toString: function () {
-                                return `${this.groupHash}:${this.index}`;
+                                return `${(this.groupHash as any).toString()}:${this.index}`; // Added .toString() for safety if groupHash is complex
                             }
                         }
-                    });
+                    } as Product); // Assert that the final object matches the Product interface
                 });
             }
         } catch (error) {

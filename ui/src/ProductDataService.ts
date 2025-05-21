@@ -1,8 +1,10 @@
 import { decode } from "@msgpack/msgpack";
+import type { DecodedProductGroupEntry } from "./search/search-utils";
+
 
 export class ProductDataService {
     private store: any;
-    private readonly PRODUCTS_PER_GROUP = 1000; // Define backend constant here
+    private readonly PRODUCTS_PER_GROUP = 1000;
 
     constructor(store: any) {
         this.store = store;
@@ -10,15 +12,17 @@ export class ProductDataService {
 
     private extractProductsFromGroups(groupRecords: any[]): any[] {
         if (!groupRecords || groupRecords.length === 0) return [];
-        let allProducts = [];
+        let allProducts: any[] = []; // Initialize with any[] or a more specific type if you know the final structure
         for (const record of groupRecords) {
             try {
-                const group = decode(record.entry.Present.entry);
+                // +++ MODIFICATION HERE +++
+                const group = decode(record.entry.Present.entry) as DecodedProductGroupEntry | null;
                 const groupHash = record.signed_action.hashed.hash;
-                if (group.products && Array.isArray(group.products)) {
-                    const productsWithHash = group.products.map((product, index) => ({
-                        ...product,
-                        hash: `${groupHash}_${index}`
+
+                if (group && group.products && Array.isArray(group.products)) {
+                    const productsWithHash = group.products.map((productDetails, index: number) => ({
+                        ...productDetails,
+                        hash: `${groupHash}_${index}` // Storing as simple string hash for this intermediate step
                     }));
                     allProducts = [...allProducts, ...productsWithHash];
                 }

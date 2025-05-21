@@ -11,6 +11,7 @@
   import { AddressService } from "./cart/AddressService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
+  import { ShopStore, type StoreContext } from "./store"; // ADDED
 
   // Import Profiles components
   import { ProfilesStore, ProfilesClient } from "@holochain-open-dev/profiles";
@@ -29,25 +30,21 @@
 
   let client: any;
   let profilesStore: ProfilesStore;
+  let shopStoreInstance: ShopStore | null = null; // MODIFIED: Initialize to null
 
   // Create a single cart service that all components can access
   // Start with a writable that we'll set once connected
-  const cartService = writable(null);
+  const cartService = writable<SimpleCartService | null>(null);
   setContext("cartService", cartService);
 
   // Create a writable for the address service
-  const addressService = writable(null);
-  setContext("addressService", addressService);
+  // We'll keep addressService as a writable store for now if other components consume it this way
+  const addressServiceStore = writable<AddressService | null>(null);
+  setContext("addressService", addressServiceStore);
 
-  // Create a store object with references that can be updated later
-  const storeObj = {
-    simpleCartService: null,
-    addressService: null,
-  };
-
-  // Provide the store context
-  setContext("store", {
-    getStore: () => storeObj,
+  // Set the "store" context immediately. shopStoreInstance is initially null.
+  setContext<StoreContext>("store", {
+    getStore: () => shopStoreInstance,
   });
 
   let connected = false;
@@ -83,27 +80,22 @@
     if (tokenResp) params.token = tokenResp.token;
     client = await AppWebsocket.connect(params);
 
-    // Now that we have a client, initialize the cart service and set it in the context
-    const simpleCartService = new SimpleCartService(client);
+    // Initialize ShopStore once client is available
+    // The setContext call has been moved to the top level.
+    // We just assign the instance here.
+    shopStoreInstance = new ShopStore(client, roleName);
+
+    // Now that we have a client, initialize the cart service and set it in the store
+    const simpleCartServiceInstance = new SimpleCartService(client);
     console.log("SimpleCartService created with client:", !!client);
+    cartService.set(simpleCartServiceInstance); // Set the instance into the cartService store
 
     // Initialize the address service
     const addressServiceInstance = new AddressService(client);
     console.log("AddressService created with client:", !!client);
+    addressServiceStore.set(addressServiceInstance); // Update the address service store
 
-    // Update the store with the actual services
-    cartService.set(simpleCartService);
-    addressService.set(addressServiceInstance);
-
-    // Update the store object reference directly
-    storeObj.simpleCartService = simpleCartService;
-    storeObj.addressService = addressServiceInstance;
-
-    console.log("App.svelte - storeObj updated:", {
-      hasSimpleCartService: !!storeObj.simpleCartService,
-      hasAddressService: !!storeObj.addressService,
-      storeObjectKeys: Object.keys(storeObj),
-    });
+    // The console.log related to storeObj is removed as storeObj is no longer central to the "store" context.
 
     // Initialize ProfilesStore
     profilesStore = new ProfilesStore(new ProfilesClient(client, "grocery"), {
@@ -343,42 +335,6 @@
   /* Direct styling of Shoelace button parts for gradient and effects */
   :global(create-profile) ::part(button) {
     transition: all 0.25s ease !important;
-  }
-
-  :global(create-profile form) sl-button[variant="primary"]::part(base) {
-    background: linear-gradient(
-      135deg,
-      var(--primary, #00cfbb),
-      var(--secondary, #8d72e1)
-    ) !important;
-    border-color: transparent !important;
-    box-shadow: var(--shadow-button, 0 4px 5px rgba(0, 0, 0, 0.2)) !important;
-    transition: all 0.25s ease !important;
-  }
-
-  :global(create-profile form) sl-button[variant="primary"]::part(base):hover {
-    background: linear-gradient(
-      135deg,
-      var(--primary-dark, #00b3a1),
-      var(--secondary, #8d72e1)
-    ) !important;
-    transform: translateY(var(--hover-lift, -2px)) !important;
-    box-shadow: var(--shadow-medium, 0 4px 12px rgba(0, 0, 0, 0.15)) !important;
-  }
-
-  :global(create-profile form) sl-button[variant="default"]::part(base) {
-    background: var(--background, #f2fffe) !important;
-    color: var(--text-primary, #1e3a3a) !important;
-    border: var(--border-width-thin, 1px) solid var(--border, #ccf2ee) !important;
-    box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0, 0, 0, 0.08)) !important;
-    transition: all 0.25s ease !important;
-  }
-
-  :global(create-profile form) sl-button[variant="default"]::part(base):hover {
-    background: var(--surface, #ffffff) !important;
-    border-color: var(--primary, #00cfbb) !important;
-    transform: translateY(var(--hover-lift, -2px)) !important;
-    box-shadow: var(--shadow-medium, 0 4px 12px rgba(0, 0, 0, 0.15)) !important;
   }
 
   @keyframes spin {

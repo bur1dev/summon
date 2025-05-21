@@ -1,5 +1,6 @@
 <script lang="ts">
     import { getContext, onMount, onDestroy } from "svelte";
+    import type { StoreContext } from "./store"; // Corrected import path
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
 
@@ -9,9 +10,8 @@
     export let products = [];
     export let allProductsTotal: number = 0;
 
-    const { getStore } = getContext("store");
+    const { getStore } = getContext<StoreContext>("store"); // Typed getContext
     const store = getStore();
-    const cartStore = store.cartStore;
     const dispatch = createEventDispatcher();
 
     let productsGridRef;

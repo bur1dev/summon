@@ -5,10 +5,14 @@
         onMount,
         onDestroy,
     } from "svelte";
+    import { get, type Writable } from "svelte/store"; // Import get
+    import type { SimpleCartService } from "./cart/SimpleCartService";
     import { X, Plus, Minus, ArrowLeft, Save } from "lucide-svelte";
 
     const dispatch = createEventDispatcher();
-    const cartService = getContext("cartService");
+    // cartServiceStore holds the store from context, which in turn holds the SimpleCartService instance (or null)
+    const cartServiceStore =
+        getContext<Writable<SimpleCartService | null>>("cartService");
 
     export let isOpen = false;
     export let product;
@@ -55,12 +59,18 @@
     }
 
     async function addToCart() {
-        if (!$cartService) return;
+        const serviceInstance = get(cartServiceStore);
+        if (!serviceInstance) {
+            console.error(
+                "ProductDetailModal: addToCart called but cartService instance is not available.",
+            );
+            return;
+        }
 
         try {
             isTransitioning = true; // Start transition animation
 
-            await $cartService.addToCart(
+            await serviceInstance.addToCart(
                 groupHashBase64,
                 productIndex,
                 quantity,
@@ -111,9 +121,15 @@
     }
 
     async function updateCartQuantity() {
-        if (!$cartService) return;
+        const serviceInstance = get(cartServiceStore);
+        if (!serviceInstance) {
+            console.error(
+                "ProductDetailModal: updateCartQuantity called but cartService instance is not available.",
+            );
+            return;
+        }
         try {
-            await $cartService.addToCart(
+            await serviceInstance.addToCart(
                 groupHashBase64,
                 productIndex,
                 quantity,
@@ -125,8 +141,15 @@
     }
 
     function checkCartStatus() {
-        if (!$cartService) return;
-        const items = $cartService.getCartItems();
+        const serviceInstance = get(cartServiceStore);
+        if (!serviceInstance) {
+            // This might be called before the service is set in the store, especially on initial mount.
+            // console.log("ProductDetailModal: checkCartStatus called but cartService instance is not yet available from store.");
+            return;
+        }
+        // The type of serviceInstance from get(cartServiceStore) should be SimpleCartService if not null
+        // So, direct method calls should be safe if serviceInstance is not null.
+        const items = serviceInstance.getCartItems();
         const item = items.find(
             (item) =>
                 item &&
@@ -154,12 +177,19 @@
 
     // New function to load product preferences
     async function loadProductPreference() {
-        if (!$cartService || !groupHashBase64 || productIndex === undefined)
+        const serviceInstance = get(cartServiceStore);
+        if (
+            !serviceInstance ||
+            !groupHashBase64 ||
+            productIndex === undefined
+        ) {
+            // console.log("ProductDetailModal: loadProductPreference prerequisites not met.");
             return;
+        }
 
         loadingPreference = true;
         try {
-            const result = await $cartService.getProductPreference(
+            const result = await serviceInstance.getProductPreference(
                 groupHashBase64,
                 productIndex,
             );
@@ -187,10 +217,11 @@
 
     // New function to save product preference
     async function saveProductPreference() {
-        if (!$cartService || !note || !note.trim()) return;
+        const serviceInstance = get(cartServiceStore);
+        if (!serviceInstance || !note || !note.trim()) return;
 
         try {
-            const result = await $cartService.saveProductPreference({
+            const result = await serviceInstance.saveProductPreference({
                 groupHash: groupHashBase64,
                 productIndex,
                 note: note.trim(),
@@ -208,10 +239,11 @@
 
     // New function to delete product preference
     async function deleteProductPreference() {
-        if (!$cartService || !existingPreference) return;
+        const serviceInstance = get(cartServiceStore);
+        if (!serviceInstance || !existingPreference) return;
 
         try {
-            const result = await $cartService.deleteProductPreference(
+            const result = await serviceInstance.deleteProductPreference(
                 existingPreference.hash,
             );
             if (result && result.success) {
@@ -249,9 +281,15 @@
     }
 
     async function saveInstructions() {
-        if (!$cartService) return;
+        const serviceInstance = get(cartServiceStore);
+        if (!serviceInstance) {
+            console.error(
+                "ProductDetailModal: saveInstructions called but cartService instance is not available.",
+            );
+            return;
+        }
         try {
-            await $cartService.addToCart(
+            await serviceInstance.addToCart(
                 groupHashBase64,
                 productIndex,
                 quantity,
@@ -279,29 +317,65 @@
         noteChanged = false;
     }
 
+    let unsubscribeFromServiceInstance: (() => void) | null = null;
+
     onMount(() => {
         if (isOpen) {
             document.body.style.overflow = "hidden";
+            // Initial check using get(), service might not be ready for methods yet
+            // but checkCartStatus and loadProductPreference internally use get() and handle null instance
             checkCartStatus();
-
-            if (forceShowPreferences || isInCart) {
-                showPreferences = true;
-            }
-
-            // Load existing preference for this product
             loadProductPreference();
         }
 
-        if ($cartService) {
-            unsubscribeCartState = $cartService.subscribe(() => {
+        // This outer subscription is to get the serviceInstance when it becomes available
+        unsubscribeCartState = cartServiceStore.subscribe((serviceInstance) => {
+            // Clean up any previous subscription to an old service instance's items
+            if (unsubscribeFromServiceInstance) {
+                unsubscribeFromServiceInstance();
+                unsubscribeFromServiceInstance = null;
+            }
+
+            if (
+                serviceInstance &&
+                typeof serviceInstance.subscribe === "function"
+            ) {
+                // Now that we have a valid serviceInstance, subscribe to its internal cart item changes
+                unsubscribeFromServiceInstance = serviceInstance.subscribe(
+                    (_cartItemsFromService) => {
+                        // This callback is triggered when items in SimpleCartService change.
+                        // Re-run checkCartStatus to update the modal's view of the cart.
+                        checkCartStatus();
+                    },
+                );
+
+                // Also, perform an initial check and preference load when the service instance first becomes available or changes
                 checkCartStatus();
-            });
-        }
+                if (isOpen) {
+                    // Only load preferences if modal is open and service is available
+                    loadProductPreference();
+                }
+            } else {
+                // Service instance is null (e.g., on logout or initial state)
+                // Reset local state that depends on the cart
+                isInCart = false;
+                quantity = isSoldByWeight ? 1 : 1; // Reset to default
+                showPreferences = false;
+                note = ""; // Clear note
+                existingNote = "";
+                // Potentially clear other states like existingPreference if they are tied to a cart session
+            }
+        });
     });
 
     onDestroy(() => {
         document.body.style.overflow = "";
-        if (unsubscribeCartState) unsubscribeCartState();
+        if (unsubscribeCartState) {
+            unsubscribeCartState(); // Unsubscribe from cartServiceStore
+        }
+        if (unsubscribeFromServiceInstance) {
+            unsubscribeFromServiceInstance(); // Unsubscribe from serviceInstance.subscribe
+        }
     });
 
     $: if (isOpen) {

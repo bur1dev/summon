@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import type { Writable } from 'svelte/store';
+import type { SearchMethod, Product } from './search/search-types'; // Added import, Added Product
 
 // UI state types
 export type CurrentView = 'active' | 'checked-out';
@@ -42,9 +43,9 @@ export const searchModeStore = writable<boolean>(false);
 export const searchQueryStore = writable<string>('');
 export const productNameStore = writable<string>('');
 export const selectedProductHashStore = writable<string | null>(null);
-export const searchResultsStore = writable<any[]>([]); // Changed from fuseResultsStore
+export const searchResultsStore = writable<Product[]>([]); // Changed from fuseResultsStore, Changed any[] to Product[]
 export const isViewAllStore = writable<boolean>(false);
-export const searchMethodStore = writable<string>('');
+export const searchMethodStore = writable<SearchMethod>(''); // Changed type to SearchMethod
 
 // Helper functions
 export function setSearchState(params: {
@@ -52,9 +53,9 @@ export function setSearchState(params: {
     searchQuery?: string,
     productName?: string,
     selectedProductHash?: string | null,
-    searchResults?: any[], // Changed from fuseResults
+    searchResults?: Product[], // Changed from fuseResults, Changed any[] to Product[]
     isViewAll?: boolean,
-    searchMethod?: string
+    searchMethod?: SearchMethod // Changed type to SearchMethod
 }) {
     if (params.searchMode !== undefined) searchModeStore.set(params.searchMode);
     if (params.searchQuery !== undefined) searchQueryStore.set(params.searchQuery);

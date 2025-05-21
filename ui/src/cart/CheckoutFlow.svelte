@@ -15,6 +15,12 @@
     import { decode } from "@msgpack/msgpack";
     import { ChevronLeft } from "lucide-svelte";
 
+    // Define an interface for the decoded product group
+    interface ProductGroup {
+        products: any[]; // Ideally, replace 'any' with a more specific Product type if available
+        // Add other expected properties of a product group if known
+    }
+
     // Import agent-avatar component
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
 
@@ -27,8 +33,8 @@
     export let onClose: () => void;
 
     // Get the store for the client
-    const { getStore } = getContext("store");
-    const store = getStore();
+    const storeContext = getContext<import("../store").StoreContext>("store");
+    const store = storeContext.getStore();
 
     // Get profiles store from context
     const profilesStore = getContext("profiles-store");
@@ -113,13 +119,21 @@
                         payload: groupHash,
                     });
 
-                    if (result) {
-                        const group = decode(result.entry.Present.entry);
+                    if (
+                        result &&
+                        result.entry &&
+                        result.entry.Present &&
+                        result.entry.Present.entry
+                    ) {
+                        const group = decode(
+                            result.entry.Present.entry,
+                        ) as ProductGroup;
 
                         // Get specific product by index
                         if (
                             group &&
                             group.products &&
+                            item.productIndex < group.products.length && // Add bounds check
                             group.products[item.productIndex]
                         ) {
                             return {

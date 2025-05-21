@@ -1,4 +1,4 @@
-import { SearchApiClient } from "./search-api";
+import type { SearchApiClient } from "./search-api";
 import {
     deduplicateProducts,
     groupRelatedProducts,
@@ -452,16 +452,25 @@ export class SearchStrategyFactory {
                 return new TextSearchStrategy(searchResults || productIndex || [], query);
 
             case "hybrid_dropdown": // For dropdown re-ranking
-                // queryEmbedding is crucial here for HNSW re-ranking
                 if (preFilteredCandidates && queryEmbedding) {
-                    return new HybridDropdownStrategy(
-                        query,
-                        preFilteredCandidates, // HNSW index built from these candidates
-                        queryEmbedding,
-                        15
-                    );
+                    const embeddingForStrategy: Float32Array | null =
+                        queryEmbedding instanceof Float32Array
+                            ? queryEmbedding
+                            : (Array.isArray(queryEmbedding) && queryEmbedding.length > 0
+                                ? new Float32Array(queryEmbedding)
+                                : null);
+
+                    if (embeddingForStrategy) { // Only proceed if we have a valid Float32Array
+                        return new HybridDropdownStrategy(
+                            query,
+                            preFilteredCandidates,
+                            embeddingForStrategy,
+                            15
+                        );
+                    }
                 }
-                // Fallback for dropdown if no embedding (use text results directly)
+                // Fallback for dropdown if no valid embedding or preFilteredCandidates
+                console.warn("[SearchStrategyFactory] Hybrid dropdown requirements not fully met (missing candidates or valid embedding after conversion), falling back to text search for dropdown.");
                 return new TextSearchStrategy(preFilteredCandidates || [], query);
 
 

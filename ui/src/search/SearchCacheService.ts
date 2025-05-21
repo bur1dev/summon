@@ -1,13 +1,10 @@
-import { decode } from "@msgpack/msgpack";
-import { encodeHashToBase64 } from "@holochain/client";
+import { decode, DecodeError } from "@msgpack/msgpack";
+import { encodeHashToBase64 } from "@holochain/client"; // Removed HolochainClient import
 
 // SearchCacheService.ts
-interface CachedData {
-    timestamp: number;
-    products: any[];
-}
 
-interface DecodedProduct {
+// Data structure from Holochain zome call (before processing)
+interface RawProductDataFromZome {
     name: string;
     price: number;
     size: string;
@@ -15,16 +12,91 @@ interface DecodedProduct {
     subcategory?: string;
     product_type?: string;
     image_url?: string;
+    promo_price?: number;
+    stocks_status?: string;
+    sold_by?: string;
+    product_id?: string;
+    embedding?: number[];
+    [key: string]: any; // For other potential fields
+}
+
+// Represents the hash object associated with a product
+interface ProductHashObject {
+    groupHash: Uint8Array | string; // Uint8Array from zome, string if already base64 encoded
+    index: number;
+    toString(): string;
+    needsToString?: boolean; // For legacy cache objects that need toString restored
+}
+
+// Product structure optimized for IndexedDB storage (normalized, embeddings as ArrayBuffer)
+interface StoredProductRecord {
+    name: string;
+    price: number;
+    promo_price?: number;
+    size: string;
+    stocks_status?: string;
+
+    // Normalized fields (IDs)
+    categoryId: number;
+    subcategoryId: number;
+    productTypeId: number;
+    brandId: number;
+
+    // Other non-normalized string fields
+    image_url?: string;
+    sold_by?: string;
+    productId?: string;
+
+    embeddingBuffer?: ArrayBuffer; // Embeddings stored as ArrayBuffer
+
+    // Hash can be a string (preferred for storage) or a legacy object during transition
+    hash: string | ProductHashObject; // ProductHashObject for legacy cases
+    // where needsToString might be true
+
+    // Allow other dynamic fields if strictly necessary, though ideally defined
     [key: string]: any;
 }
 
+// Product structure for client-side use (denormalized, embeddings as Float32Array)
+interface ProcessedProduct {
+    name: string;
+    price: number;
+    promo_price?: number;
+    size: string;
+    stocks_status?: string;
+
+    // Denormalized string fields
+    category: string | null;
+    subcategory: string | null;
+    product_type: string | null;
+    brand: string | null; // Assuming brandId maps to brand name
+
+    // Original IDs for reference
+    categoryId: number;
+    subcategoryId: number;
+    productTypeId: number;
+    brandId: number;
+
+    // Other string fields
+    image_url?: string;
+    sold_by?: string;
+    productId?: string;
+
+    embedding?: Float32Array; // Processed embedding
+    hash: ProductHashObject; // Hash as an object with a toString method
+
+    // Allow other dynamic fields
+    [key: string]: any;
+}
+
+
 // Lookup table interfaces for string normalization
 interface LookupTable {
-    [key: string]: number;
+    [key: string]: number; // e.g. "Produce": 1
 }
 
 interface ReverseLookupTable {
-    [key: number]: string;
+    [key: number]: string; // e.g. 1: "Produce"
 }
 
 interface NormalizedLookupTables {
@@ -36,12 +108,72 @@ interface NormalizedLookupTables {
     reverseProductTypes: ReverseLookupTable;
     brands: LookupTable;
     reverseBrands: ReverseLookupTable;
-    // Add other lookup tables as needed
 }
 
-const CACHE_KEY = 'product_search_index_cache';
+// For data stored in IndexedDB related to lookup tables
+interface LookupDataRecord {
+    id: string; // Should be LOOKUP_TABLES_KEY
+    tables: NormalizedLookupTables;
+    timestamp: number;
+}
+
+// For metadata stored in IndexedDB
+interface CacheMetadata {
+    id: string; // Should be 'metadata_v1'
+    timestamp: number;
+    productCount: number;
+    lastUpdate: string;
+    version: number;
+    normalized: boolean; // Indicates if products in cache are normalized
+}
+
+// For product chunks stored in IndexedDB
+interface ProductChunk {
+    id: string; // e.g., 'chunk_0'
+    products: StoredProductRecord[];
+}
+
+// Minimal type for the Holochain store/client passed to methods
+// Using 'any' for the client type to avoid import issues if HolochainClient is not a direct export
+// or if the actual client object has a different specific type.
+// The critical part is that it must have a callZome method.
+interface HolochainStore {
+    service: {
+        client: {
+            callZome: (args: {
+                role_name: string;
+                zome_name: string;
+                fn_name: string;
+                payload: any;
+            }) => Promise<any>;
+        };
+    };
+}
+
+// Structure of a Holochain record containing a product group
+interface ProductGroupRecord {
+    signed_action: {
+        hashed: {
+            hash: Uint8Array; // ActionHash
+        };
+    };
+    entry: {
+        Present: {
+            entry: Uint8Array; // MsgPack encoded ProductGroup entry
+        };
+    };
+}
+
+// Decoded ProductGroup entry from MsgPack
+interface DecodedProductGroup {
+    products: RawProductDataFromZome[];
+    // other fields if any, e.g., category_path
+}
+
+
+const CACHE_KEY = 'product_search_index_cache'; // Not directly used, but good for reference
 const CACHE_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-const LOOKUP_TABLES_KEY = 'lookup_tables_v1';
+const LOOKUP_TABLES_KEY = 'lookup_tables_v1' as const; // Use 'as const' for literal type
 const CACHE_VERSION = 1; // Increment when changing cache structure
 
 // Top categories to load first for better user experience
@@ -72,71 +204,61 @@ export default class SearchCacheService {
     // Open database connection
     private static openDatabase(): Promise<IDBDatabase> {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('product-search-cache', 4); // Increased version for lookup tables
+            const request: IDBOpenDBRequest = indexedDB.open('product-search-cache', 4);
 
-            request.onerror = (event) => {
-                console.error('IndexedDB error:', event);
+            request.onerror = (event: Event) => {
+                console.error('IndexedDB error:', (event.target as IDBRequest).error);
                 reject('Error opening database');
             };
 
-            request.onsuccess = (event) => {
-                resolve(request.result);
+            request.onsuccess = (event: Event) => {
+                resolve((event.target as IDBOpenDBRequest).result);
             };
 
-            request.onupgradeneeded = (event) => {
-                const db = request.result;
+            request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+                const db = (event.target as IDBOpenDBRequest).result;
 
-                // Check if products object store already exists and delete if upgrading
                 if (db.objectStoreNames.contains('products')) {
                     db.deleteObjectStore('products');
                 }
-
-                // Create fresh products store
                 db.createObjectStore('products', { keyPath: 'id' });
                 console.log('Created new products object store with version 4 (optimized with lookup tables)');
             };
         });
     }
 
-    static async getSearchIndex(store: any, forceRefresh: boolean = false): Promise<any[]> {
-        // Always clear cache when forceRefresh is true (app initialization)
+    static async getSearchIndex(store: HolochainStore, forceRefresh: boolean = false): Promise<ProcessedProduct[]> {
         if (forceRefresh) {
             await this.clearCache();
             return this.buildIndexFromCategories(store);
         }
 
         try {
-            // Initialize DB if needed
             if (!this.dbPromise) {
                 this.dbPromise = this.openDatabase();
             }
             const db = await this.dbPromise;
 
-            // Get metadata
             const tx = db.transaction('products', 'readonly');
+            const productsStore = tx.objectStore('products');
 
-            // Get all keys for debugging
-            const keysRequest = tx.objectStore('products').getAllKeys();
-            const keys = await new Promise<string[]>((resolve, reject) => {
-                keysRequest.onsuccess = () => resolve(keysRequest.result as string[]);
+            const keysRequest = productsStore.getAllKeys();
+            const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+                keysRequest.onsuccess = () => resolve(keysRequest.result);
                 keysRequest.onerror = () => reject(keysRequest.error);
             });
-            console.log(`[SearchCacheService] Found ${keys.length} keys in cache:`, keys.slice(0, 5));
+            console.log(`[SearchCacheService] Found ${keys.length} keys in cache:`, keys.slice(0, 5).map(k => String(k)));
 
-            // Check if we have lookup tables
             const hasLookupTables = keys.includes(LOOKUP_TABLES_KEY);
 
-            // Now get the metadata using the proper key
-            const metadataRequest = tx.objectStore('products').get('metadata_v1');
-            const metadataItem = await new Promise((resolve, reject) => {
-                metadataRequest.onsuccess = () => resolve(metadataRequest.result);
+            const metadataRequest = productsStore.get('metadata_v1');
+            const metadataItem = await new Promise<CacheMetadata | undefined>((resolve, reject) => {
+                metadataRequest.onsuccess = () => resolve(metadataRequest.result as CacheMetadata | undefined);
                 metadataRequest.onerror = () => reject(metadataRequest.error);
             });
 
-            // Check if cache is valid with better debugging
             const cacheAge = metadataItem?.timestamp ? Date.now() - metadataItem.timestamp : Infinity;
             const isValid = metadataItem &&
-                metadataItem.timestamp &&
                 metadataItem.productCount > 0 &&
                 cacheAge < CACHE_TIMEOUT &&
                 metadataItem.version === CACHE_VERSION;
@@ -144,11 +266,10 @@ export default class SearchCacheService {
             if (isValid) {
                 console.log(`[SearchCacheService] Valid cache found with ${metadataItem.productCount} products, age: ${Math.floor(cacheAge / (60 * 60 * 1000))} hours`);
 
-                // Load lookup tables first if available
                 if (hasLookupTables) {
-                    const lookupRequest = tx.objectStore('products').get(LOOKUP_TABLES_KEY);
-                    const lookupData = await new Promise((resolve, reject) => {
-                        lookupRequest.onsuccess = () => resolve(lookupRequest.result);
+                    const lookupRequest = productsStore.get(LOOKUP_TABLES_KEY);
+                    const lookupData = await new Promise<LookupDataRecord | undefined>((resolve, reject) => {
+                        lookupRequest.onsuccess = () => resolve(lookupRequest.result as LookupDataRecord | undefined);
                         lookupRequest.onerror = () => reject(lookupRequest.error);
                     });
 
@@ -160,82 +281,94 @@ export default class SearchCacheService {
                     }
                 }
 
-                // Collect all chunks
-                const allProducts = [];
+                const allProducts: ProcessedProduct[] = [];
                 let chunkIndex = 0;
                 let hasMoreChunks = true;
-                let totalEmbeddingCount = 0;
-                let productsWithEmbeddings = 0;
                 let arrayBufferCount = 0;
+                let productsWithEmbeddingsFromArray = 0;
+
 
                 while (hasMoreChunks) {
                     const chunkId = `chunk_${chunkIndex}`;
-
                     try {
-                        const chunkRequest = tx.objectStore('products').get(chunkId);
-                        const chunk = await new Promise((resolve, reject) => {
-                            chunkRequest.onsuccess = () => resolve(chunkRequest.result);
+                        const chunkRequest = productsStore.get(chunkId);
+                        const chunk = await new Promise<ProductChunk | undefined>((resolve, reject) => {
+                            chunkRequest.onsuccess = () => resolve(chunkRequest.result as ProductChunk | undefined);
                             chunkRequest.onerror = () => reject(chunkRequest.error);
                         });
 
                         if (chunk && chunk.products && chunk.products.length > 0) {
-                            // Process products in chunk
-                            const processedProducts = chunk.products.map(product => {
-                                // Denormalize product if using lookup tables
+                            const processedChunkProducts: ProcessedProduct[] = chunk.products.map((storedProduct: StoredProductRecord) => {
+                                let productToProcess: StoredProductRecord | ProcessedProduct = storedProduct;
+
                                 if (hasLookupTables && metadataItem.normalized) {
-                                    product = this.denormalizeProduct(product);
+                                    // Type assertion needed as denormalizeProduct expects StoredProductRecord
+                                    productToProcess = this.denormalizeProduct(storedProduct as StoredProductRecord);
                                 }
 
-                                // Convert embedding buffer back to Float32Array if it exists
-                                if (product.embeddingBuffer) {
+                                // Ensure productToProcess is treated as a mutable object for further modifications
+                                const fullyProcessedProduct: ProcessedProduct = { ...productToProcess } as ProcessedProduct;
+
+
+                                if (storedProduct.embeddingBuffer) {
                                     try {
-                                        product.embedding = new Float32Array(product.embeddingBuffer);
+                                        fullyProcessedProduct.embedding = new Float32Array(storedProduct.embeddingBuffer);
                                         arrayBufferCount++;
-                                        // Remove the buffer property as it's no longer needed
-                                        delete product.embeddingBuffer;
+                                        delete (fullyProcessedProduct as any).embeddingBuffer; // Remove after conversion
                                     } catch (err) {
                                         console.error('Error converting ArrayBuffer to Float32Array:', err);
-                                        product.embedding = []; // Fallback to empty array
+                                        fullyProcessedProduct.embedding = new Float32Array();
                                     }
-                                } else if (product.embedding && Array.isArray(product.embedding)) {
-                                    // Convert regular arrays to Float32Array for consistency
+                                } else if (fullyProcessedProduct.embedding && Array.isArray(fullyProcessedProduct.embedding)) {
                                     try {
-                                        product.embedding = new Float32Array(product.embedding);
-                                        productsWithEmbeddings++;
+                                        fullyProcessedProduct.embedding = new Float32Array(fullyProcessedProduct.embedding);
+                                        productsWithEmbeddingsFromArray++;
                                     } catch (err) {
                                         console.error('Error converting array to Float32Array:', err);
+                                        fullyProcessedProduct.embedding = new Float32Array();
                                     }
+                                } else {
+                                    fullyProcessedProduct.embedding = new Float32Array();
                                 }
+
 
                                 // Recreate hash toString method
-                                if (product.hash) {
-                                    // For normalized hash data
-                                    if (typeof product.hash === 'string' && product.hash.includes(':')) {
-                                        const [groupHashStr, indexStr] = product.hash.split(':');
-                                        product.hash = {
-                                            groupHash: groupHashStr,
-                                            index: parseInt(indexStr, 10),
-                                            toString: function () {
-                                                return `${this.groupHash}:${this.index}`;
-                                            }
-                                        };
-                                    }
-                                    // For legacy hash objects that need toString restored
-                                    else if (product.hash.needsToString) {
-                                        product.hash.toString = function () {
-                                            const groupHashStr = (this.groupHash instanceof Uint8Array)
-                                                ? encodeHashToBase64(this.groupHash)
-                                                : String(this.groupHash);
-                                            return `${groupHashStr}:${this.index}`;
-                                        };
-                                        delete product.hash.needsToString;
-                                    }
+                                // storedProduct.hash could be string or ProductHashObject (legacy)
+                                const currentHash = storedProduct.hash;
+                                if (typeof currentHash === 'string' && currentHash.includes(':')) {
+                                    const [groupHashStr, indexStr] = currentHash.split(':');
+                                    fullyProcessedProduct.hash = {
+                                        groupHash: groupHashStr,
+                                        index: parseInt(indexStr, 10),
+                                        toString: function (this: ProductHashObject) {
+                                            return `${this.groupHash}:${this.index}`;
+                                        }
+                                    };
+                                } else if (typeof currentHash === 'object' && (currentHash as ProductHashObject).needsToString) {
+                                    const hashObj = currentHash as ProductHashObject;
+                                    hashObj.toString = function (this: ProductHashObject) {
+                                        const groupHashStr = (this.groupHash instanceof Uint8Array)
+                                            ? encodeHashToBase64(this.groupHash)
+                                            : String(this.groupHash);
+                                        return `${groupHashStr}:${this.index}`;
+                                    };
+                                    delete hashObj.needsToString;
+                                    fullyProcessedProduct.hash = hashObj;
+                                } else if (typeof currentHash === 'object' && typeof (currentHash as ProductHashObject).toString === 'function') {
+                                    // It's already a valid ProductHashObject
+                                    fullyProcessedProduct.hash = currentHash as ProductHashObject;
+                                } else {
+                                    // Fallback or error if hash is in an unexpected format
+                                    console.warn("Product hash in unexpected format:", currentHash);
+                                    // Provide a default hash object to satisfy ProcessedProduct type
+                                    fullyProcessedProduct.hash = {
+                                        groupHash: '', index: 0, toString: () => ':0'
+                                    };
                                 }
-
-                                return product;
+                                return fullyProcessedProduct;
                             });
 
-                            allProducts.push(...processedProducts);
+                            allProducts.push(...processedChunkProducts);
                             chunkIndex++;
                         } else {
                             hasMoreChunks = false;
@@ -246,15 +379,13 @@ export default class SearchCacheService {
                     }
                 }
 
-                console.log(`[SearchCacheService] Loaded ${allProducts.length} products from cache. Found ${arrayBufferCount} products with ArrayBuffer embeddings and ${productsWithEmbeddings} with array embeddings.`);
+                console.log(`[SearchCacheService] Loaded ${allProducts.length} products from cache. Found ${arrayBufferCount} products with ArrayBuffer embeddings and ${productsWithEmbeddingsFromArray} with array embeddings.`);
 
-                // Validate data integrity
                 const hasValidData = this.validateCachedProducts(allProducts);
                 if (!hasValidData) {
                     console.log('[SearchCacheService] Cache validation failed, rebuilding index from DHT');
                     return this.buildIndexFromCategories(store);
                 }
-
                 return allProducts;
             } else {
                 console.log('[SearchCacheService] Cache invalid or expired, rebuilding index from DHT');
@@ -262,64 +393,55 @@ export default class SearchCacheService {
         } catch (error) {
             console.error('[SearchCacheService] Error accessing IndexedDB cache:', error);
         }
-
-        // If cache invalid or error occurred, build from categories
         return this.buildIndexFromCategories(store);
     }
 
-    private static validateCachedProducts(products: any[]): boolean {
+    private static validateCachedProducts(products: ProcessedProduct[]): boolean {
         if (!products.length) {
             console.log('[SearchCacheService] No products found in cache');
             return false;
         }
-
         const sampleSize = Math.min(10, products.length);
         const sampleProducts = products.slice(0, sampleSize);
 
-        // Check if essential properties exist
         for (const product of sampleProducts) {
-            if (!product.name || !product.category) {
-                console.log('[SearchCacheService] Product missing essential properties (name or category)');
+            if (!product.name || product.category === undefined) { // category can be null, so check for undefined
+                console.log('[SearchCacheService] Product missing essential properties (name or category info)');
                 return false;
             }
         }
 
-        // Sample embedding information for diagnostic purposes
-        const withEmbeddings = products.filter(p => p.embedding && (p.embedding.length > 0)).length;
+        const withEmbeddings = products.filter(p => p.embedding && p.embedding.length > 0).length;
         const withTypedEmbeddings = products.filter(p => p.embedding instanceof Float32Array).length;
         console.log(`[SearchCacheService] Product cache stats: ${withEmbeddings}/${products.length} have embeddings, ${withTypedEmbeddings} are Float32Arrays`);
-
         return true;
     }
 
-    private static async buildIndexFromCategories(store: any): Promise<any[]> {
-        let allProducts = [];
-        const limit = 1000; // ProductGroups per category (each group can contain up to ~100 products)
+    private static async buildIndexFromCategories(store: HolochainStore): Promise<ProcessedProduct[]> {
+        let allProducts: ProcessedProduct[] = [];
+        const limit = 1000;
         let totalProductCount = 0;
 
-        // Reset lookup tables
         this.initializeLookupTables();
 
         try {
             console.log('[SearchCacheService] Building search index from Holochain DHT');
+            const categoriesToLoad = [...TOP_CATEGORIES, ...ALL_CATEGORIES.filter(c => !TOP_CATEGORIES.includes(c))];
 
-            // First load top categories for better UX
-            for (const category of TOP_CATEGORIES) {
+            for (const category of categoriesToLoad) {
                 try {
-                    const response = await store.service.client.callZome({
+                    // Type the response from callZome if possible, here assumed any
+                    const response: { product_groups: ProductGroupRecord[] } | null = await store.service.client.callZome({
                         role_name: "grocery",
-                        zome_name: "products",
+                        zome_name: "products", // Assuming zome name is "products" not "product_catalog"
                         fn_name: "get_products_by_category",
-                        payload: {
-                            category,
-                            limit
-                        },
+                        payload: { category, limit },
                     });
 
                     if (response && response.product_groups && response.product_groups.length > 0) {
                         const productsFromGroups = this.extractProductsFromGroups(response.product_groups);
-                        allProducts = [...allProducts, ...productsFromGroups];
-                        totalProductCount += productsFromGroups.length;
+                        allProducts.push(...productsFromGroups);
+                        totalProductCount += productsFromGroups.length; // productsFromGroups is already a count of individual products
                         console.log(`[SearchCacheService] Loaded ${productsFromGroups.length} products from category ${category}`);
                     }
                 } catch (error) {
@@ -327,34 +449,6 @@ export default class SearchCacheService {
                 }
             }
 
-            // Load remaining categories
-            for (const category of ALL_CATEGORIES) {
-                // Skip if already loaded in top categories
-                if (TOP_CATEGORIES.includes(category)) continue;
-
-                try {
-                    const response = await store.service.client.callZome({
-                        role_name: "grocery",
-                        zome_name: "products",
-                        fn_name: "get_products_by_category",
-                        payload: {
-                            category,
-                            limit
-                        },
-                    });
-
-                    if (response && response.product_groups && response.product_groups.length > 0) {
-                        const productsFromGroups = this.extractProductsFromGroups(response.product_groups);
-                        allProducts = [...allProducts, ...productsFromGroups];
-                        totalProductCount += productsFromGroups.length;
-                        console.log(`[SearchCacheService] Loaded ${productsFromGroups.length} products from category ${category}`);
-                    }
-                } catch (error) {
-                    console.error(`[SearchCacheService] Error loading category ${category}:`, error);
-                }
-            }
-
-            // Log lookup table stats
             console.log(`[SearchCacheService] Lookup tables created:`, {
                 categories: Object.keys(this.lookupTables.categories).length,
                 subcategories: Object.keys(this.lookupTables.subcategories).length,
@@ -362,15 +456,14 @@ export default class SearchCacheService {
                 brands: Object.keys(this.lookupTables.brands).length
             });
 
-            // Update cache once with all products after everything is loaded
             console.log(`[SearchCacheService] Writing complete cache with ${allProducts.length} products...`);
             await this.updateCache(allProducts);
 
-            console.log(`[SearchCacheService] Search index initialized with ${allProducts.length} products from ${totalProductCount} total products`);
+            console.log(`[SearchCacheService] Search index initialized with ${allProducts.length} products`);
             return allProducts;
         } catch (error) {
             console.error("[SearchCacheService] Error building search index:", error);
-            return []; // Return empty array on error instead of partial results
+            return [];
         }
     }
 
@@ -379,14 +472,10 @@ export default class SearchCacheService {
      */
     private static initializeLookupTables(): void {
         this.lookupTables = {
-            categories: {},
-            reverseCategories: {},
-            subcategories: {},
-            reverseSubcategories: {},
-            productTypes: {},
-            reverseProductTypes: {},
-            brands: {},
-            reverseBrands: {}
+            categories: {}, reverseCategories: {},
+            subcategories: {}, reverseSubcategories: {},
+            productTypes: {}, reverseProductTypes: {},
+            brands: {}, reverseBrands: {}
         };
     }
 
@@ -394,18 +483,13 @@ export default class SearchCacheService {
      * Add a value to the appropriate lookup table if it doesn't exist
      */
     private static addToLookupTable(value: string | null | undefined, table: LookupTable, reverseTable: ReverseLookupTable): number {
-        // Handle null or undefined
-        if (value === null || value === undefined || value === '') {
-            return 0; // Use 0 to represent null/undefined/empty values
+        if (value === null || value === undefined || value.trim() === '') {
+            return 0; // 0 for null, undefined, or empty strings
         }
-
-        // If already in lookup table, return existing ID
         if (table[value] !== undefined) {
             return table[value];
         }
-
-        // Otherwise add to lookup table with new ID
-        const newId = Object.keys(table).length + 1; // Start at 1 (0 reserved for null/undefined)
+        const newId = Object.keys(table).length + 1;
         table[value] = newId;
         reverseTable[newId] = value;
         return newId;
@@ -415,309 +499,267 @@ export default class SearchCacheService {
      * Get a value from the reverse lookup table
      */
     private static getFromReverseLookup(id: number, reverseTable: ReverseLookupTable): string | null {
-        if (id === 0) return null; // 0 represents null/undefined/empty
+        if (id === 0) return null;
         return reverseTable[id] || null;
     }
 
     /**
      * Extract products from Holochain product groups and collect unique values for lookup tables
      */
-    private static extractProductsFromGroups(productGroups: any[]): any[] {
-        let extractedProducts: any[] = [];
+    private static extractProductsFromGroups(productGroups: ProductGroupRecord[]): ProcessedProduct[] {
+        const extractedProducts: ProcessedProduct[] = [];
         let productsWithEmbeddings = 0;
-        let totalProducts = 0;
+        let totalProductsInGroups = 0;
 
         for (const record of productGroups) {
             try {
-                // Get the group hash (ActionHash of the ProductGroup entry)
-                const groupHash = record.signed_action.hashed.hash;
+                const groupHash = record.signed_action.hashed.hash; // This is Uint8Array
+                const groupEntryData = record.entry.Present.entry;
+                const decodedData = decode(groupEntryData); // This is 'unknown'
 
-                // Decode the ProductGroup entry data
-                const groupEntry = decode(record.entry.Present.entry);
+                // Runtime check for the structure of DecodedProductGroup
+                // Ensure decodedData is an object, not null, has a 'products' property, and that property is an array.
+                if (decodedData && typeof decodedData === 'object' && decodedData !== null &&
+                    'products' in decodedData && Array.isArray((decodedData as { products: unknown[] }).products)) {
+                    const groupEntry = decodedData as DecodedProductGroup; // Now the assertion is safer
 
-                // Check if it's a valid ProductGroup with a products array
-                if (groupEntry && Array.isArray(groupEntry.products)) {
-                    totalProducts += groupEntry.products.length;
+                    totalProductsInGroups += groupEntry.products.length;
 
-                    groupEntry.products.forEach((product: any, index: number) => {
-                        // Convert embedding to Float32Array if it exists
-                        let embeddingTypedArray = null;
-                        if (product.embedding && Array.isArray(product.embedding)) {
+                    groupEntry.products.forEach((rawProduct: RawProductDataFromZome, index: number) => {
+                        let embeddingTypedArray: Float32Array | undefined = undefined;
+                        if (rawProduct.embedding && Array.isArray(rawProduct.embedding) && rawProduct.embedding.length > 0) {
                             try {
-                                embeddingTypedArray = new Float32Array(product.embedding);
+                                embeddingTypedArray = new Float32Array(rawProduct.embedding);
                                 productsWithEmbeddings++;
                             } catch (err) {
-                                console.error('Error converting to Float32Array:', err);
-                                embeddingTypedArray = null;
+                                console.error('Error converting to Float32Array:', err, rawProduct.embedding);
+                                embeddingTypedArray = new Float32Array();
                             }
+                        } else {
+                            embeddingTypedArray = new Float32Array();
                         }
 
-                        // Add values to lookup tables
-                        const categoryId = this.addToLookupTable(
-                            product.category,
-                            this.lookupTables.categories,
-                            this.lookupTables.reverseCategories
-                        );
+                        const categoryId = this.addToLookupTable(rawProduct.category, this.lookupTables.categories, this.lookupTables.reverseCategories);
+                        const subcategoryId = this.addToLookupTable(rawProduct.subcategory, this.lookupTables.subcategories, this.lookupTables.reverseSubcategories);
+                        const productTypeId = this.addToLookupTable(rawProduct.product_type, this.lookupTables.productTypes, this.lookupTables.reverseProductTypes);
 
-                        const subcategoryId = this.addToLookupTable(
-                            product.subcategory,
-                            this.lookupTables.subcategories,
-                            this.lookupTables.reverseSubcategories
-                        );
-
-                        const productTypeId = this.addToLookupTable(
-                            product.product_type,
-                            this.lookupTables.productTypes,
-                            this.lookupTables.reverseProductTypes
-                        );
-
-                        // Extract potential brand from name (simplified approach)
-                        let brand = null;
-                        if (product.name) {
-                            // Try to extract brand from first part of name
-                            const parts = product.name.split(' ');
-                            if (parts.length > 0) {
-                                brand = parts[0];
+                        let brandName: string | null = null;
+                        if (rawProduct.name) {
+                            const parts = rawProduct.name.split(' ');
+                            if (parts.length > 0 && parts[0].length > 1 && parts[0] === parts[0].toUpperCase()) { // Simple brand heuristic
+                                brandName = parts[0];
                             }
                         }
+                        const brandId = this.addToLookupTable(brandName, this.lookupTables.brands, this.lookupTables.reverseBrands);
 
-                        const brandId = this.addToLookupTable(
-                            brand,
-                            this.lookupTables.brands,
-                            this.lookupTables.reverseBrands
-                        );
+                        const productHashObject: ProductHashObject = {
+                            groupHash: groupHash, // Keep as Uint8Array initially
+                            index: index,
+                            toString: function (this: ProductHashObject) {
+                                const groupHashStr = (this.groupHash instanceof Uint8Array)
+                                    ? encodeHashToBase64(this.groupHash)
+                                    : String(this.groupHash); // Should already be string if not Uint8Array
+                                return `${groupHashStr}:${this.index}`;
+                            }
+                        };
 
-                        // Simplified hash string instead of object with methods
-                        const hashString = `${groupHash instanceof Uint8Array ? encodeHashToBase64(groupHash) : groupHash}:${index}`;
-
-                        // Construct the product object for the client-side index
                         extractedProducts.push({
-                            // Essential fields remain as-is
-                            name: product.name,
-                            price: product.price,
-                            promo_price: product.promo_price,
-                            size: product.size,
-                            stocks_status: product.stocks_status,
-
-                            // Normalized fields (will be lookup IDs in storage)
-                            categoryId: categoryId,
-                            subcategoryId: subcategoryId,
-                            productTypeId: productTypeId,
-                            brandId: brandId,
-
-                            // Non-normalized fields for initial client use
-                            category: product.category,
-                            subcategory: product.subcategory,
-                            product_type: product.product_type,
-                            image_url: product.image_url,
-                            sold_by: product.sold_by,
-                            productId: product.product_id,
-
-                            // Store the embedding as a Float32Array or empty array if conversion failed
-                            embedding: embeddingTypedArray || new Float32Array(0),
-
-                            // Simplified hash
-                            hash: {
-                                groupHash,
-                                index,
-                                toString: function () {
-                                    const groupHashStr = (this.groupHash instanceof Uint8Array)
-                                        ? encodeHashToBase64(this.groupHash)
-                                        : String(this.groupHash);
-                                    return `${groupHashStr}:${this.index}`;
-                                }
-                            },
-
-                            // Simplified hash string for storage
-                            hashString: hashString
+                            name: rawProduct.name,
+                            price: rawProduct.price,
+                            promo_price: rawProduct.promo_price,
+                            size: rawProduct.size,
+                            stocks_status: rawProduct.stocks_status,
+                            categoryId,
+                            subcategoryId,
+                            productTypeId,
+                            brandId,
+                            category: rawProduct.category, // Keep original strings for immediate use
+                            subcategory: rawProduct.subcategory || null,
+                            product_type: rawProduct.product_type || null,
+                            brand: brandName,
+                            image_url: rawProduct.image_url,
+                            sold_by: rawProduct.sold_by,
+                            productId: rawProduct.product_id,
+                            embedding: embeddingTypedArray,
+                            hash: productHashObject,
+                            // Removed hashString, normalization will create string hash from ProductHashObject
                         });
                     });
+                } else {
+                    // Data does not conform to DecodedProductGroup structure
+                    console.warn(
+                        "[SearchCacheService] Decoded group entry did not conform to DecodedProductGroup structure or was null/undefined. Skipping group. GroupHash (first 10 chars of ActionHash):",
+                        encodeHashToBase64(record.signed_action.hashed.hash).substring(0, 10),
+                        "Actual decoded data:", decodedData
+                    );
+                    // This group will be skipped, and processing will continue with the next group.
                 }
             } catch (error) {
-                console.error("Error extracting products from group:", error);
+                if (error instanceof DecodeError) {
+                    // DecodeError from msgpack doesn't have a byteOffset property in its standard definition.
+                    // Log the message and potentially the raw data if needed for debugging.
+                    console.error("MsgPack DecodeError extracting products from group:", error.message /*, record.entry.Present.entry */);
+                } else {
+                    console.error("Error extracting products from group:", error);
+                }
             }
         }
-
-        console.log(`[SearchCacheService] Extracted ${extractedProducts.length} products from ${productGroups.length} groups. ${productsWithEmbeddings}/${totalProducts} have embeddings.`);
+        console.log(`[SearchCacheService] Extracted ${extractedProducts.length} products from ${productGroups.length} groups. ${productsWithEmbeddings}/${totalProductsInGroups} have embeddings.`);
         return extractedProducts;
     }
 
     /**
-     * Normalize a product for storage by replacing strings with IDs
+     * Normalize a product for storage by replacing strings with IDs and converting hash to string.
      */
-    private static normalizeProduct(product: any): any {
-        const normalized = { ...product };
+    private static normalizeProduct(product: ProcessedProduct): StoredProductRecord {
+        // Create a new object that conforms to StoredProductRecord
+        const normalized: Partial<StoredProductRecord> & { [key: string]: any } = { ...product };
 
-        // Remove redundant category/subcategory/product_type strings (already stored as IDs)
+        // Delete fields that are part of ProcessedProduct but not StoredProductRecord (denormalized strings)
         delete normalized.category;
         delete normalized.subcategory;
         delete normalized.product_type;
+        delete normalized.brand;
 
-        // Replace hash object with string representation
-        if (normalized.hash && typeof normalized.hash === 'object') {
-            if (normalized.hashString) {
-                normalized.hash = normalized.hashString;
-            } else if (normalized.hash.toString) {
-                normalized.hash = normalized.hash.toString();
-            }
+        // Convert hash object to string for storage
+        if (normalized.hash && typeof normalized.hash === 'object' && typeof normalized.hash.toString === 'function') {
+            normalized.hash = (normalized.hash as ProductHashObject).toString();
+        } else if (typeof normalized.hash !== 'string') {
+            // Fallback if hash is not in expected format
+            console.warn("Normalizing product with unexpected hash format:", normalized.hash);
+            normalized.hash = ':0'; // Default string hash
         }
-        delete normalized.hashString;
+        // embedding is handled in updateCache, converting Float32Array to ArrayBuffer
 
-        return normalized;
+        return normalized as StoredProductRecord;
     }
 
     /**
-     * Denormalize a product by replacing IDs with string values
+     * Denormalize a product by replacing IDs with string values. Hash remains an object.
      */
-    private static denormalizeProduct(product: any): any {
-        const denormalized = { ...product };
+    private static denormalizeProduct(product: StoredProductRecord): ProcessedProduct {
+        // Type assertion: treat product as a base for ProcessedProduct
+        const denormalized = { ...product } as unknown as ProcessedProduct;
 
-        // Restore category/subcategory/product_type from IDs
         denormalized.category = this.getFromReverseLookup(product.categoryId, this.lookupTables.reverseCategories);
         denormalized.subcategory = this.getFromReverseLookup(product.subcategoryId, this.lookupTables.reverseSubcategories);
         denormalized.product_type = this.getFromReverseLookup(product.productTypeId, this.lookupTables.reverseProductTypes);
+        denormalized.brand = this.getFromReverseLookup(product.brandId, this.lookupTables.reverseBrands);
 
-        // Keep the IDs for potential internal use but these won't be needed by the client
+        // Hash is handled in getSearchIndex when loading from cache, converting string back to object if needed.
+        // Here, we assume if product.hash is already an object, it's a ProductHashObject.
+        // If it's a string, getSearchIndex will convert it.
+        // For type safety, ensure denormalized.hash is ProductHashObject.
+        // This part is mostly handled by getSearchIndex's product mapping logic.
+        // If product.hash is a string here, it will be converted later.
+        // If it's an object, it should already be ProductHashObject-like.
+        if (typeof product.hash === 'string') {
+            // This will be converted to ProductHashObject in getSearchIndex
+            // For now, to satisfy ProcessedProduct, we might need a temporary cast or structure
+            // However, the main conversion logic is in getSearchIndex
+        } else { // It's a ProductHashObject (potentially legacy)
+            denormalized.hash = product.hash as ProductHashObject;
+        }
+
 
         return denormalized;
     }
 
-    private static async updateCache(products: any[]): Promise<void> {
+    private static async updateCache(products: ProcessedProduct[]): Promise<void> {
         try {
-            // Verify product embedding data before caching
             let productsWithTypedEmbeddings = 0;
-            let productsWithArrayEmbeddings = 0;
-            let totalEmbeddingDimensions = 0;
+            let productsWithArrayEmbeddings = 0; // Should be 0 if all are Float32Array
+            let totalBufferSize = 0;
 
-            // Check if we already have an open database connection
             if (!this.dbPromise) {
                 this.dbPromise = this.openDatabase();
             }
             const db = await this.dbPromise;
 
             const tx = db.transaction('products', 'readwrite');
-            const store = tx.objectStore('products');
+            const objectStore = tx.objectStore('products');
 
-            // Store lookup tables first
-            try {
-                const lookupTablesRecord = {
-                    id: LOOKUP_TABLES_KEY,
-                    tables: this.lookupTables,
-                    timestamp: Date.now()
-                };
+            const lookupTablesRecord: LookupDataRecord = {
+                id: LOOKUP_TABLES_KEY,
+                tables: this.lookupTables,
+                timestamp: Date.now()
+            };
+            const lookupPutRequest = objectStore.put(lookupTablesRecord);
+            await new Promise<void>((resolve, reject) => {
+                lookupPutRequest.onsuccess = () => resolve();
+                lookupPutRequest.onerror = (e) => reject((e.target as IDBRequest).error);
+            });
+            console.log(`[SearchCacheService] Stored lookup tables...`);
 
-                const lookupPutRequest = store.put(lookupTablesRecord);
-                await new Promise((resolve, reject) => {
-                    lookupPutRequest.onsuccess = resolve;
-                    lookupPutRequest.onerror = reject;
-                });
+            const metadata: CacheMetadata = {
+                id: 'metadata_v1',
+                timestamp: Date.now(),
+                productCount: products.length,
+                lastUpdate: new Date().toISOString(),
+                version: CACHE_VERSION,
+                normalized: true
+            };
+            const metadataPutRequest = objectStore.put(metadata);
+            await new Promise<void>((resolve, reject) => {
+                metadataPutRequest.onsuccess = () => resolve();
+                metadataPutRequest.onerror = (e) => reject((e.target as IDBRequest).error);
+            });
+            console.log(`[SearchCacheService] Stored metadata for ${products.length} products`);
 
-                console.log(`[SearchCacheService] Stored lookup tables with ${Object.keys(this.lookupTables.categories).length} categories, ${Object.keys(this.lookupTables.subcategories).length} subcategories, ${Object.keys(this.lookupTables.productTypes).length} product types`);
-            } catch (lookupError) {
-                console.error('[SearchCacheService] Error storing lookup tables:', lookupError);
-            }
-
-            // Store metadata with version and normalized flag
-            try {
-                const metadata = {
-                    id: 'metadata_v1',
-                    timestamp: Date.now(),
-                    productCount: products.length,
-                    lastUpdate: new Date().toISOString(),
-                    version: CACHE_VERSION,
-                    normalized: true // Flag that indicates we're using normalized data
-                };
-                const metadataPutRequest = store.put(metadata);
-                await new Promise((resolve, reject) => {
-                    metadataPutRequest.onsuccess = resolve;
-                    metadataPutRequest.onerror = reject;
-                });
-                console.log(`[SearchCacheService] Stored metadata for ${products.length} products`);
-            } catch (metadataError) {
-                console.error('[SearchCacheService] Error storing metadata:', metadataError);
-            }
-
-            // Store products in chunks to avoid transaction size limits
-            const CHUNK_SIZE = 250; // Reduced from 500 to be safer with IndexedDB limits
-            let totalBufferSize = 0;
-
+            const CHUNK_SIZE = 250;
             for (let i = 0; i < products.length; i += CHUNK_SIZE) {
                 const chunkId = `chunk_${Math.floor(i / CHUNK_SIZE)}`;
-                const chunk = products.slice(i, i + CHUNK_SIZE);
+                const productChunk = products.slice(i, i + CHUNK_SIZE);
 
-                // Make a clone of the chunk and optimize for storage
-                const serializableChunk = chunk.map(product => {
-                    // Normalize the product using lookup tables
-                    const normalizedProduct = this.normalizeProduct(product);
+                const serializableChunk: StoredProductRecord[] = productChunk.map(product => {
+                    const normalizedProduct = this.normalizeProduct(product); // Returns StoredProductRecord shell
+                    const storableProduct: StoredProductRecord = { ...normalizedProduct }; // Ensure all StoredProductRecord fields
 
-                    // Handle embedding - convert Float32Array to ArrayBuffer for storage
-                    if (normalizedProduct.embedding instanceof Float32Array && normalizedProduct.embedding.length > 0) {
+                    if (product.embedding instanceof Float32Array && product.embedding.length > 0) {
                         try {
-                            // Create a copy of the buffer to avoid potential shared references
-                            normalizedProduct.embeddingBuffer = normalizedProduct.embedding.buffer.slice(0);
+                            // Explicitly create a new ArrayBuffer and copy data
+                            const sourceBuffer = product.embedding.buffer;
+                            const newBuffer = new ArrayBuffer(sourceBuffer.byteLength);
+                            new Uint8Array(newBuffer).set(new Uint8Array(sourceBuffer));
+                            storableProduct.embeddingBuffer = newBuffer;
+
                             productsWithTypedEmbeddings++;
-                            totalBufferSize += normalizedProduct.embeddingBuffer.byteLength;
-                            // Remove the embedding property as we're storing it as a buffer
-                            delete normalizedProduct.embedding;
+                            totalBufferSize += storableProduct.embeddingBuffer.byteLength;
+                            delete (storableProduct as any).embedding; // Remove original Float32Array property
                         } catch (err) {
                             console.error('Error creating ArrayBuffer from Float32Array:', err);
-                            normalizedProduct.embedding = []; // Fallback
-                            productsWithArrayEmbeddings++;
+                            // storableProduct.embeddingBuffer remains undefined
                         }
-                    } else if (normalizedProduct.embedding && Array.isArray(normalizedProduct.embedding) && normalizedProduct.embedding.length > 0) {
-                        // If it's a regular array, convert to Float32Array then to ArrayBuffer
-                        try {
-                            const typedArray = new Float32Array(normalizedProduct.embedding);
-                            normalizedProduct.embeddingBuffer = typedArray.buffer.slice(0);
-                            productsWithArrayEmbeddings++;
-                            totalBufferSize += normalizedProduct.embeddingBuffer.byteLength;
-                            delete normalizedProduct.embedding;
-                        } catch (err) {
-                            console.error('Error converting array to ArrayBuffer:', err);
-                            normalizedProduct.embedding = []; // Fallback
-                        }
-                    } else {
-                        // No valid embedding, keep as empty array
-                        normalizedProduct.embedding = [];
+                    }
+                    // 'embedding' field is not part of StoredProductRecord
+                    // Ensure no 'embedding: Float32Array' field is on storableProduct
+                    if ('embedding' in storableProduct && !(storableProduct as any).embeddingBuffer) {
+                        delete (storableProduct as any).embedding;
                     }
 
-                    return normalizedProduct;
+
+                    return storableProduct;
                 });
 
                 try {
-                    // Store the serializable chunk
-                    const putRequest = store.put({
-                        id: chunkId,
-                        products: serializableChunk
+                    const putRequest = objectStore.put({ id: chunkId, products: serializableChunk } as ProductChunk);
+                    await new Promise<void>((resolve, reject) => {
+                        putRequest.onsuccess = () => resolve();
+                        putRequest.onerror = (e) => reject((e.target as IDBRequest).error);
                     });
-
-                    await new Promise((resolve, reject) => {
-                        putRequest.onsuccess = resolve;
-                        putRequest.onerror = reject;
-                    });
-
                     console.log(`[SearchCacheService] Stored chunk ${chunkId} with ${serializableChunk.length} products`);
                 } catch (chunkError) {
                     console.error(`[SearchCacheService] Error storing chunk ${chunkId}:`, chunkError);
-
-                    // Try again without embeddings if it failed - likely a size issue
                     try {
-                        const slimChunk = serializableChunk.map(product => {
-                            // Create a new object without the embedding field
-                            const { embeddingBuffer, embedding, ...slimProduct } = product;
-                            return slimProduct;
+                        const slimChunk = serializableChunk.map(p => {
+                            const { embeddingBuffer, ...slimProduct } = p;
+                            return slimProduct as StoredProductRecord;
                         });
-
-                        const fallbackPutRequest = store.put({
-                            id: chunkId,
-                            products: slimChunk
+                        const fallbackPutRequest = objectStore.put({ id: chunkId, products: slimChunk });
+                        await new Promise<void>((resolve, reject) => {
+                            fallbackPutRequest.onsuccess = () => resolve();
+                            fallbackPutRequest.onerror = (e) => reject((e.target as IDBRequest).error);
                         });
-
-                        await new Promise((resolve, reject) => {
-                            fallbackPutRequest.onsuccess = resolve;
-                            fallbackPutRequest.onerror = reject;
-                        });
-
                         console.log(`[SearchCacheService] Stored slim chunk ${chunkId} without embeddings`);
                     } catch (slimChunkError) {
                         console.error(`[SearchCacheService] Error storing slim chunk ${chunkId}:`, slimChunkError);
@@ -725,14 +767,13 @@ export default class SearchCacheService {
                 }
             }
 
-            // Wait for transaction to complete
-            await new Promise((resolve, reject) => {
-                tx.oncomplete = resolve;
-                tx.onerror = reject;
+            await new Promise<void>((resolve, reject) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject((e.target as IDBTransaction).error);
             });
 
-            console.log(`[SearchCacheService] Cached ${products.length} products in IndexedDB. ` +
-                `${productsWithTypedEmbeddings} have typed embeddings, ${productsWithArrayEmbeddings} have array embeddings. ` +
+            console.log(`[SearchCacheService] Cached ${products.length} products. ` +
+                `${productsWithTypedEmbeddings} have typed embeddings. ` + // productsWithArrayEmbeddings removed as it should be 0
                 `Total buffer size: ${(totalBufferSize / (1024 * 1024)).toFixed(2)}MB`);
         } catch (error) {
             console.error('[SearchCacheService] Error updating IndexedDB cache:', error);
@@ -741,44 +782,39 @@ export default class SearchCacheService {
 
     static async clearCache(): Promise<void> {
         try {
-            // If database doesn't exist yet, nothing to clear
-            if (!indexedDB.databases) {
-                console.log('[SearchCacheService] No IndexedDB to clear - none exists yet');
+            let dbDatabases: IDBDatabaseInfo[] | undefined; // Correct type is IDBDatabaseInfo
+            if (typeof indexedDB.databases === 'function') {
+                dbDatabases = await indexedDB.databases();
+            }
+
+            if (!dbDatabases || !dbDatabases.some(db => db.name === 'product-search-cache')) {
+                console.log('[SearchCacheService] No IndexedDB named "product-search-cache" to clear.');
+                this.initializeLookupTables(); // Still reset in-memory tables
                 return;
             }
 
             if (!this.dbPromise) {
                 this.dbPromise = this.openDatabase();
             }
-
             const db = await this.dbPromise;
 
-            try {
-                // Simpler approach - just clear the object store
-                const tx = db.transaction('products', 'readwrite');
-                const store = tx.objectStore('products');
-                const clearRequest = store.clear();
+            const tx = db.transaction('products', 'readwrite');
+            const store = tx.objectStore('products');
+            const clearRequest = store.clear();
 
-                await new Promise((resolve, reject) => {
-                    clearRequest.onsuccess = resolve;
-                    clearRequest.onerror = reject;
-                });
+            await new Promise<void>((resolve, reject) => {
+                clearRequest.onsuccess = () => resolve();
+                clearRequest.onerror = (e) => reject((e.target as IDBRequest).error);
+            });
+            await new Promise<void>((resolve, reject) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject((e.target as IDBTransaction).error);
+            });
 
-                await new Promise((resolve, reject) => {
-                    tx.oncomplete = resolve;
-                    tx.onerror = reject;
-                });
-
-                console.log('[SearchCacheService] IndexedDB cache cleared');
-
-                // Reset lookup tables
-                this.initializeLookupTables();
-            } catch (innerError) {
-                console.error('[SearchCacheService] Error clearing IndexedDB store:', innerError);
-            }
+            console.log('[SearchCacheService] IndexedDB cache ("products" store) cleared');
+            this.initializeLookupTables();
         } catch (error) {
             console.error('[SearchCacheService] Error clearing IndexedDB cache:', error);
-            // Continue without failing - it's ok if clearing fails
         }
     }
 }

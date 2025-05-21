@@ -1,0 +1,3272 @@
+
+> customer-ui@0.11.0 check
+> svelte-check --tsconfig ./tsconfig.json
+
+
+====================================
+Loading svelte-check in workspace: /home/bur1/Holochain/summon/ui
+Getting Svelte diagnostics...
+
+/home/bur1/Holochain/summon/ui/src/search/search-utils.ts:231:11
+Hint: 'searchTerms' is declared but its value is never read. 
+    const searchTermLower = searchTerm.toLowerCase();
+    const searchTerms = searchTermLower.split(/\s+/);
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDataService.ts:7:22
+Hint: 'PRODUCTS_PER_GROUP' is declared but its value is never read. 
+    private store: any;
+    private readonly PRODUCTS_PER_GROUP = 1000;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDataService.ts:95:17
+Hint: Variable 'result' implicitly has an 'any' type, but a better type may be inferred from usage. 
+            let groupLimit = 1;
+            let result;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDataService.ts:135:21
+Hint: Variable 'result' implicitly has an 'any' type, but a better type may be inferred from usage. 
+                let groupLimit = 1;
+                let result;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDataService.ts:210:9
+Hint: 'isProductType' is declared but its value is never read. 
+        groupLimit: number,  // EXPECTING GROUP LIMIT NOW
+        isProductType: boolean = false // Keep for determining payload structure if needed
+    ) {
+
+
+/home/bur1/Holochain/summon/ui/src/store.ts:13:41
+Hint: Parameter 'roleName' implicitly has an 'any' type, but a better type may be inferred from usage. 
+export class ShopService {
+  constructor(public client: AppClient, public roleName, public zomeName = 'products') { }
+  private callZome(fnName: string, payload: any) {
+
+
+/home/bur1/Holochain/summon/ui/src/store.ts:14:11
+Hint: 'callZome' is declared but its value is never read. 
+  constructor(public client: AppClient, public roleName, public zomeName = 'products') { }
+  private callZome(fnName: string, payload: any) {
+    return this.client.callZome({
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:42:31
+Hint: Parameter 'status' implicitly has an 'any' type, but a better type may be inferred from usage. 
+// Add this function near the top with other utility functions
+function normalizeStockStatus(status) {
+  if (!status) return "UNKNOWN"; // Changed from "HIGH" to "UNKNOWN"
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:64:11
+Hint: 'selectedLocationId' is declared but its value is never read. 
+  private store: ShopStore;
+  private selectedLocationId: string = "70300168";
+  // These properties are kept as they were present in the original file provided
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:67:11
+Hint: 'selectedCategory' is declared but its value is never read. 
+  public products: any[] = [];
+  private selectedCategory: string | null = null;
+  private selectedSubcategory: string | null = null;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:68:11
+Hint: 'selectedSubcategory' is declared but its value is never read. 
+  private selectedCategory: string | null = null;
+  private selectedSubcategory: string | null = null;
+  private visibleItems: number = 1000;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:69:11
+Hint: 'visibleItems' is declared but its value is never read. 
+  private selectedSubcategory: string | null = null;
+  private visibleItems: number = 1000;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:73:13
+Hint: Property 'myAgentKey' is declared but its value is never read. 
+    public client: any, // Made public
+    private myAgentKey: AgentPubKeyB64,
+    store: ShopStore
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:164:16
+Hint: 'categoryFromFile' is declared but its value is never read. 
+
+        const [categoryFromFile, subcategoryFromFile, productTypeFromFile] = key.split('|||'); // Renamed variables
+        processedTypes++;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductStore.ts:164:34
+Hint: 'subcategoryFromFile' is declared but its value is never read. 
+
+        const [categoryFromFile, subcategoryFromFile, productTypeFromFile] = key.split('|||'); // Renamed variables
+        processedTypes++;
+
+
+/home/bur1/Holochain/summon/ui/src/UiStateStore.ts:2:1
+Hint: 'Writable' is declared but its value is never read. 
+import { writable } from 'svelte/store';
+import type { Writable } from 'svelte/store';
+import type { SearchMethod, Product } from './search/search-types'; // Added import, Added Product
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:228:52
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. 
+                // Transform items to the expected format
+                const cartItems = result.items.map(item => {
+                    const hashBase64 = encodeHashToBase64(item.group_hash);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:241:53
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. 
+                // Filter out any invalid items
+                const validItems = cartItems.filter(item =>
+                    item && item.groupHash && item.productIndex !== undefined);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:323:21
+Hint: 'key' is declared but its value is never read. 
+        // Add remaining Holochain items that aren't in local
+        for (const [key, holochainItem] of holochainItemsMap.entries()) {
+            mergedItems.push(holochainItem);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:503:25
+Hint: Variable 'groupHash' implicitly has an 'any' type, but a better type may be inferred from usage. 
+                let cartProducts = this.localCartItems.map(item => {
+                    let groupHash;
+                    try {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:673:42
+Hint: Parameter 'carts' implicitly has an 'any' type, but a better type may be inferred from usage. 
+    // Process checked out carts to add product details and delivery info
+    private async processCheckedOutCarts(carts) {
+        console.log("Processing checked out carts from Holochain:", carts);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:681:45
+Hint: Parameter 'cart' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        // For each cart, enrich products with details
+        return Promise.all(carts.map(async (cart) => {
+            const cartHash = encodeHashToBase64(cart.cart_hash);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:695:79
+Hint: Parameter 'product' implicitly has an 'any' type, but a better type may be inferred from usage. 
+            // Get product details for each product
+            const productsWithDetails = await Promise.all(products.map(async (product) => {
+                if (!product || !product.group_hash) {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SimpleCartService.ts:850:29
+Hint: 'await' has no effect on the type of this expression. 
+                            // Only force sync to Holochain AFTER zome call completes successfully
+                            await this.forceSyncToHolochain();
+                        } catch (e) {
+
+
+/home/bur1/Holochain/summon/ui/src/ReportCategoryDialog.svelte:347:25
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                    <div class="report-options">
+                        <div
+                            class="report-option {reportType === 'incorrect'
+                                ? 'selected'
+                                : ''}"
+                            on:click={() => setReportType("incorrect")}
+                        >
+                            <div class="report-option-heading">
+                                Just flag as incorrect
+                            </div>
+                            <div class="report-option-description">
+                                Report that this product is in the wrong
+                                category without suggesting the correct one.
+                            </div>
+                        </div>
+
+
+
+/home/bur1/Holochain/summon/ui/src/ReportCategoryDialog.svelte:362:25
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+
+                        <div
+                            class="report-option {reportType === 'suggestion'
+                                ? 'selected'
+                                : ''}"
+                            on:click={() => setReportType("suggestion")}
+                        >
+                            <div class="report-option-heading">
+                                Suggest correct category
+                            </div>
+                            <div class="report-option-description">
+                                Report this product and suggest where it should
+                                be categorized.
+                            </div>
+                        </div>
+                    </div>
+
+
+/home/bur1/Holochain/summon/ui/src/ReportCategoryDialog.svelte:297:5
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+{#if isOpen}
+    <div
+        class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
+        on:click|self={handleClose}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
+        use:portal
+    >
+        <div class="dialog-content {isClosing ? 'scale-out' : 'scale-in'}">
+            <div class="dialog-header">
+                <h2 id="dialog-title">Report Incorrect Category</h2>
+                <button
+                    class="btn btn-icon btn-icon-primary btn-icon-sm"
+                    on:click={handleClose}
+                    aria-label="Close dialog"
+                >
+                    <X size={20} />
+                </button>
+            </div>
+
+            <div class="dialog-body">
+                <div class="product-info-card">
+                    <p><strong>Product:</strong> {product.name}</p>
+                    <p>
+                        <strong>Current Category:</strong>
+                        {product.category} → {product.subcategory} → {product.product_type ||
+                            product.subcategory}
+                    </p>
+
+                    {#if product.image_url}
+                        <img
+                            src={product.image_url}
+                            alt={product.name}
+                            class="product-image"
+                        />
+                    {:else}
+                        <div class="product-image-placeholder">
+                            <p>No image available</p>
+                            <p class="placeholder-product-name">
+                                {product.name}
+                            </p>
+                        </div>
+                    {/if}
+                </div>
+
+                <div class="report-type-selector">
+                    <div class="report-option-title">
+                        What would you like to do?
+                    </div>
+                    <div class="report-options">
+                        <div
+                            class="report-option {reportType === 'incorrect'
+                                ? 'selected'
+                                : ''}"
+                            on:click={() => setReportType("incorrect")}
+                        >
+                            <div class="report-option-heading">
+                                Just flag as incorrect
+                            </div>
+                            <div class="report-option-description">
+                                Report that this product is in the wrong
+                                category without suggesting the correct one.
+                            </div>
+                        </div>
+
+                        <div
+                            class="report-option {reportType === 'suggestion'
+                                ? 'selected'
+                                : ''}"
+                            on:click={() => setReportType("suggestion")}
+                        >
+                            <div class="report-option-heading">
+                                Suggest correct category
+                            </div>
+                            <div class="report-option-description">
+                                Report this product and suggest where it should
+                                be categorized.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {#if reportType === "suggestion"}
+                    <div class="form-container">
+                        <div class="form-group">
+                            <label for="category-select"
+                                >Suggested Category:</label
+                            >
+                            <select
+                                id="category-select"
+                                bind:value={selectedCategory}
+                                class="form-select"
+                            >
+                                {#each mainCategories as category}
+                                    <option value={category.name}
+                                        >{category.name}</option
+                                    >
+                                {/each}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="subcategory-select"
+                                >Suggested Subcategory:</label
+                            >
+                            <select
+                                id="subcategory-select"
+                                bind:value={selectedSubcategory}
+                                class="form-select"
+                            >
+                                {#each subcategories as subcategory}
+                                    <option value={subcategory.name}
+                                        >{subcategory.name}</option
+                                    >
+                                {/each}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="productType-select"
+                                >Suggested Product Type:</label
+                            >
+                            <select
+                                id="productType-select"
+                                bind:value={selectedProductType}
+                                class="form-select"
+                                disabled={!selectedSubcategory ||
+                                    subcategories.find(
+                                        (s) => s.name === selectedSubcategory,
+                                    )?.gridOnly}
+                            >
+                                {#if subcategories.find((s) => s.name === selectedSubcategory)?.gridOnly}
+                                    <option value={selectedSubcategory}
+                                        >{selectedSubcategory}</option
+                                    >
+                                {:else if productTypes && productTypes.length > 0}
+                                    {#each productTypes as type}
+                                        <option value={type}>{type}</option>
+                                    {/each}
+                                {/if}
+                            </select>
+                        </div>
+                    </div>
+                {/if}
+
+                <div class="form-group">
+                    <label for="notes-area">Notes (optional):</label>
+                    <textarea
+                        id="notes-area"
+                        bind:value={notes}
+                        class="form-textarea"
+                        placeholder="Why should this product be in a different category?"
+                    ></textarea>
+                </div>
+            </div>
+
+            <div class="dialog-actions">
+                <button class="btn btn-secondary btn-md" on:click={handleClose}
+                    >Cancel</button
+                >
+                <button
+                    class="btn btn-primary btn-md"
+                    on:click={handleSubmit}
+                    disabled={reportType === "suggestion" &&
+                        (!selectedCategory || !selectedSubcategory)}
+                >
+                    Submit Report
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}
+
+
+/home/bur1/Holochain/summon/ui/src/ReportCategoryDialog.svelte:224:28
+Hint: Parameter 'type' implicitly has an 'any' type, but a better type may be inferred from usage. (js)
+
+    function setReportType(type) {
+        reportType = type;
+
+
+/home/bur1/Holochain/summon/ui/src/ReportCategoryDialog.svelte:229:21
+Hint: Parameter 'node' implicitly has an 'any' type, but a better type may be inferred from usage. (js)
+    // Portal functionality to mount dialog to body
+    function portal(node) {
+        const target = document.body;
+
+
+/home/bur1/Holochain/summon/ui/src/ReportCategoryDialog.svelte:257:22
+Hint: Parameter 'newIsOpen' implicitly has an 'any' type, but a better type may be inferred from usage. (js)
+            // Svelte might call update if isOpen changes, ensure it doesn't re-append
+            update: (newIsOpen) => {
+                if (newIsOpen && !appended) {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:542:37
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                                <div class="counter-btn-group">
+                                    <span
+                                        class="counter-btn minus"
+                                        on:click|stopPropagation={decrementQuantity}
+                                    >
+                                        <Minus size={20} />
+                                    </span>
+                                    <span class="counter-value"
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:551:37
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                                    >
+                                    <span
+                                        class="counter-btn plus"
+                                        on:click|stopPropagation={incrementQuantity}
+                                    >
+                                        <Plus size={20} />
+                                    </span>
+                                </div>
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:404:5
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+{#if isOpen}
+    <div
+        class="modal-overlay {isClosing ? 'fade-out' : 'fade-in'}"
+        on:click={handleOverlayClick}
+        use:portal
+    >
+        <div class="product-modal {isClosing ? 'scale-out' : 'scale-in'}">
+            <div class="modal-header">
+                <button class="back-button btn btn-text" on:click={closeModal}>
+                    <ArrowLeft size={16} /> Back
+                </button>
+                <button
+                    class="close-button btn btn-icon btn-icon-primary btn-icon-sm"
+                    on:click={closeModal}
+                >
+                    <X size={20} />
+                </button>
+            </div>
+
+            <div class="modal-content">
+                <div class="product-section">
+                    <div class="product-image-container">
+                        {#if product.image_url}
+                            <img
+                                src={product.image_url}
+                                alt={product.name}
+                                class="product-image"
+                            />
+                        {/if}
+                    </div>
+
+                    <div class="product-info">
+                        <div class="stock-status">
+                            {#if product.stocks_status === "HIGH"}
+                                <span class="stock-high">Many in stock</span>
+                            {:else if product.stocks_status === "LOW"}
+                                <span class="stock-low">Low stock</span>
+                            {:else}
+                                <span class="stock-out">Maybe out</span>
+                            {/if}
+                        </div>
+
+                        <h1 class="product-title">{product.name}</h1>
+                        <div class="shop-all btn-link">
+                            Shop all {product.category}
+                        </div>
+
+                        <div class="product-details">
+                            <h3>Details</h3>
+                            <div class="details-content">
+                                <p>{product.size || "1 each"}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="purchase-section">
+                        <div class="product-price">
+                            {#if product.promo_price && product.promo_price < product.price}
+                                <div class="promo-price-line">
+                                    <span class="promo-price"
+                                        >${Number(product.promo_price).toFixed(
+                                            2,
+                                        )}</span
+                                    >
+                                    {#if isSoldByWeight}
+                                        <span class="price-unit">/lb</span>
+                                    {/if}
+                                </div>
+                                <div class="regular-price-line">
+                                    <span class="regular-price"
+                                        >reg. ${Number(product.price).toFixed(
+                                            2,
+                                        )}</span
+                                    >
+                                    {#if isSoldByWeight}
+                                        <span class="price-unit">/lb</span>
+                                    {/if}
+                                </div>
+                                <div class="loyalty-label">
+                                    With loyalty card
+                                </div>
+                            {:else}
+                                <div class="current-price-line">
+                                    <span class="current-price"
+                                        >${Number(product.price).toFixed(
+                                            2,
+                                        )}</span
+                                    >
+                                    {#if isSoldByWeight}
+                                        <span class="price-unit">/lb</span>
+                                    {/if}
+                                </div>
+                            {/if}
+                        </div>
+
+                        <div class="quantity-control-container">
+                            <!-- Not-in-cart quantity controls -->
+                            <div
+                                class="quantity-control {isInCart
+                                    ? 'slide-out-right hide'
+                                    : 'slide-in-left'} {isTransitioning
+                                    ? 'transitioning'
+                                    : ''}"
+                            >
+                                <div class="quantity-selector">
+                                    <button
+                                        class="quantity-button btn btn-icon btn-icon-primary"
+                                        on:click={decrementQuantity}
+                                        disabled={quantity <= incrementValue}
+                                    >
+                                        <Minus size={20} />
+                                    </button>
+                                    <span class="quantity-display"
+                                        >{formatQuantity(quantity)}</span
+                                    >
+                                    <button
+                                        class="quantity-button btn btn-icon btn-icon-primary"
+                                        on:click={incrementQuantity}
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                                <button
+                                    class="add-to-cart-button btn btn-primary btn-md"
+                                    on:click={addToCart}
+                                >
+                                    Add to cart
+                                </button>
+                            </div>
+
+                            <!-- In-cart quantity controls -->
+                            <div
+                                class="quantity-control in-cart {isInCart
+                                    ? 'slide-in-left'
+                                    : 'slide-out-right hide'} {isTransitioning
+                                    ? 'transitioning'
+                                    : ''}"
+                            >
+                                <div class="counter-btn-group">
+                                    <span
+                                        class="counter-btn minus"
+                                        on:click|stopPropagation={decrementQuantity}
+                                    >
+                                        <Minus size={20} />
+                                    </span>
+                                    <span class="counter-value"
+                                        >{formatQuantity(quantity)} in cart</span
+                                    >
+                                    <span
+                                        class="counter-btn plus"
+                                        on:click|stopPropagation={incrementQuantity}
+                                    >
+                                        <Plus size={20} />
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="preferences-section {showPreferences
+                        ? 'visible'
+                        : ''}"
+                >
+                    <h2>Your preferences</h2>
+                    <div class="preferences-input-row">
+                        <div class="input-container">
+                            <p class="preferences-label">
+                                Special instructions
+                            </p>
+                            <input
+                                type="text"
+                                bind:value={note}
+                                on:input={handleNoteInput}
+                                placeholder="I would like my shopper to..."
+                                class="preferences-input {noteChanged
+                                    ? 'active'
+                                    : ''}"
+                            />
+
+                            <!-- Checkbox for saving preferences -->
+                            <div class="save-preference-toggle">
+                                <label class="toggle-container">
+                                    <input
+                                        type="checkbox"
+                                        bind:checked={savePreference}
+                                        on:change={handleSavePreferenceToggle}
+                                        disabled={loadingPreference}
+                                    />
+                                    <span class="toggle-text">
+                                        {#if loadingPreference}
+                                            Loading...
+                                        {:else}
+                                            Remember my preferences for next
+                                            time
+                                        {/if}
+                                    </span>
+                                    {#if existingPreference}
+                                        <span class="saved-badge">
+                                            <Save size={12} />
+                                            Saved
+                                        </span>
+                                    {/if}
+                                </label>
+                            </div>
+                        </div>
+                        {#if showButtons}
+                            <div class="preferences-buttons">
+                                <button
+                                    class="cancel-button btn btn-secondary btn-md"
+                                    on:click={cancelPreferences}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    class="save-button btn btn-primary btn-md"
+                                    on:click={saveInstructions}
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{/if}
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:12:11
+Hint: 'dispatch' is declared but its value is never read. (ts)
+
+    const dispatch = createEventDispatcher();
+    // cartServiceStore holds the store from context, which in turn holds the SimpleCartService instance (or null)
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:18:16
+Hint: Variable 'product' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let isOpen = false;
+    export let product;
+    export let groupHashBase64: string;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:25:9
+Hint: Variable 'unsubscribeCartState' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    let isInCart = false;
+    let unsubscribeCartState;
+    let note = "";
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:40:29
+Hint: Parameter 'qty' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function formatQuantity(qty) {
+        return isSoldByWeight ? `${qty} lb` : qty;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:55:33
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function handleOverlayClick(e) {
+        if (e.target === e.currentTarget) {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:259:21
+Hint: Parameter 'node' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function portal(node) {
+        let target = document.body;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductDetailModal.svelte:394:41
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Toggle preference saving based on checkbox
+    function handleSavePreferenceToggle(e) {
+        savePreference = e.target.checked;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:380:7
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+    {#if displayAmount > 0}
+      <span class="minus counter-btn" on:click|stopPropagation={decrementCount}>
+        <Minus size={16} color="white" />
+      </span>
+      <span class="count counter-value" on:click|stopPropagation={() => {}}>
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:383:7
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+      </span>
+      <span class="count counter-value" on:click|stopPropagation={() => {}}>
+        {displayAmount}
+        {displayUnit}
+      </span>
+      <span class="plus counter-btn" on:click|stopPropagation={incrementCount}>
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:387:7
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+      </span>
+      <span class="plus counter-btn" on:click|stopPropagation={incrementCount}>
+        <Plus size={16} color="white" />
+      </span>
+    {:else}
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:369:1
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+
+<div class="product-card fade-in" on:click={handleCardClick}>
+  <button
+    class="add-btn btn {displayAmount > 0
+      ? 'counter-btn-group expanded'
+      : 'btn-icon btn-icon-primary'}"
+    on:click={(e) => {
+      console.log("Add button clicked");
+      handleButtonClick(e);
+    }}
+  >
+    {#if displayAmount > 0}
+      <span class="minus counter-btn" on:click|stopPropagation={decrementCount}>
+        <Minus size={16} color="white" />
+      </span>
+      <span class="count counter-value" on:click|stopPropagation={() => {}}>
+        {displayAmount}
+        {displayUnit}
+      </span>
+      <span class="plus counter-btn" on:click|stopPropagation={incrementCount}>
+        <Plus size={16} color="white" />
+      </span>
+    {:else}
+      <span class="plus-icon">
+        <Plus size={20} color="white" />
+      </span>
+    {/if}
+  </button>
+  <button
+    class="report-btn btn btn-icon-sm"
+    on:click|stopPropagation={handleReportClick}
+    title="Report incorrect category"
+  >
+    🚩
+  </button>
+  <div class="product-card-content">
+    <!-- Rest of the content remains unchanged -->
+    {#if product.image_url}
+      <img
+        use:lazyLoad={product.image_url}
+        data-src={product.image_url}
+        alt={product.name}
+        class="product-image"
+        loading="lazy"
+      />
+    {:else}
+      <!-- Optional: Placeholder for products without images -->
+      <div class="product-image placeholder-image">No Image</div>
+    {/if}
+    <div class="prices">
+      {#if product.promo_price && product.promo_price < product.price}
+        <div class="price-row">
+          <div class="promo-price">
+            ${Number(product.promo_price).toFixed(2)}{isSoldByWeight
+              ? " /lb"
+              : ""}
+          </div>
+          <div class="regular-price">
+            reg. ${Number(product.price).toFixed(2)}{isSoldByWeight
+              ? " /lb"
+              : ""}
+          </div>
+        </div>
+        <div class="promo-label">With loyalty card</div>
+      {:else}
+        <div class="regular-price-solo">
+          ${Number(product.price).toFixed(2)}{isSoldByWeight ? " /lb" : ""}
+        </div>
+      {/if}
+    </div>
+    <div class="name">{product.name}</div>
+    <div class="size">{product.size}</div>
+    <div class="stock" style="display: flex; align-items: center;">
+      <BarChart
+        size={30}
+        style="margin-right: 5px; color: {getStockColor(
+          product.stocks_status,
+        )};"
+      />
+      {getStockText(product.stocks_status)}
+    </div>
+  </div>
+</div>
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:4:12
+Hint: 'BarChart' is deprecated. (ts)
+  import type { Writable } from "svelte/store";
+  import { BarChart, Plus, Minus } from "lucide-svelte";
+  import { encodeHashToBase64 } from "@holochain/client";
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:65:14
+Hint: Variable 'product' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+  export let product;
+  export let actionHash = undefined;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:71:7
+Hint: Variable 'unsubscribeCartState' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let itemWeight = 1; // Default to 1 lb for weight items
+  let unsubscribeCartState;
+  let isServiceReady = false;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:73:7
+Hint: Variable 'unsubscribeReadyState' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let isServiceReady = false;
+  let unsubscribeReadyState;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:152:28
+Hint: Parameter 'items' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Update item count whenever it changes
+  function updateItemCount(items) {
+    if (!items || !Array.isArray(items)) return;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:215:30
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Function to handle report button click
+  function handleReportClick(e) {
+    e.stopPropagation();
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:221:37
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Handle report submission
+  async function handleReportSubmit(event) {
+    const reportData = event.detail;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:250:30
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Handle the main "Add" button click
+  function handleButtonClick(e) {
+    e.stopPropagation();
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:260:28
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+  function handleCardClick(e) {
+    // Prevent modal from opening when clicking on specific interactive elements
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:278:13
+Hint: 'result' is declared but its value is never read. (ts)
+      const quantity = isSoldByWeight ? 1 : 1; // Default to 1 lb or 1 ct
+      const result = await $cartService.addToCart(
+        groupHashBase64,
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:289:33
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Increment item quantity
+  async function incrementCount(e) {
+    e.stopPropagation();
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:303:33
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Decrement item quantity
+  async function decrementCount(e) {
+    e.stopPropagation();
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:322:33
+Hint: Parameter 'status' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Add this function
+  function normalizeStockStatus(status) {
+    if (!status) return "UNKNOWN";
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:331:12
+Hint: 'normalizePromoPrice' is declared but its value is never read. (ts)
+  // Add this function
+  function normalizePromoPrice(promoPrice, regularPrice) {
+    if (
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:331:32
+Hint: Parameter 'promoPrice' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Add this function
+  function normalizePromoPrice(promoPrice, regularPrice) {
+    if (
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:331:44
+Hint: Parameter 'regularPrice' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Add this function
+  function normalizePromoPrice(promoPrice, regularPrice) {
+    if (
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:348:25
+Hint: Parameter 'status' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // More debugging in your getStockText function
+  function getStockText(status) {
+    // Additional defensive check
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:361:26
+Hint: Parameter 'status' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Update this function
+  function getStockColor(status) {
+    const normalizedStatus = normalizeStockStatus(status);
+
+
+/home/bur1/Holochain/summon/ui/src/ProductCard.svelte:441:8
+Hint: 'BarChart' is deprecated. (ts)
+    <div class="stock" style="display: flex; align-items: center;">
+      <BarChart
+        size={30}
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-api.ts:117:43
+Hint: 'await' has no effect on the type of this expression. 
+                        const groupHash = record.signed_action.hashed.hash;
+                        const groupData = await decodeEntry(record.entry.Present.entry);
+
+
+
+/home/bur1/Holochain/summon/ui/src/search/EmbeddingService.ts:106:30
+Hint: Parameter 'err' implicitly has an 'any' type, but a better type may be inferred from usage. 
+                    resolve: () => { clearTimeout(timeout); resolve(); },
+                    reject: (err) => { clearTimeout(timeout); reject(err); },
+                    operation: 'workerReady'
+
+
+/home/bur1/Holochain/summon/ui/src/search/EmbeddingService.ts:337:13
+Hint: Variable 'initResult' implicitly has an 'any' type, but a better type may be inferred from usage. 
+
+        let initResult;
+        try {
+
+
+/home/bur1/Holochain/summon/ui/src/search/EmbeddingService.ts:403:13
+Hint: Variable 'buildResult' implicitly has an 'any' type, but a better type may be inferred from usage. 
+
+        let buildResult;
+        try {
+
+
+/home/bur1/Holochain/summon/ui/src/search/EmbeddingService.ts:445:17
+Hint: Variable 'saveResult' implicitly has an 'any' type, but a better type may be inferred from usage. 
+            console.log(`[EmbeddingService PREPARE] Requesting worker to save HNSW index to "${filename}" (as persistIndex is true for this call)...`);
+            let saveResult;
+            try {
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-strategy.ts:138:13
+Hint: 'apiClient' is declared but its value is never read. 
+    // apiClient might not be strictly needed if all products are local and embeddings are generated client-side or pre-loaded
+    private apiClient: SearchApiClient;
+    private queryEmbedding: number[] | Float32Array;
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchResults.svelte:6:9
+Hint: 'SemanticSearchStrategy' is declared but its value is never read. (ts)
+        ProductSelectionStrategy,
+        SemanticSearchStrategy,
+        TextSearchStrategy,
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchResults.svelte:13:16
+Hint: Variable 'store' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    export let store;
+    export let query: string = "";
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchResults.svelte:21:9
+Hint: Variable 'uiProps' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    let apiClient: SearchApiClient;
+    let uiProps;
+    $: uiProps = store?.uiProps;
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchResults.svelte:21:9
+Hint: 'uiProps' is declared but its value is never read. (ts)
+    let apiClient: SearchApiClient;
+    let uiProps;
+    $: uiProps = store?.uiProps;
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchResults.svelte:26:9
+Hint: 'totalResults' is declared but its value is never read. (ts)
+    let displayedResults: Product[] = [];
+    let totalResults = 0;
+    let errorMessage = "";
+
+
+/home/bur1/Holochain/summon/ui/src/AllProductsGrid.svelte:11:16
+Warn: Component has unused export property 'allProductsTotal'. If it is for external reference only, please consider using `export const allProductsTotal` (svelte)
+    export let products = [];
+    export let allProductsTotal: number = 0;
+
+
+
+/home/bur1/Holochain/summon/ui/src/AllProductsGrid.svelte:14:11
+Hint: 'store' is declared but its value is never read. (ts)
+    const { getStore } = getContext<StoreContext>("store"); // Typed getContext
+    const store = getStore();
+    const dispatch = createEventDispatcher();
+
+
+/home/bur1/Holochain/summon/ui/src/AllProductsGrid.svelte:17:9
+Hint: Variable 'productsGridRef' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    let productsGridRef;
+    let parentScrollContainer;
+
+
+/home/bur1/Holochain/summon/ui/src/AllProductsGrid.svelte:18:9
+Hint: Variable 'parentScrollContainer' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    let productsGridRef;
+    let parentScrollContainer;
+    let containerHeight;
+
+
+/home/bur1/Holochain/summon/ui/src/AllProductsGrid.svelte:19:9
+Hint: Variable 'containerHeight' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    let parentScrollContainer;
+    let containerHeight;
+    let visibleIndices = [];
+
+
+/home/bur1/Holochain/summon/ui/src/AllProductsGrid.svelte:19:9
+Hint: 'containerHeight' is declared but its value is never read. (ts)
+    let parentScrollContainer;
+    let containerHeight;
+    let visibleIndices = [];
+
+
+/home/bur1/Holochain/summon/ui/src/AllProductsGrid.svelte:32:9
+Hint: Variable 'zoomTimeout' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+        typeof window !== "undefined" ? window.devicePixelRatio : 1;
+    let zoomTimeout;
+
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:49:16
+Hint: Variable 'currentRanges' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let disabled: boolean = false;
+    export let currentRanges;
+    export let totalProducts; // This is the estimated total for the path
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:50:16
+Hint: Variable 'totalProducts' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let currentRanges;
+    export let totalProducts; // This is the estimated total for the path
+    export let identifier; // subcategory or productType name
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:51:16
+Hint: Variable 'identifier' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let totalProducts; // This is the estimated total for the path
+    export let identifier; // subcategory or productType name
+    export let store;
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:52:16
+Hint: Variable 'store' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let identifier; // subcategory or productType name
+    export let store;
+    export let selectedCategory;
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:53:16
+Hint: Variable 'selectedCategory' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let store;
+    export let selectedCategory;
+    export let selectedSubcategory;
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:54:16
+Hint: Variable 'selectedSubcategory' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let selectedCategory;
+    export let selectedSubcategory;
+    export let mainGridContainer;
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:55:16
+Hint: Variable 'mainGridContainer' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let selectedSubcategory;
+    export let mainGridContainer;
+    export let isProductType = false;
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:61:11
+Hint: 'PRODUCTS_PER_GROUP' is declared but its value is never read. (ts)
+    const dispatch = createEventDispatcher();
+    const PRODUCTS_PER_GROUP = 1000; // From backend constant
+
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:79:30
+Hint: Parameter 'id' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Parse compound identifiers like "Category_Subcategory" if needed
+    function parseIdentifier(id) {
+        if (id && typeof id === "string" && id.includes("_")) {
+
+
+/home/bur1/Holochain/summon/ui/src/NavigationArrows.svelte:174:41
+Hint: Parameter 'count' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+        let trueGrandTotalForPath = 0;
+        groupBoundaries = response.map((count) => {
+            const numericCount = Number(count) || 0;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:36:9
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+        </div>
+        <span
+            class="view-all-link btn btn-text"
+            on:click|stopPropagation={onViewMore}
+        >
+            View More
+            <ChevronRight size={20} class="chevron-icon" />
+        </span>
+    </div>
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:11:16
+Hint: Variable 'currentRanges' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let products = []; // This should be the exact slice of products to display
+    export let currentRanges; // Contains { start, end } for this identifier
+    export let totalProducts = {}; // Contains total estimate for this identifier's path
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:13:16
+Hint: Variable 'store' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let totalProducts = {}; // Contains total estimate for this identifier's path
+    export let store;
+    export let selectedCategory;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:14:16
+Hint: Variable 'selectedCategory' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let store;
+    export let selectedCategory;
+    export let selectedSubcategory;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:15:16
+Hint: Variable 'selectedSubcategory' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let selectedCategory;
+    export let selectedSubcategory;
+    export let mainGridContainer; // Passed down to NavigationArrows for capacity calculation
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:16:16
+Hint: Variable 'mainGridContainer' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let selectedSubcategory;
+    export let mainGridContainer; // Passed down to NavigationArrows for capacity calculation
+    export let isProductType = false;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:19:16
+Hint: Variable 'action' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let onViewMore = () => {};
+    export let action; // For resize observer in ProductBrowser
+    export let hasMore = {}; // New prop to store hasMore values from backend
+
+
+/home/bur1/Holochain/summon/ui/src/ProductRow.svelte:26:35
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Forward report events from ProductCard
+    function handleReportCategory(event) {
+        dispatch("reportCategory", event.detail);
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:34:9
+Hint: Variable 'mainGridContainer' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    let rowCapacities = {}; // Store capacity for each row
+    let mainGridContainer; // Reference to the main browser container
+    let allProductsTotal = 0; // Total products for the grid view
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:42:9
+Hint: 'isResizing' is declared but its value is never read. (ts)
+    let resizeTimeouts: Record<string, number> = {}; // Store separate timeouts for each row
+    let isResizing = false;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:55:28
+Hint: Parameter 'node' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Expose action for components to register with resize observer
+    export const action = (node) => {
+        if (!node) return;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:206:17
+Hint: Variable 'result' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+            let result;
+            if (isProductTypeRow) {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:371:41
+Hint: Parameter 'capacity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    async function loadMainCategoryView(capacity) {
+        const subcategories =
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:404:9
+Hint: Parameter 'remainingSubcategories' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    async function loadRemainingSubcategories(
+        remainingSubcategories,
+        capacity,
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:405:9
+Hint: Parameter 'capacity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+        remainingSubcategories,
+        capacity,
+    ) {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:415:41
+Hint: Parameter 'sub' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+            const batchResults = await Promise.all(
+                currentBatch.map(async (sub) => {
+                    return await productDataService.loadSubcategoryProducts(
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:429:40
+Hint: Parameter 'capacity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    async function loadSubcategoryView(capacity) {
+        const subcategoryConfig = mainCategories
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:465:41
+Hint: Parameter 'capacity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    async function loadProductTypesView(capacity) {
+        const subcategoryConfig = mainCategories
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:525:40
+Hint: Parameter 'results' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function processSubcategoryResults(results, capacity) {
+        results.forEach((result) => {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:525:49
+Hint: Parameter 'capacity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function processSubcategoryResults(results, capacity) {
+        results.forEach((result) => {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:526:26
+Hint: Parameter 'result' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    function processSubcategoryResults(results, capacity) {
+        results.forEach((result) => {
+            if (!result?.products?.length || !result?.name) return;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:547:37
+Hint: Parameter 'results' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function processHomeViewResults(results, capacity) {
+        results.forEach((result) => {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:547:46
+Hint: Parameter 'capacity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function processHomeViewResults(results, capacity) {
+        results.forEach((result) => {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:548:26
+Hint: Parameter 'result' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    function processHomeViewResults(results, capacity) {
+        results.forEach((result) => {
+            if (!result?.products?.length || !result?.identifier) return;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:569:40
+Hint: Parameter 'results' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function processProductTypeResults(results, capacity) {
+        results.forEach((result) => {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:569:49
+Hint: Parameter 'capacity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function processProductTypeResults(results, capacity) {
+        results.forEach((result) => {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:570:26
+Hint: Parameter 'result' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    function processProductTypeResults(results, capacity) {
+        results.forEach((result) => {
+            if (!result?.products?.length || !result?.type) return;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:622:31
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // This function handles the 'dataLoaded' event from NavigationArrows
+    function handleDataLoaded(event) {
+        const {
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:639:15
+Hint: 'capacity' is declared but its value is never read. (ts)
+        // Use row-specific capacity if available, otherwise use container capacity
+        const capacity = rowCapacities[identifier] || containerCapacity;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:671:35
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function handleReportCategory(event) {
+        dispatch("reportCategory", event.detail);
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:675:42
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function handleBoundariesInitialized(event) {
+        const { identifier: id, grandTotal } = event.detail;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:689:43
+Hint: Parameter 'identifier' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Get subcategory name for display from identifier
+    function getSubcategoryFromIdentifier(identifier) {
+        if (!identifier.includes("_")) return identifier;
+
+
+/home/bur1/Holochain/summon/ui/src/ProductBrowser.svelte:696:40
+Hint: Parameter 'identifier' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Get category for a featured row
+    function getCategoryFromIdentifier(identifier) {
+        if (!identifier.includes("_")) return selectedCategory;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/AddressService.ts:106:23
+Hint: 'result' is declared but its value is never read. 
+
+                const result = await this.client.callZome({
+                    role_name: 'grocery',
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:24:9
+Hint: 'profilesStore' is declared but its value is never read. (ts)
+  // Get profiles store from context
+  const profilesStore = getContext("profiles-store");
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:27:7
+Hint: Variable 'addressService' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Services
+  let addressService;
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:43:15
+Hint: 'unsubscribe' is declared but its value is never read. (ts)
+        // Subscribe to addresses to populate cache
+        const unsubscribe = addressService
+          .getAddresses()
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:45:23
+Hint: Parameter 'addresses' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+          .getAddresses()
+          .subscribe((addresses) => {
+            addressCache = addresses;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:85:35
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Function to return a cart to shopping
+  async function returnToShopping(item) {
+    try {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:107:25
+Hint: Parameter 'status' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Format status for display
+  function formatStatus(status) {
+    switch (status) {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:121:12
+Hint: 'getAddressFromCache' is declared but its value is never read. (ts)
+  // Get address from cache
+  function getAddressFromCache(addressHash) {
+    if (!addressHash) return null;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckedOutCartsView.svelte:121:32
+Hint: Parameter 'addressHash' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Get address from cache
+  function getAddressFromCache(addressHash) {
+    if (!addressHash) return null;
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:193:11
+Warn: Empty block (svelte)
+
+          {#if $isHomeViewStore}{/if}
+        {/if}
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:51:14
+Warn: Component has unused export property 'standAlone'. If it is for external reference only, please consider using `export const standAlone` (svelte)
+  // Only keep standAlone param
+  export let standAlone = false;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:6:3
+Hint: 'ProductCard' is declared but its value is never read. (ts)
+  import type { SimpleCartService } from "./cart/SimpleCartService"; // Added SimpleCartService
+  import ProductCard from "./ProductCard.svelte";
+  import { onMount, onDestroy } from "svelte";
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:7:3
+Hint: All imports in import declaration are unused. (ts)
+  import ProductCard from "./ProductCard.svelte";
+  import { onMount, onDestroy } from "svelte";
+  import { mainCategories } from "./categoryData";
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:13:3
+Hint: 'CheckedOutCarts' is declared but its value is never read. (ts)
+  import ProductBrowser from "./ProductBrowser.svelte";
+  import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte";
+
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:18:5
+Hint: 'isCartOpenStore' is declared but its value is never read. (ts)
+    currentViewStore,
+    isCartOpenStore,
+    searchModeStore,
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:30:5
+Hint: 'resetSearchState' is declared but its value is never read. (ts)
+    isViewAllStore,
+    resetSearchState,
+    isHomeViewStore,
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:41:9
+Hint: 'cartService' is declared but its value is never read. (ts)
+  // Get cart service directly from the context
+  const cartService = getContext<Writable<SimpleCartService>>("cartService");
+
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:54:34
+Hint: Parameter 'category' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Export this function to be called from Controller
+  export function selectCategory(category, subcategory) {
+    handleCategorySelect({ detail: { category, subcategory } });
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:54:44
+Hint: Parameter 'subcategory' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Export this function to be called from Controller
+  export function selectCategory(category, subcategory) {
+    handleCategorySelect({ detail: { category, subcategory } });
+
+
+/home/bur1/Holochain/summon/ui/src/ShopView.svelte:122:37
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+  async function handleReportSubmit(event) {
+    try {
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchCacheService.ts:174:7
+Hint: 'CACHE_KEY' is declared but its value is never read. 
+
+const CACHE_KEY = 'product_search_index_cache'; // Not directly used, but good for reference
+const CACHE_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchCacheService.ts:423:13
+Hint: 'totalProductCount' is declared but its value is never read. 
+        const limit = 1000;
+        let totalProductCount = 0;
+
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchCacheService.ts:671:17
+Hint: 'productsWithArrayEmbeddings' is declared but its value is never read. 
+            let productsWithTypedEmbeddings = 0;
+            let productsWithArrayEmbeddings = 0; // Should be 0 if all are Float32Array
+            let totalBufferSize = 0;
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:795:9
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+    {#if showDropdown}
+        <div
+            class="search-overlay"
+            on:click={() => (showDropdown = false)}
+            use:portal
+        ></div>
+
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:821:29
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                        {#if result.isType && "type" in result && "sample" in result}
+                            <div
+                                class="dropdown-item type-item"
+                                on:click={() => handleClickType(result)}
+                            >
+                                <div class="product-image">
+                                    {#if result.sample && "image_url" in result.sample && result.sample.image_url}
+                                        <img
+                                            src={result.sample.image_url}
+                                            alt={result.type}
+                                        />
+                                    {/if}
+                                </div>
+                                <div class="product-name">
+                                    <span class="product-type"
+                                        >{result.type}</span
+                                    >
+                                    {searchQuery}
+                                </div>
+                            </div>
+                        {:else if !result.isType && "name" in result && "price" in result}
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:841:29
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                        {:else if !result.isType && "name" in result && "price" in result}
+                            <div
+                                class="dropdown-item"
+                                on:click={() => handleClickProduct(result)}
+                            >
+                                <div class="product-image">
+                                    {#if "image_url" in result && result.image_url}
+                                        <img
+                                            src={result.image_url}
+                                            alt={result.name}
+                                        />
+                                    {/if}
+                                </div>
+                                <div class="product-name">{result.name}</div>
+                                <div class="product-price">
+                                    ${typeof result.price === "number"
+                                        ? result.price.toFixed(2)
+                                        : "0.00"}
+                                </div>
+                            </div>
+                        {/if}
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:864:13
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+            </div>
+            <div class="view-all" on:click={handleViewAllResults}>
+                View all results
+            </div>
+        </div>
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:24:16
+Warn: Component has unused export property 'productCache'. If it is for external reference only, please consider using `export const productCache` (svelte)
+    export let store;
+    export let productCache;
+
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:3:40
+Hint: Could not find a declaration file for module 'lodash'. '/home/bur1/Holochain/summon/node_modules/lodash/lodash.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/lodash` if it exists or add a new declaration (.d.ts) file containing `declare module 'lodash';` (ts)
+    import { createEventDispatcher, onMount, onDestroy } from "svelte";
+    import { debounce, throttle } from "lodash";
+    import Fuse, { type FuseResult } from "fuse.js";
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:10:9
+Hint: 'CompositeHash' is declared but never used. (ts)
+        ProductTypeGroup,
+        CompositeHash,
+        SearchMethod,
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:11:9
+Hint: 'SearchMethod' is declared but never used. (ts)
+        CompositeHash,
+        SearchMethod,
+        SearchResult,
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:12:9
+Hint: 'SearchResult' is declared but never used. (ts)
+        SearchMethod,
+        SearchResult,
+    } from "./search-types";
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:14:26
+Hint: 'deduplicateProducts' is declared but its value is never read. (ts)
+    } from "./search-types";
+    import { parseQuery, deduplicateProducts } from "./search-utils";
+    import { SearchApiClient } from "./search-api";
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:18:9
+Hint: 'SemanticSearchStrategy' is declared but its value is never read. (ts)
+        SearchStrategyFactory,
+        SemanticSearchStrategy,
+        HybridDropdownStrategy,
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:23:16
+Hint: Variable 'store' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    export let store;
+    export let productCache;
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:24:16
+Hint: Variable 'productCache' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let store;
+    export let productCache;
+
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:39:9
+Hint: 'embeddingStatus' is declared but its value is never read. (ts)
+    // Embedding state
+    let embeddingStatus = "Initializing...";
+    let queryEmbeddingCache = new Map<string, Float32Array>();
+
+
+/home/bur1/Holochain/summon/ui/src/search/SearchBar.svelte:56:21
+Hint: Parameter 'node' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function portal(node) {
+        let target = document.body;
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:898:5
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+{#if showApproveDialog && selectedReport}
+    <div
+        class="overlay"
+        style="background-color: rgba(0,0,0,0.7); z-index: 9999;"
+        on:click|self={() => {
+            showApproveDialog = false;
+            selectedReport = null;
+        }}
+        use:portal
+    >
+        <div class="dialog">
+            <h2>Review Category Report ({selectedReport.id})</h2>
+
+            <div class="report-details">
+                <div class="report-section">
+                    <h3>Product</h3>
+                    <p><strong>Name:</strong> {selectedReport.product.name}</p>
+                    <p>
+                        <strong>Size:</strong>
+                        {selectedReport.product.size || "Not specified"}
+                    </p>
+                    {#if selectedReport.product.image_url}
+                        <img
+                            src={selectedReport.product.image_url}
+                            alt={selectedReport.product.name}
+                            class="product-img"
+                        />
+                    {:else}
+                        <div class="no-image">
+                            <p>No image available for this product</p>
+                            <p class="product-name">
+                                {selectedReport.product.name}
+                            </p>
+                        </div>
+                    {/if}
+                </div>
+
+                <div class="report-section">
+                    <h3>Current Categorization</h3>
+                    <ul>
+                        <li>
+                            <strong>Category:</strong>
+                            {selectedReport.currentCategory.category || "N/A"}
+                        </li>
+                        <li>
+                            <strong>Subcategory:</strong>
+                            {selectedReport.currentCategory.subcategory ||
+                                "N/A"}
+                        </li>
+                        <li>
+                            <strong>Product Type:</strong>
+                            {selectedReport.currentCategory.product_type ||
+                                "N/A"}
+                        </li>
+                    </ul>
+                </div>
+
+                {#if selectedReport.source === "system" || !selectedReport.suggestedCategory?.category || selectedReport.type === "negative_example"}
+                    <div class="report-section system-section">
+                        <h3>
+                            {#if selectedReport.type === "negative_example"}
+                                Flagged as Incorrect
+                            {:else}
+                                Select Correct Category
+                            {/if}
+                        </h3>
+                        {#if selectedReport.type !== "negative_example"}
+                            <p class="system-note">
+                                This report requires you to select the correct
+                                category.
+                            </p>
+                        {/if}
+
+                        <div class="form-group">
+                            <label for="category">Category:</label>
+                            <select
+                                id="category"
+                                bind:value={selectedCategory}
+                                class="form-select"
+                                disabled={selectedReport.type ===
+                                    "negative_example"}
+                            >
+                                <option value={null}>Select Category</option>
+                                {#each mainCategories as category}
+                                    <option value={category.name}
+                                        >{category.name}</option
+                                    >
+                                {/each}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="subcategory">Subcategory:</label>
+                            <select
+                                id="subcategory"
+                                bind:value={selectedSubcategory}
+                                disabled={!selectedCategory ||
+                                    selectedReport.type === "negative_example"}
+                                class="form-select"
+                            >
+                                <option value={null}>Select Subcategory</option>
+                                {#each subcategories as subcategory}
+                                    <option value={subcategory.name}
+                                        >{subcategory.name}</option
+                                    >
+                                {/each}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="productType">Product Type:</label>
+                            <select
+                                id="productType"
+                                bind:value={selectedProductType}
+                                disabled={!selectedSubcategory ||
+                                    subcategories.find(
+                                        (s) => s.name === selectedSubcategory,
+                                    )?.gridOnly ||
+                                    selectedReport.type === "negative_example"}
+                                class="form-select"
+                            >
+                                {#if subcategories.find((s) => s.name === selectedSubcategory)?.gridOnly}
+                                    <option value={selectedSubcategory}
+                                        >{selectedSubcategory}</option
+                                    >
+                                {:else if productTypes && productTypes.length > 0}
+                                    <option value={null}
+                                        >Select Product Type</option
+                                    >
+                                    {#each productTypes as type}
+                                        <option value={type}>{type}</option>
+                                    {/each}
+                                {:else if selectedSubcategory}
+                                    <option value={null}
+                                        >No product types defined</option
+                                    >
+                                {/if}
+                            </select>
+                        </div>
+                    </div>
+                {:else}
+                    <!-- User-suggested category, already reviewed by user -->
+                    <div class="report-section">
+                        <h3>Suggested Categorization (by User)</h3>
+                        <ul>
+                            <li>
+                                <strong>Category:</strong>
+                                {selectedReport.suggestedCategory.category}
+                            </li>
+                            <li>
+                                <strong>Subcategory:</strong>
+                                {selectedReport.suggestedCategory.subcategory ||
+                                    "N/A"}
+                            </li>
+                            <li>
+                                <strong>Product Type:</strong>
+                                {selectedReport.suggestedCategory
+                                    .product_type ||
+                                    selectedReport.suggestedCategory
+                                        .subcategory ||
+                                    "N/A"}
+                            </li>
+                        </ul>
+                    </div>
+                {/if}
+
+                {#if selectedReport.notes}
+                    <div class="report-section">
+                        <h3>Notes</h3>
+                        <p>{selectedReport.notes}</p>
+                    </div>
+                {/if}
+
+                <div class="action-buttons">
+                    <button class="reject-btn" on:click={() => rejectReport()}>
+                        Reject
+                    </button>
+
+                    <button
+                        class="approve-btn"
+                        on:click={() => approveReport()}
+                    >
+                        {selectedReport.type === "negative_example"
+                            ? "Confirm as Incorrect & Re-evaluate"
+                            : "Approve Suggestion"}
+                    </button>
+
+                    <button
+                        class="cancel-btn"
+                        on:click={() => {
+                            showApproveDialog = false;
+                            selectedReport = null;
+                        }}
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+{/if}
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:1105:9
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+    >
+        <div class="sync-modal" on:click|stopPropagation>
+            <div class="sync-modal-header">
+                <h3>DHT Synchronization Status</h3>
+                {#if !syncStatus.inProgress}
+                    <button
+                        class="close-button"
+                        on:click={() => (syncStatusModalOpen = false)}
+                    >
+                        <X size={20} />
+                    </button>
+                {/if}
+            </div>
+
+            <div class="sync-modal-content">
+                {#if syncStatus.inProgress}
+                    <div class="sync-status">
+                        <div class="sync-spinner"></div>
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+
+                    <div class="progress-container">
+                        <div
+                            class="progress-bar"
+                            style="width: {syncStatus.progress}%"
+                        ></div>
+                    </div>
+
+                    <p class="sync-count">
+                        {syncStatus.completedUpdates} / {syncStatus.totalToUpdate}
+                        product types processed
+                    </p>
+                {:else if syncStatus.message.includes("error") || syncStatus.message.includes("Error")}
+                    <div class="sync-error">
+                        <AlertCircle size={32} color="#ff5555" />
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+                {:else}
+                    <div class="sync-success">
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+                {/if}
+            </div>
+        </div>
+    </div>
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:1101:5
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+{#if syncStatusModalOpen}
+    <div
+        class="sync-modal-overlay"
+        on:click={() => !syncStatus.inProgress && (syncStatusModalOpen = false)}
+    >
+        <div class="sync-modal" on:click|stopPropagation>
+            <div class="sync-modal-header">
+                <h3>DHT Synchronization Status</h3>
+                {#if !syncStatus.inProgress}
+                    <button
+                        class="close-button"
+                        on:click={() => (syncStatusModalOpen = false)}
+                    >
+                        <X size={20} />
+                    </button>
+                {/if}
+            </div>
+
+            <div class="sync-modal-content">
+                {#if syncStatus.inProgress}
+                    <div class="sync-status">
+                        <div class="sync-spinner"></div>
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+
+                    <div class="progress-container">
+                        <div
+                            class="progress-bar"
+                            style="width: {syncStatus.progress}%"
+                        ></div>
+                    </div>
+
+                    <p class="sync-count">
+                        {syncStatus.completedUpdates} / {syncStatus.totalToUpdate}
+                        product types processed
+                    </p>
+                {:else if syncStatus.message.includes("error") || syncStatus.message.includes("Error")}
+                    <div class="sync-error">
+                        <AlertCircle size={32} color="#ff5555" />
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+                {:else}
+                    <div class="sync-success">
+                        <p class="sync-message">{syncStatus.message}</p>
+                    </div>
+                {/if}
+            </div>
+        </div>
+    </div>
+{/if}
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:39:9
+Hint: 'queueingForRecategorization' is declared but its value is never read. (ts)
+    // Recategorization variables
+    let queueingForRecategorization = false;
+    let processingQueue = false;
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:84:25
+Hint: Parameter 'report' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function viewReport(report) {
+        // Make a full copy to ensure reactivity
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:348:9
+Hint: Parameter 'reportIdToQueue' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    async function queueForRecategorization(
+        reportIdToQueue, // Expecting the actual ID (e.g., array index or unique DB ID)
+        showMessages = true,
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:607:34
+Hint: Parameter 'status' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function getStatusBadgeClass(status) {
+        if (status === "approved") return "badge-success";
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:615:34
+Hint: Parameter 'source' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function getSourceBadgeClass(source) {
+        return source === "system" ? "badge-system" : "badge-user";
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:619:14
+Hint: 'getReportTypeBadgeClass' is declared but its value is never read. (ts)
+
+    function getReportTypeBadgeClass(type) {
+        if (type === "negative_example") return "badge-negative";
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:619:38
+Hint: Parameter 'type' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function getReportTypeBadgeClass(type) {
+        if (type === "negative_example") return "badge-negative";
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:625:21
+Hint: Parameter 'node' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function portal(node) {
+        const target = document.body;
+
+
+/home/bur1/Holochain/summon/ui/src/CategoryReportsAdmin.svelte:784:47
+Hint: 'i' is declared but its value is never read. (ts)
+                <tbody>
+                    {#each reports as report, i (report.id)}
+                        <tr
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:179:5
+Warn: Unused CSS selector ":global(update-profile form) sl-button[variant="primary"]::part(base)" (svelte)
+
+    :global(update-profile form) sl-button[variant="primary"]::part(base) {
+        background: linear-gradient(
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:193:5
+Warn: Unused CSS selector ":global(update-profile form)
+        sl-button[variant="primary"]::part(base):hover" (svelte)
+
+    :global(update-profile form)
+        sl-button[variant="primary"]::part(base):hover {
+        background: linear-gradient(
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:207:5
+Warn: Unused CSS selector ":global(update-profile form) sl-button[variant="default"]::part(base)" (svelte)
+
+    :global(update-profile form) sl-button[variant="default"]::part(base) {
+        background: var(--background, #f2fffe) !important;
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:219:5
+Warn: Unused CSS selector ":global(update-profile form)
+        sl-button[variant="default"]::part(base):hover" (svelte)
+
+    :global(update-profile form)
+        sl-button[variant="default"]::part(base):hover {
+        background: var(--surface, #ffffff) !important;
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:231:5
+Warn: Unused CSS selector ":global(update-profile) sl-input::part(base)" (svelte)
+    /* Input field styling */
+    :global(update-profile) sl-input::part(base),
+    :global(update-profile) sl-textarea::part(base) {
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:232:5
+Warn: Unused CSS selector ":global(update-profile) sl-textarea::part(base)" (svelte)
+    :global(update-profile) sl-input::part(base),
+    :global(update-profile) sl-textarea::part(base) {
+        border-radius: var(--btn-border-radius, 50px) !important;
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:238:5
+Warn: Unused CSS selector ":global(update-profile) sl-input::part(base):hover" (svelte)
+
+    :global(update-profile) sl-input::part(base):hover,
+    :global(update-profile) sl-textarea::part(base):hover {
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:239:5
+Warn: Unused CSS selector ":global(update-profile) sl-textarea::part(base):hover" (svelte)
+    :global(update-profile) sl-input::part(base):hover,
+    :global(update-profile) sl-textarea::part(base):hover {
+        border-color: var(--primary, #00cfbb) !important;
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:243:5
+Warn: Unused CSS selector ":global(update-profile) sl-input::part(base):focus-within" (svelte)
+
+    :global(update-profile) sl-input::part(base):focus-within,
+    :global(update-profile) sl-textarea::part(base):focus-within {
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:244:5
+Warn: Unused CSS selector ":global(update-profile) sl-textarea::part(base):focus-within" (svelte)
+    :global(update-profile) sl-input::part(base):focus-within,
+    :global(update-profile) sl-textarea::part(base):focus-within {
+        border-color: var(--primary, #00cfbb) !important;
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:15:9
+Hint: Variable 'dialog' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Dialog reference
+    let dialog;
+
+
+
+/home/bur1/Holochain/summon/ui/src/ProfileEditor.svelte:21:35
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Handle profile updated event
+    function handleProfileUpdated(event) {
+        console.log("Profile updated:", event);
+
+
+/home/bur1/Holochain/summon/ui/src/SidebarMenu.svelte:32:5
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+    <!-- Overlay -->
+    <div
+        class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
+        on:click={closeMenu}
+    />
+
+
+
+/home/bur1/Holochain/summon/ui/src/SidebarMenu.svelte:52:21
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                <div class="profile-section">
+                    <div
+                        class="avatar-container"
+                        on:click={() => {
+                            showProfileEditor = true;
+                            if (!profileEditorComponent) return;
+                            profileEditorComponent.open();
+                        }}
+                        title="Edit Your Profile"
+                    >
+                        <agent-avatar
+                            size="72"
+                            agent-pub-key={myAgentPubKeyB64}
+                            disable-tooltip={true}
+                            disable-copy={true}
+                        ></agent-avatar>
+                    </div>
+                    <div class="profile-text">Click to edit profile</div>
+
+
+/home/bur1/Holochain/summon/ui/src/SidebarMenu.svelte:8:16
+Warn: Component has unused export property 'store'. If it is for external reference only, please consider using `export const store` (svelte)
+
+    export let store: any;
+    export let myAgentPubKeyB64: string | undefined;
+
+
+/home/bur1/Holochain/summon/ui/src/SidebarMenu.svelte:14:9
+Hint: Variable 'profileEditorComponent' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    let showProfileEditor = false;
+    let profileEditorComponent;
+    let isClosing = false;
+
+
+/home/bur1/Holochain/summon/ui/src/SidebarMenu.svelte:25:35
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function handleProfileUpdated(event) {
+        console.log("Profile updated event:", event);
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:35:14
+Warn: Component has unused export property 'standAlone'. If it is for external reference only, please consider using `export const standAlone` (svelte)
+  // These now come from the UiStateStore
+  export let standAlone = false;
+  export let cartTotal = 0; // This prop is passed from Controller, but we'll use the cart service value
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:9:3
+Hint: 'SidebarMenu' is declared but its value is never read. (ts)
+  import SearchBar from "./search/SearchBar.svelte";
+  import SidebarMenu from "./SidebarMenu.svelte";
+  import {
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:13:5
+Hint: 'searchModeStore' is declared but its value is never read. (ts)
+    isCartOpenStore,
+    searchModeStore,
+    searchQueryStore,
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:14:5
+Hint: 'searchQueryStore' is declared but its value is never read. (ts)
+    searchModeStore,
+    searchQueryStore,
+    productNameStore,
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:15:5
+Hint: 'productNameStore' is declared but its value is never read. (ts)
+    searchQueryStore,
+    productNameStore,
+    selectedProductHashStore,
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:16:5
+Hint: 'selectedProductHashStore' is declared but its value is never read. (ts)
+    productNameStore,
+    selectedProductHashStore,
+    searchResultsStore, // Changed from fuseResultsStore
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:17:5
+Hint: 'searchResultsStore' is declared but its value is never read. (ts)
+    selectedProductHashStore,
+    searchResultsStore, // Changed from fuseResultsStore
+    isViewAllStore,
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:18:5
+Hint: 'isViewAllStore' is declared but its value is never read. (ts)
+    searchResultsStore, // Changed from fuseResultsStore
+    isViewAllStore,
+    setSearchState,
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:32:9
+Hint: 'profilesStore' is declared but its value is never read. (ts)
+  // Get profiles store from context
+  const profilesStore = getContext("profiles-store");
+
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:39:7
+Hint: Variable 'myAgentPubKey' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Get current agent pubkey and encode it
+  let myAgentPubKey;
+  let myAgentPubKeyB64;
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:40:7
+Hint: Variable 'myAgentPubKeyB64' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let myAgentPubKey;
+  let myAgentPubKeyB64;
+  let avatarLoaded = false;
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:41:7
+Hint: 'avatarLoaded' is declared but its value is never read. (ts)
+  let myAgentPubKeyB64;
+  let avatarLoaded = false;
+
+
+
+/home/bur1/Holochain/summon/ui/src/HeaderContainer.svelte:103:6
+Hint: 'uiProps' is declared but its value is never read. (ts)
+
+  $: uiProps = store.uiProps;
+
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:112:5
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+  <div class="sidebar-header" bind:this={headerElement}>
+    <div class="store-logo-container btn btn-toggle active" on:click={goToHome}>
+      <div class="store-name">Ralphs Store</div>
+    </div>
+  </div>
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:119:7
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+    {#each mainCategories as category}
+      <div
+        class="category-item btn btn-toggle {selectedCategory === category.name
+          ? 'active'
+          : ''}"
+        on:click={() => selectCategory(category.name)}
+      >
+        {category.name}
+      </div>
+
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:130:11
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+        {#each category.subcategories as subcategory (subcategory.name)}
+          <div
+            class="subcategory-item btn btn-toggle {selectedSubcategory ===
+            subcategory.name
+              ? 'active'
+              : ''}"
+            on:click|stopPropagation={() => selectSubcategory(subcategory.name)}
+          >
+            {subcategory.name}
+          </div>
+        {/each}
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:2:24
+Hint: 'onMount' is declared but its value is never read. (ts)
+<script lang="ts">
+  import { getContext, onMount } from "svelte"; // onMount isn't used, consider removing if not needed elsewhere
+  import type { ShopStore } from "./store";
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:15:7
+Hint: 'store' is declared but its value is never read. (ts)
+  const { getStore }: any = getContext("store");
+  let store: ShopStore = getStore();
+
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:17:7
+Hint: 'currentPage' is declared but its value is never read. (ts)
+
+  let currentPage = 0;
+  // let hasMore = false; // Not used, consider removing
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:23:7
+Hint: Variable 'sidebarElement' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let selectedSubcategory = null; // This is shadowed by the store, consider removing local if not needed
+  let sidebarElement;
+  let headerElement;
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:24:7
+Hint: Variable 'headerElement' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let sidebarElement;
+  let headerElement;
+
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:32:27
+Hint: Parameter 'category' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+  function selectCategory(category) {
+    currentPage = 0;
+
+
+/home/bur1/Holochain/summon/ui/src/CategorySidebar.svelte:85:30
+Hint: Parameter 'subcategory' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+  function selectSubcategory(subcategory) {
+    currentPage = 0;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/ProductCartItem.svelte:10:16
+Hint: Variable 'product' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Props - UPDATED FOR NEW STRUCTURE
+    export let product;
+    export let quantity;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/ProductCartItem.svelte:11:16
+Hint: Variable 'quantity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let product;
+    export let quantity;
+    export let groupHash; // Changed from productHash
+
+
+/home/bur1/Holochain/summon/ui/src/cart/ProductCartItem.svelte:12:16
+Hint: Variable 'groupHash' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let quantity;
+    export let groupHash; // Changed from productHash
+    export let productIndex; // Added
+
+
+/home/bur1/Holochain/summon/ui/src/cart/ProductCartItem.svelte:13:16
+Hint: Variable 'productIndex' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    export let groupHash; // Changed from productHash
+    export let productIndex; // Added
+    export let note = null; // Added for note support
+
+
+/home/bur1/Holochain/summon/ui/src/cart/AddressSelector.svelte:135:25
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                    {#each [...addresses.entries()] as [hash, address]}
+                        <div
+                            class="address-card {selectedAddressHash === hash
+                                ? 'selected'
+                                : ''}"
+                            on:click={() => selectAddress(hash)}
+                        >
+                            <div class="address-icon">
+                                <MapPin size={18} />
+                            </div>
+                            <div class="address-card-content">
+                                <div class="address-label">
+                                    {address.label || "Address"}
+                                    {#if address.is_default}
+                                        <span class="default-badge"
+                                            >Default</span
+                                        >
+                                    {/if}
+                                </div>
+                                <div class="address-line">
+                                    {address.street}
+                                    {#if address.unit}
+                                        <span class="unit">{address.unit}</span>
+                                    {/if}
+                                </div>
+                                <div class="address-line">
+                                    {address.city}, {address.state}
+                                    {address.zip}
+                                </div>
+                            </div>
+                            <div class="address-card-selector">
+                                <div
+                                    class="radio-circle {selectedAddressHash ===
+                                    hash
+                                        ? 'checked'
+                                        : ''}"
+                                ></div>
+                            </div>
+                        </div>
+                    {/each}
+
+
+/home/bur1/Holochain/summon/ui/src/cart/AddressSelector.svelte:61:37
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Add new address
+    async function handleAddAddress(event) {
+        isValidating = true;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:120:17
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+            {#each visibleDays as day}
+                <div
+                    class="date-card {selectedDate &&
+                    day.date.getTime() === selectedDate.getTime()
+                        ? 'selected'
+                        : ''}"
+                    on:click={() => selectDate(day.date)}
+                >
+                    <div class="date-card-day">{day.dayOfWeek}</div>
+                    <div class="date-card-date">{day.dateFormatted}</div>
+                </div>
+            {/each}
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:148:21
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+                {#each currentDateTimeSlots as timeSlot}
+                    <div
+                        class="time-slot {selectedTimeSlot &&
+                        (typeof selectedTimeSlot === 'string'
+                            ? selectedTimeSlot === timeSlot.slot
+                            : selectedTimeSlot.id === timeSlot.id)
+                            ? 'selected'
+                            : ''}"
+                        on:click={() => selectTimeSlot(timeSlot)}
+                    >
+                        <div class="time-slot-time">{timeSlot.display}</div>
+                    </div>
+                {/each}
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:10:16
+Hint: Variable 'timeSlots' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Props
+    export let timeSlots;
+    export let selectedDate = null;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:27:18
+Hint: Parameter 'day' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+            const matchingDay = timeSlots.find(
+                (day) => day.date.getTime() === selectedDate.getTime(),
+            );
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:33:22
+Hint: Parameter 'slot' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+                const matchingSlot = matchingDay.timeSlots.find(
+                    (slot) => slot.slot === selectedTimeSlot,
+                );
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:55:25
+Hint: Parameter 'date' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Handle date selection (only selects, doesn't navigate)
+    function selectDate(date) {
+        selectedDate = date;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:62:29
+Hint: Parameter 'timeSlot' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Handle time slot selection
+    function selectTimeSlot(timeSlot) {
+        selectedTimeSlot = timeSlot;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:80:26
+Hint: Parameter 'direction' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Scroll date carousel - only changes which days are visible
+    function scrollDates(direction) {
+        if (direction === "left" && canScrollLeft) {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/DeliveryTimeSelector.svelte:93:14
+Hint: Parameter 'd' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+        timeSlots.find(
+            (d) => selectedDate && d.date.getTime() === selectedDate.getTime(),
+        )?.timeSlots || [];
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:9:16
+Warn: Component has unused export property 'cartTotal'. If it is for external reference only, please consider using `export const cartTotal` (svelte)
+    export let cartItems = [];
+    export let cartTotal = 0;
+    export let address: Address;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:2:37
+Hint: 'onMount' is declared but its value is never read. (ts)
+<script lang="ts">
+    import { createEventDispatcher, onMount } from "svelte";
+    import { PencilLine, Plus, Minus, X, Save } from "lucide-svelte";
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:5:5
+Hint: 'DeliveryTimeSlot' is declared but its value is never read. (ts)
+    import type { Address } from "./AddressService";
+    import type { DeliveryTimeSlot } from "./SimpleCartService";
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:68:25
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Create a composite key for tracking updates
+    function getItemKey(item) {
+        return `${item.groupHash}_${item.productIndex}`;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:126:35
+Hint: Parameter 'groupHash' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    async function updateQuantity(groupHash, productIndex, newQuantity, note) {
+        if (!cartService || newQuantity < 1) return;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:126:46
+Hint: Parameter 'productIndex' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    async function updateQuantity(groupHash, productIndex, newQuantity, note) {
+        if (!cartService || newQuantity < 1) return;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:126:60
+Hint: Parameter 'newQuantity' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    async function updateQuantity(groupHash, productIndex, newQuantity, note) {
+        if (!cartService || newQuantity < 1) return;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:126:73
+Hint: Parameter 'note' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    async function updateQuantity(groupHash, productIndex, newQuantity, note) {
+        if (!cartService || newQuantity < 1) return;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:159:33
+Hint: Parameter 'groupHash' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // New function to remove item completely
+    async function handleRemove(groupHash, productIndex) {
+        if (!groupHash) return;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:159:44
+Hint: Parameter 'productIndex' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // New function to remove item completely
+    async function handleRemove(groupHash, productIndex) {
+        if (!groupHash) return;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:180:34
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function handleDecrementItem(item) {
+        const itemKey = getItemKey(item);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:195:34
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+    function handleIncrementItem(item) {
+        const itemKey = getItemKey(item);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:211:25
+Hint: Parameter 'groupHash' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Returns true if a product is currently updating
+    function isUpdating(groupHash, productIndex) {
+        const itemKey = `${groupHash}_${productIndex}`;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:211:36
+Hint: Parameter 'productIndex' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Returns true if a product is currently updating
+    function isUpdating(groupHash, productIndex) {
+        const itemKey = `${groupHash}_${productIndex}`;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:217:37
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Note editing functionality
+    async function startEditingNote(item) {
+        editingNoteForItem = item;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:311:41
+Hint: Parameter 'e' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Toggle preference saving based on checkbox
+    function handleSavePreferenceToggle(e) {
+        savePreference = e.target.checked;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutSummary.svelte:320:29
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Helper to determine display unit based on product type
+    function getDisplayUnit(item) {
+        return item.productDetails?.sold_by === "WEIGHT" ? "lb" : "ct";
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:31:16
+Warn: Component has unused export property 'productDetails'. If it is for external reference only, please consider using `export const productDetails` (svelte)
+    export let cartItems = [];
+    export let productDetails = {};
+    export let cartTotal = 0;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:7:35
+Hint: 'Address' is declared but its value is never read. (ts)
+    } from "@holochain/client";
+    import { AddressService, type Address } from "./AddressService";
+    import type {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:9:9
+Hint: 'DeliveryTimeSlot' is declared but never used. (ts)
+    import type {
+        DeliveryTimeSlot,
+        CheckoutDetails,
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:40:11
+Hint: 'profilesStore' is declared but its value is never read. (ts)
+    // Get profiles store from context
+    const profilesStore = getContext("profiles-store");
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:61:56
+Hint: Parameter 'items' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+        if (cartService && typeof cartService.subscribe === "function") {
+            unsubscribe = cartService.subscribe(async (items) => {
+                localCartItems = items || [];
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:85:36
+Hint: Parameter 'items' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Helper function to enrich cart items with product details
+    async function enrichCartItems(items) {
+        console.log("Enriching cart items with product details:", items.length);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:91:30
+Hint: Parameter 'item' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+        const enrichedItems = await Promise.all(
+            items.map(async (item) => {
+                try {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:174:32
+Hint: Parameter 'addressHash' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Load address from hash
+    async function loadAddress(addressHash) {
+        if (!addressService || !addressHash) return null;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:183:58
+Hint: Parameter 'addressMap' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+            return new Promise((resolve) => {
+                const unsubscribe = addresses.subscribe((addressMap) => {
+                    if (addressMap.has(addressHash)) {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/CheckoutFlow.svelte:267:27
+Hint: Parameter 'currentStep' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+    // Validate the current state before proceeding to the next step
+    function validateStep(currentStep) {
+        if (currentStep === 1) {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:240:3
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+>
+  <div
+    class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"
+    class:open={isOpen}
+    on:click|stopPropagation
+  >
+    {#if isShowingCheckoutFlow}
+      <CheckoutFlow
+        {client}
+        cartService={$cartServiceStore}
+        {cartItems}
+        {productDetails}
+        {cartTotal}
+        onClose={closeCheckoutFlow}
+        on:checkout-success={handleCheckoutSuccess}
+      />
+    {:else}
+      <CartHeader onClose={closeCart} />
+
+      <div class="cart-content">
+        <div class="cart-main">
+          <div class="cart-main-header">
+            <div class="cart-title">
+              Cart ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})
+            </div>
+            <button
+              class="delete-cart-btn btn btn-icon btn-icon-primary btn-icon-sm"
+              on:click={clearCart}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <!-- NEW: Dual price display section -->
+          <div class="cart-totals-section">
+            <div class="cart-total-regular">Total: ${cartTotal.toFixed(2)}</div>
+            <div class="cart-total-promo">
+              With loyalty card: ${cartPromoTotal.toFixed(2)}
+            </div>
+            {#if totalSavings > 0}
+              <div class="savings-amount">
+                You save: ${totalSavings.toFixed(2)}
+              </div>
+            {/if}
+          </div>
+
+          <div class="cart-items">
+            {#if isLoading}
+              <div class="loading">Loading cart items...</div>
+            {:else if cartItems.length === 0}
+              <div class="empty-cart">Your cart is empty</div>
+            {:else}
+              <!-- FIXED: Safe sorting of cart items -->
+              {#each [...cartItems]
+                .filter((item) => item && item.groupHash)
+                .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
+                {@const detailsKey = `${item.groupHash}_${item.productIndex}`}
+                {#if productDetails[detailsKey]}
+                  <ProductCartItem
+                    product={productDetails[detailsKey]}
+                    quantity={item.quantity}
+                    groupHash={item.groupHash}
+                    productIndex={item.productIndex}
+                    note={item.note}
+                    isUpdating={false}
+                  />
+                {/if}
+              {/each}
+            {/if}
+
+            {#if checkoutError}
+              <div class="error-message">
+                {checkoutError}
+              </div>
+            {/if}
+          </div>
+
+          <div class="checkout-button-container">
+            <button
+              class="checkout-button btn btn-primary btn-lg"
+              disabled={cartItems.length === 0}
+              on:click={startCheckout}
+            >
+              Proceed to Checkout
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+  </div>
+</div>
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:235:1
+Warn: A11y: visible, non-interactive elements with an on:click event must be accompanied by an on:keydown, on:keyup, or on:keypress event. (svelte)
+
+<div
+  class="overlay {isOpen ? (isClosing ? 'fade-out' : 'fade-in') : ''}"
+  class:visible={isOpen}
+  on:click={closeCart}
+>
+  <div
+    class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"
+    class:open={isOpen}
+    on:click|stopPropagation
+  >
+    {#if isShowingCheckoutFlow}
+      <CheckoutFlow
+        {client}
+        cartService={$cartServiceStore}
+        {cartItems}
+        {productDetails}
+        {cartTotal}
+        onClose={closeCheckoutFlow}
+        on:checkout-success={handleCheckoutSuccess}
+      />
+    {:else}
+      <CartHeader onClose={closeCart} />
+
+      <div class="cart-content">
+        <div class="cart-main">
+          <div class="cart-main-header">
+            <div class="cart-title">
+              Cart ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})
+            </div>
+            <button
+              class="delete-cart-btn btn btn-icon btn-icon-primary btn-icon-sm"
+              on:click={clearCart}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <!-- NEW: Dual price display section -->
+          <div class="cart-totals-section">
+            <div class="cart-total-regular">Total: ${cartTotal.toFixed(2)}</div>
+            <div class="cart-total-promo">
+              With loyalty card: ${cartPromoTotal.toFixed(2)}
+            </div>
+            {#if totalSavings > 0}
+              <div class="savings-amount">
+                You save: ${totalSavings.toFixed(2)}
+              </div>
+            {/if}
+          </div>
+
+          <div class="cart-items">
+            {#if isLoading}
+              <div class="loading">Loading cart items...</div>
+            {:else if cartItems.length === 0}
+              <div class="empty-cart">Your cart is empty</div>
+            {:else}
+              <!-- FIXED: Safe sorting of cart items -->
+              {#each [...cartItems]
+                .filter((item) => item && item.groupHash)
+                .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
+                {@const detailsKey = `${item.groupHash}_${item.productIndex}`}
+                {#if productDetails[detailsKey]}
+                  <ProductCartItem
+                    product={productDetails[detailsKey]}
+                    quantity={item.quantity}
+                    groupHash={item.groupHash}
+                    productIndex={item.productIndex}
+                    note={item.note}
+                    isUpdating={false}
+                  />
+                {/if}
+              {/each}
+            {/if}
+
+            {#if checkoutError}
+              <div class="error-message">
+                {checkoutError}
+              </div>
+            {/if}
+          </div>
+
+          <div class="checkout-button-container">
+            <button
+              class="checkout-button btn btn-primary btn-lg"
+              disabled={cartItems.length === 0}
+              on:click={startCheckout}
+            >
+              Proceed to Checkout
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+  </div>
+</div>
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:29:9
+Hint: 'productStore' is declared but its value is never read. (ts)
+  const store = storeContext.getStore();
+  const productStore = store?.productStore;
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:35:7
+Hint: 'isCheckingOut' is declared but its value is never read. (ts)
+  let isLoading = true;
+  let isCheckingOut = false;
+  let isShowingCheckoutFlow = false;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:39:7
+Hint: Variable 'cartTotalUnsubscribe' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let isClosing = false; // Added for animation control
+  let cartTotalUnsubscribe;
+  let cartPromoTotalUnsubscribe;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:40:7
+Hint: Variable 'cartPromoTotalUnsubscribe' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let cartTotalUnsubscribe;
+  let cartPromoTotalUnsubscribe;
+  let cartTotal = 0;
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:45:7
+Hint: Variable 'unsubscribe' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Subscribe to cart changes
+  let unsubscribe;
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:107:38
+Hint: Parameter 'groupHashB64' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Product fetching - FIXED: Handle undefined hashB64
+  async function fetchProductDetails(groupHashB64, productIndex) {
+    try {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:107:52
+Hint: Parameter 'productIndex' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Product fetching - FIXED: Handle undefined hashB64
+  async function fetchProductDetails(groupHashB64, productIndex) {
+    try {
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:208:34
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Handle checkout success
+  function handleCheckoutSuccess(event) {
+    closeCart();
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:208:34
+Hint: 'event' is declared but its value is never read. (ts)
+  // Handle checkout success
+  function handleCheckoutSuccess(event) {
+    closeCart();
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:221:24
+Hint: Parameter 'a' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Safe compare function for sorting
+  function safeCompare(a, b) {
+    // Handle undefined values
+
+
+/home/bur1/Holochain/summon/ui/src/cart/SlideOutCart.svelte:221:27
+Hint: Parameter 'b' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Safe compare function for sorting
+  function safeCompare(a, b) {
+    // Handle undefined values
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:9:5
+Hint: 'createEventDispatcher' is declared but its value is never read. (ts)
+    getContext,
+    createEventDispatcher,
+  } from "svelte";
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:15:3
+Hint: 'ProfilesStore' is declared but its value is never read. (ts)
+
+  import { ProfilesStore } from "@holochain-open-dev/profiles";
+  import CategorySidebar from "./CategorySidebar.svelte";
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:22:5
+Hint: 'searchModeStore' is declared but its value is never read. (ts)
+    isCartOpenStore,
+    searchModeStore,
+    searchQueryStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:23:5
+Hint: 'searchQueryStore' is declared but its value is never read. (ts)
+    searchModeStore,
+    searchQueryStore,
+    selectedCategoryStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:24:5
+Hint: 'selectedCategoryStore' is declared but its value is never read. (ts)
+    searchQueryStore,
+    selectedCategoryStore,
+    selectedSubcategoryStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:25:5
+Hint: 'selectedSubcategoryStore' is declared but its value is never read. (ts)
+    selectedCategoryStore,
+    selectedSubcategoryStore,
+    selectedProductTypeStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:26:5
+Hint: 'selectedProductTypeStore' is declared but its value is never read. (ts)
+    selectedSubcategoryStore,
+    selectedProductTypeStore,
+    showReportDialogStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:27:5
+Hint: 'showReportDialogStore' is declared but its value is never read. (ts)
+    selectedProductTypeStore,
+    showReportDialogStore,
+    reportedProductStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:28:5
+Hint: 'reportedProductStore' is declared but its value is never read. (ts)
+    showReportDialogStore,
+    reportedProductStore,
+    productNameStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:29:5
+Hint: 'productNameStore' is declared but its value is never read. (ts)
+    reportedProductStore,
+    productNameStore,
+    selectedProductHashStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:30:5
+Hint: 'selectedProductHashStore' is declared but its value is never read. (ts)
+    productNameStore,
+    selectedProductHashStore,
+    searchResultsStore, // Changed from fuseResultsStore
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:31:5
+Hint: 'searchResultsStore' is declared but its value is never read. (ts)
+    selectedProductHashStore,
+    searchResultsStore, // Changed from fuseResultsStore
+    isViewAllStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:32:5
+Hint: 'isViewAllStore' is declared but its value is never read. (ts)
+    searchResultsStore, // Changed from fuseResultsStore
+    isViewAllStore,
+    isHomeViewStore,
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:42:7
+Hint: Variable 'shopViewComponent' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  let store: ShopStore = new ShopStore(client, roleName);
+  let shopViewComponent; // Reference to the ShopView component
+
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:49:9
+Hint: 'profilesStore' is declared but its value is never read. (ts)
+  // Get profiles store from context (passed down from profiles-context)
+  const profilesStore = getContext("profiles-store");
+
+
+
+/home/bur1/Holochain/summon/ui/src/Controller.svelte:63:33
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  // Handle category selection from sidebar
+  function handleCategorySelect(event) {
+    if (shopViewComponent) {
+
+
+/home/bur1/Holochain/summon/ui/src/App.svelte:7:5
+Hint: 'encodeHashToBase64' is declared but its value is never read. (ts)
+    type AppWebsocketConnectionOptions,
+    encodeHashToBase64,
+  } from "@holochain/client";
+
+
+/home/bur1/Holochain/summon/ui/src/App.svelte:56:9
+Hint: Variable 'tokenResp' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+  async function initialize(): Promise<void> {
+    let tokenResp;
+
+
+
+/home/bur1/Holochain/summon/ui/src/App.svelte:113:33
+Hint: Parameter 'event' implicitly has an 'any' type, but a better type may be inferred from usage. (ts)
+
+  function handleProfileCreated(event) {
+    console.log("Profile created event:", event);
+
+
+/home/bur1/Holochain/summon/ui/src/cart/ProductIntegration.ts:18:17
+Hint: Parameter 'simpleCartService' implicitly has an 'any' type, but a better type may be inferred from usage. 
+export class ProductIntegration {
+    constructor(private simpleCartService, private productStore) { }
+
+
+
+/home/bur1/Holochain/summon/ui/src/cart/ProductIntegration.ts:18:44
+Hint: Parameter 'productStore' implicitly has an 'any' type, but a better type may be inferred from usage. 
+export class ProductIntegration {
+    constructor(private simpleCartService, private productStore) { }
+
+
+
+/home/bur1/Holochain/summon/ui/src/profiles/types.ts:2:3
+Hint: 'ActionHash' is declared but never used. 
+import type {
+  ActionHash,
+  AgentPubKey,
+
+
+/home/bur1/Holochain/summon/ui/src/profiles/types.ts:3:3
+Hint: 'AgentPubKey' is declared but never used. 
+  ActionHash,
+  AgentPubKey,
+  Create,
+
+
+/home/bur1/Holochain/summon/ui/src/profiles/types.ts:8:3
+Hint: 'DnaHash' is declared but never used. 
+  DeleteLink,
+  DnaHash,
+  EntryHash,
+
+
+/home/bur1/Holochain/summon/ui/src/profiles/types.ts:9:3
+Hint: 'EntryHash' is declared but never used. 
+  DnaHash,
+  EntryHash,
+  Record,
+
+
+/home/bur1/Holochain/summon/ui/src/profiles/types.ts:10:3
+Hint: 'Record' is declared but never used. 
+  EntryHash,
+  Record,
+  SignedActionHashed,
+
+
+/home/bur1/Holochain/summon/ui/src/search/embedding-worker.ts:386:13
+Hint: 'addedCountSinceLastCall' is declared but its value is never read. 
+
+        let addedCountSinceLastCall = 0;
+        for (let i = 0; i < points.length; i++) {
+
+
+/home/bur1/Holochain/summon/ui/src/search/embedding-worker.ts:459:41
+Hint: Parameter 'origIdx' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        const validDistances: number[] = [];
+        finalResults.neighbors.forEach((origIdx, i) => {
+            if (typeof origIdx === 'number') {
+
+
+/home/bur1/Holochain/summon/ui/src/search/embedding-worker.ts:459:50
+Hint: Parameter 'i' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        const validDistances: number[] = [];
+        finalResults.neighbors.forEach((origIdx, i) => {
+            if (typeof origIdx === 'number') {
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-constants.ts:14:21
+Hint: Parameter 'query' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        preferredCategory: "Dry Goods & Pasta",
+        condition: (query) => query.includes("pasta") || query.includes("tomato")
+    },
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-constants.ts:20:21
+Hint: Parameter 'query' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        preferredCategory: "Beer",
+        condition: (query) => query.includes("non-alcoholic") || query.includes("non")
+    },
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-constants.ts:25:21
+Hint: Parameter 'query' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        preferredCategory: "Wine",
+        condition: (query) => query.includes("non-alcoholic") || query.includes("non")
+    },
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-constants.ts:30:21
+Hint: Parameter 'query' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        preferredCategory: "Dry Goods & Pasta",
+        condition: (query) => query.includes("can")
+    },
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-constants.ts:36:21
+Hint: Parameter 'query' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        preferredCategory: "Deli",
+        condition: (query) => query.includes("hummus") ||
+            query.includes("guacamole") ||
+
+
+/home/bur1/Holochain/summon/ui/src/search/search-constants.ts:43:21
+Hint: Parameter 'query' implicitly has an 'any' type, but a better type may be inferred from usage. 
+        preferredCategory: "Liquor",
+        condition: (query) => query.includes("can")
+    },
+
+
+====================================
+svelte-check found 0 errors, 46 warnings, and 258 hints

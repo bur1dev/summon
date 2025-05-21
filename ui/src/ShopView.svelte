@@ -1,6 +1,8 @@
 <script lang="ts">
   import { getContext } from "svelte";
-  import type { ShopStore } from "./store";
+  import type { Writable } from "svelte/store"; // Added Writable
+  import type { ShopStore, StoreContext, UIProps } from "./store"; // Added StoreContext, ADDED UIProps
+  import type { SimpleCartService } from "./cart/SimpleCartService"; // Added SimpleCartService
   import ProductCard from "./ProductCard.svelte";
   import { onMount, onDestroy } from "svelte";
   import { mainCategories } from "./categoryData";
@@ -32,14 +34,18 @@
   } from "./UiStateStore";
 
   // Store setup
-  const { getStore } = getContext("store");
-  let store: ShopStore = getStore();
+  const storeContext = getContext<StoreContext>("store");
+  let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
 
   // Get cart service directly from the context
-  const cartService = getContext("cartService");
+  const cartService = getContext<Writable<SimpleCartService>>("cartService");
 
-  // Create product data service
-  const productDataService = new ProductDataService(store);
+  // Create product data service - will be initialized once store is available
+  let productDataService: ProductDataService | null = null; // MODIFIED
+  $: if (store && !productDataService) {
+    // MODIFIED: Initialize when store is ready
+    productDataService = new ProductDataService(store);
+  }
 
   // Only keep standAlone param
   export let standAlone = false;
@@ -50,21 +56,29 @@
   }
 
   // Sync with UI store when uiProps changes
-  $: uiProps = store.uiProps;
+  let uiProps: Writable<UIProps> | null = null; // MODIFIED
+  $: if (store) {
+    // MODIFIED: Only access uiProps if store exists
+    uiProps = store.uiProps;
+  }
+
+  // Reactive updates based on uiProps
   $: {
-    if ($uiProps.searchMode !== undefined)
-      $searchModeStore = $uiProps.searchMode;
-    if ($uiProps.searchQuery !== undefined)
-      $searchQueryStore = $uiProps.searchQuery;
-    if ($uiProps.selectedProductHash !== undefined)
-      $selectedProductHashStore = $uiProps.selectedProductHash;
-    if ($uiProps.productName !== undefined)
-      $productNameStore = $uiProps.productName;
-    if ($uiProps.searchResults !== undefined)
-      // Changed from fuseResults
-      $searchResultsStore = $uiProps.searchResults || []; // Changed from fuseResultsStore
-    if ($uiProps.isViewAll !== undefined)
-      $isViewAllStore = $uiProps.isViewAll || false;
+    if (uiProps && $uiProps) {
+      // MODIFIED: Check if uiProps and $uiProps are available
+      if ($uiProps.searchMode !== undefined)
+        $searchModeStore = $uiProps.searchMode;
+      if ($uiProps.searchQuery !== undefined)
+        $searchQueryStore = $uiProps.searchQuery;
+      if ($uiProps.selectedProductHash !== undefined)
+        $selectedProductHashStore = $uiProps.selectedProductHash;
+      if ($uiProps.productName !== undefined)
+        $productNameStore = $uiProps.productName;
+      if ($uiProps.searchResults !== undefined)
+        $searchResultsStore = $uiProps.searchResults || [];
+      if ($uiProps.isViewAll !== undefined)
+        $isViewAllStore = $uiProps.isViewAll || false;
+    }
   }
 
   function handleCategorySelect({ detail: { category, subcategory } }) {
@@ -78,7 +92,10 @@
       // This is navigation to a category or subcategory
       $isHomeViewStore = false;
       $searchModeStore = false;
-      store.setUIprops({ ...($uiProps || {}), searchMode: false });
+      if (store && uiProps && $uiProps) {
+        // MODIFIED: Check store and uiProps
+        store.setUIprops({ ...($uiProps || {}), searchMode: false });
+      }
       $selectedCategoryStore = category;
       $selectedSubcategoryStore = subcategory;
       $selectedProductTypeStore = "All";
@@ -130,103 +147,109 @@
 
 <div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
   <div class="main-content">
-    <div class="content-wrapper">
-      {#if !$searchModeStore}
-        {#if !$isHomeViewStore && $selectedCategoryStore && $selectedSubcategoryStore}
-          {@const subcategory = mainCategories
-            .find((c) => c.name === $selectedCategoryStore)
-            ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)}
-          {#if subcategory?.productTypes && subcategory.productTypes.length > 1 && !subcategory.gridOnly}
-            <div class="product-type-nav">
-              <div class="product-type-container">
-                <button
-                  class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
-                  'All'
-                    ? 'active'
-                    : ''}"
-                  on:click={() =>
-                    handleProductTypeSelect({
-                      detail: { productType: "All" },
-                    })}
-                >
-                  All
-                </button>
-                {#each mainCategories
-                  .find((c) => c.name === $selectedCategoryStore)
-                  ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)
-                  ?.productTypes?.filter((pt) => pt !== "All") ?? [] as productType}
+    {#if store && productDataService}
+      <!-- MODIFIED: Render content only if store and service are available -->
+      <div class="content-wrapper">
+        {#if !$searchModeStore}
+          {#if !$isHomeViewStore && $selectedCategoryStore && $selectedSubcategoryStore}
+            {@const subcategory = mainCategories
+              .find((c) => c.name === $selectedCategoryStore)
+              ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)}
+            {#if subcategory?.productTypes && subcategory.productTypes.length > 1 && !subcategory.gridOnly}
+              <div class="product-type-nav">
+                <div class="product-type-container">
                   <button
                     class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
-                    productType
+                    'All'
                       ? 'active'
                       : ''}"
                     on:click={() =>
-                      handleProductTypeSelect({ detail: { productType } })}
+                      handleProductTypeSelect({
+                        detail: { productType: "All" },
+                      })}
                   >
-                    {productType}
+                    All
                   </button>
-                {/each}
+                  {#each mainCategories
+                    .find((c) => c.name === $selectedCategoryStore)
+                    ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)
+                    ?.productTypes?.filter((pt) => pt !== "All") ?? [] as productType}
+                    <button
+                      class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
+                      productType
+                        ? 'active'
+                        : ''}"
+                      on:click={() =>
+                        handleProductTypeSelect({ detail: { productType } })}
+                    >
+                      {productType}
+                    </button>
+                  {/each}
+                </div>
               </div>
-            </div>
+            {/if}
           {/if}
+
+          {#if $isHomeViewStore}{/if}
         {/if}
 
-        {#if $isHomeViewStore}{/if}
-      {/if}
-
-      <div class="product-sections">
-        {#if $searchModeStore}
-          <SearchResults
-            {store}
-            query={$searchQueryStore}
-            selectedProductHash={$selectedProductHashStore}
-            productName={$productNameStore}
-            searchResults={$searchResultsStore}
-            searchMethod={$searchMethodStore}
-            on:reportCategory={(event) => {
-              $reportedProductStore = event.detail;
-              $showReportDialogStore = true;
-            }}
-          />
-        {:else if $isHomeViewStore}
-          <!-- Home view with multiple featured subcategories -->
-          <ProductBrowser
-            selectedCategory={null}
-            selectedSubcategory={null}
-            selectedProductType={"All"}
-            isHomeView={true}
-            {featuredSubcategories}
-            searchMode={$searchModeStore}
-            {store}
-            {productDataService}
-            on:viewMore={handleViewMore}
-            on:productTypeSelect={handleProductTypeSelect}
-            on:reportCategory={(event) => {
-              $reportedProductStore = event.detail;
-              $showReportDialogStore = true;
-            }}
-          />
-        {:else}
-          <!-- Normal category browsing -->
-          <ProductBrowser
-            selectedCategory={$selectedCategoryStore}
-            selectedSubcategory={$selectedSubcategoryStore}
-            selectedProductType={$selectedProductTypeStore}
-            isHomeView={false}
-            featuredSubcategories={[]}
-            searchMode={$searchModeStore}
-            {store}
-            {productDataService}
-            on:viewMore={handleViewMore}
-            on:productTypeSelect={handleProductTypeSelect}
-            on:reportCategory={(event) => {
-              $reportedProductStore = event.detail;
-              $showReportDialogStore = true;
-            }}
-          />
-        {/if}
+        <div class="product-sections">
+          {#if $searchModeStore}
+            <SearchResults
+              {store}
+              query={$searchQueryStore}
+              selectedProductHash={$selectedProductHashStore}
+              productName={$productNameStore}
+              searchResults={$searchResultsStore}
+              searchMethod={$searchMethodStore}
+              on:reportCategory={(event) => {
+                $reportedProductStore = event.detail;
+                $showReportDialogStore = true;
+              }}
+            />
+          {:else if $isHomeViewStore}
+            <!-- Home view with multiple featured subcategories -->
+            <ProductBrowser
+              selectedCategory={null}
+              selectedSubcategory={null}
+              selectedProductType={"All"}
+              isHomeView={true}
+              {featuredSubcategories}
+              searchMode={$searchModeStore}
+              {store}
+              {productDataService}
+              on:viewMore={handleViewMore}
+              on:productTypeSelect={handleProductTypeSelect}
+              on:reportCategory={(event) => {
+                $reportedProductStore = event.detail;
+                $showReportDialogStore = true;
+              }}
+            />
+          {:else}
+            <!-- Normal category browsing -->
+            <ProductBrowser
+              selectedCategory={$selectedCategoryStore}
+              selectedSubcategory={$selectedSubcategoryStore}
+              selectedProductType={$selectedProductTypeStore}
+              isHomeView={false}
+              featuredSubcategories={[]}
+              searchMode={$searchModeStore}
+              {store}
+              {productDataService}
+              on:viewMore={handleViewMore}
+              on:productTypeSelect={handleProductTypeSelect}
+              on:reportCategory={(event) => {
+                $reportedProductStore = event.detail;
+                $showReportDialogStore = true;
+              }}
+            />
+          {/if}
+        </div>
       </div>
-    </div>
+    {:else}
+      <div>Loading store...</div>
+      <!-- MODIFIED: Show loading or placeholder -->
+    {/if}
   </div>
 </div>
 {#if $reportedProductStore && $showReportDialogStore}

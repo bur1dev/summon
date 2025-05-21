@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { mainCategories } from "./categoryData";
     import { getContext } from "svelte";
@@ -10,10 +10,11 @@
         Database,
         RefreshCw,
     } from "lucide-svelte";
+    import type { StoreContext, ShopStore } from "./store"; // Adjust path if needed
 
     // This must be at the top level
-    const { getStore } = getContext("store");
-    let store = getStore();
+    const storeContext = getContext<StoreContext>("store");
+    let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
 
     export let onClose = () => {};
 

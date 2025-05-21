@@ -1,6 +1,8 @@
 import { decodeProducts } from "./search-utils";
 import type { Product } from "./search-types";
 import { decode } from "@msgpack/msgpack";
+import type { DecodedProductGroupEntry } from "./search-utils";
+
 
 
 /**
@@ -340,10 +342,9 @@ export class SearchApiClient {
     }
 }
 
-// Import needed to decode product groups
-function decodeEntry(entry: any) {
+function decodeEntry(entry: any): DecodedProductGroupEntry | null {
     try {
-        return decode(entry);
+        return decode(entry) as DecodedProductGroupEntry | null;
     } catch (error) {
         console.error("Error decoding entry:", error);
         return null;

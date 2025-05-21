@@ -252,7 +252,6 @@
         }
 
         return {
-            update,
             destroy,
             // Svelte might call update if isOpen changes, ensure it doesn't re-append
             update: (newIsOpen) => {

@@ -1,8 +1,49 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
     import { decode } from "@msgpack/msgpack";
+    import { encodeHashToBase64, type HoloHash } from "@holochain/client"; // Added HoloHash and encodeHashToBase64
     import { ProductRowCacheService } from "./ProductRowCacheService";
     import { ChevronsLeft, ChevronsRight } from "lucide-svelte";
+
+    // Interfaces for data structures (similar to SearchCacheService)
+    interface RawProductFromDHT {
+        name: string;
+        price: number;
+        promo_price?: number;
+        size?: string;
+        category: string;
+        subcategory?: string;
+        product_type?: string;
+        image_url?: string;
+        sold_by?: string;
+        product_id?: string;
+        stocks_status?: string;
+        embedding?: number[];
+        [key: string]: any;
+    }
+
+    interface DecodedProductGroup {
+        products: RawProductFromDHT[];
+        [key: string]: any;
+    }
+
+    interface ProductWithClientHash extends RawProductFromDHT {
+        hash: string; // groupHashBase64_index
+    }
+
+    interface HolochainRecord {
+        entry: {
+            Present: {
+                entry: Uint8Array; // msgpack encoded
+            };
+        };
+        signed_action: {
+            hashed: {
+                hash: HoloHash; // HoloHash (typically Uint8Array)
+            };
+        };
+    }
+
     export let direction: "left" | "right";
     export let disabled: boolean = false;
     export let currentRanges;
@@ -54,7 +95,11 @@
     async function fetchGroup(
         groupOffset: number,
         groupLimit: number = 1,
-    ): Promise<{ products: any[]; totalInPath: number; hasMore: boolean }> {
+    ): Promise<{
+        products: ProductWithClientHash[];
+        totalInPath: number;
+        hasMore: boolean;
+    }> {
         try {
             // Parse the identifier to get correct category and subcategory
             const parsed = parseIdentifier(identifier);
@@ -80,16 +125,16 @@
                 },
             });
 
-            const products = extractProductsFromGroups(
+            const products: ProductWithClientHash[] = extractProductsFromGroups(
                 response.product_groups || [],
             );
             const totalInPath = response.total_products || 0;
-            const hasMore = response.has_more ?? false;
+            const hasMoreResponse = response.has_more ?? false;
 
             console.log(
-                `✅ Fetched group data: ${products.length} products, totalInPath=${totalInPath}, hasMore=${hasMore}`,
+                `✅ Fetched group data: ${products.length} products, totalInPath=${totalInPath}, hasMore=${hasMoreResponse}`,
             );
-            return { products, totalInPath, hasMore };
+            return { products, totalInPath, hasMore: hasMoreResponse };
         } catch (fetchError) {
             console.error(
                 `Error fetching groups from offset ${groupOffset}, limit ${groupLimit}:`,
@@ -144,24 +189,31 @@
         });
     }
 
-    function extractProductsFromGroups(groupRecords: any[]): any[] {
+    function extractProductsFromGroups(
+        groupRecords: HolochainRecord[],
+    ): ProductWithClientHash[] {
         if (!groupRecords || groupRecords.length === 0) return [];
-        let allProducts = [];
+        let allProducts: ProductWithClientHash[] = [];
         for (const record of groupRecords) {
             try {
-                const group = decode(record.entry.Present.entry);
-                const groupHash = record.signed_action.hashed.hash;
-                if (group.products && Array.isArray(group.products)) {
-                    const productsWithHash = group.products.map(
-                        (product, index) => ({
-                            ...product,
-                            hash: `${groupHash}_${index}`,
-                        }),
-                    );
+                const group = decode(
+                    record.entry.Present.entry,
+                ) as DecodedProductGroup;
+                const groupHash = record.signed_action.hashed.hash; // This is HoloHash
+                const groupHashBase64 = encodeHashToBase64(groupHash);
+
+                if (group && group.products && Array.isArray(group.products)) {
+                    const productsWithHash: ProductWithClientHash[] =
+                        group.products.map(
+                            (product: RawProductFromDHT, index: number) => ({
+                                ...product,
+                                hash: `${groupHashBase64}_${index}`, // Use base64 hash
+                            }),
+                        );
                     allProducts = [...allProducts, ...productsWithHash];
                 }
             } catch (error) {
-                console.error("Error decoding product group:", error);
+                console.error("Error decoding product group:", error, record);
             }
         }
         return allProducts;

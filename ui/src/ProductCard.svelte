@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext, onMount, onDestroy } from "svelte";
+  import type { Writable } from "svelte/store";
   import { BarChart, Plus, Minus } from "lucide-svelte";
   import { encodeHashToBase64 } from "@holochain/client";
   import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
@@ -10,33 +11,50 @@
   let showProductModal = false;
   const dispatch = createEventDispatcher();
 
-  // Get cart service directly from the context
-  const cartService = getContext("cartService");
+  // Define types for the cart service
+  interface CartItem {
+    groupHash: string;
+    productIndex: number;
+    quantity: number;
+    // Add other properties if they exist, e.g., price, name, etc.
+  }
 
-  const preload = (node) => {
-    // Start loading the image immediately if data-src is available
-    if (node.dataset.src) {
-      const img = new Image();
-      img.src = node.dataset.src;
-    }
+  interface CartServiceAPI {
+    ready: Writable<boolean>; // 'ready' is a store
+    subscribe: (callback: (items: CartItem[]) => void) => () => void; // Method to subscribe to cart item changes
+    getCartItems: () => CartItem[];
+    addToCart: (
+      groupHash: string,
+      productIndex: number,
+      quantity: number,
+    ) => Promise<any>; // Or specific return type
+    // Add any other methods or properties the cart service might have
+  }
+
+  // Get cart service directly from the context and type it as a Svelte store
+  const cartService = getContext<Writable<CartServiceAPI>>("cartService");
+
+  // Updated lazyLoad action for images
+  const lazyLoad = (imageNode: HTMLImageElement, srcUrl: string) => {
+    if (!srcUrl) return; // Do nothing if no srcUrl
 
     const observer = new IntersectionObserver(
-      (entries) => {
+      (entries, obs) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting || entry.intersectionRatio > 0) {
-            // When approaching viewport
-            const img = new Image();
-            img.src = entry.target.dataset.src;
+          if (entry.isIntersecting) {
+            imageNode.src = srcUrl; // Load the image
+            obs.unobserve(imageNode); // Stop observing once loaded
           }
         });
       },
       {
-        rootMargin: "500% 0px", // Much larger buffer
-        threshold: 0,
+        rootMargin: "200px 0px", // Load when 200px away from viewport
+        threshold: 0.01, // Trigger even if 1% is visible
       },
     );
 
-    observer.observe(node);
+    observer.observe(imageNode);
+
     return {
       destroy() {
         observer.disconnect();
@@ -348,12 +366,7 @@
   }
 </script>
 
-<div
-  class="product-card fade-in"
-  use:preload
-  data-src={product.image_url}
-  on:click={handleCardClick}
->
+<div class="product-card fade-in" on:click={handleCardClick}>
   <button
     class="add-btn btn {displayAmount > 0
       ? 'counter-btn-group expanded'
@@ -391,11 +404,15 @@
     <!-- Rest of the content remains unchanged -->
     {#if product.image_url}
       <img
-        src={product.image_url}
+        use:lazyLoad={product.image_url}
+        data-src={product.image_url}
         alt={product.name}
         class="product-image"
-        loading="eager"
+        loading="lazy"
       />
+    {:else}
+      <!-- Optional: Placeholder for products without images -->
+      <div class="product-image placeholder-image">No Image</div>
     {/if}
     <div class="prices">
       {#if product.promo_price && product.promo_price < product.price}
@@ -483,6 +500,18 @@
     padding: 0;
     box-sizing: border-box; /* Added */
     display: block; /* Added */
+  }
+
+  .placeholder-image {
+    width: 100%;
+    height: 245px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0; /* Light grey background */
+    color: #ccc; /* Light grey text */
+    font-size: 16px;
+    box-sizing: border-box;
   }
 
   /* Price styling remains unchanged */

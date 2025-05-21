@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher, onMount, onDestroy } from "svelte";
     import { debounce, throttle } from "lodash";
-    import Fuse from "fuse.js";
+    import Fuse, { type FuseResult } from "fuse.js";
     import { Search } from "lucide-svelte";
     import SearchCacheService from "./SearchCacheService";
     import type {
@@ -434,7 +434,7 @@
 
     // Legacy function maintained for initial dropdown display
     function processSearchResultsForDropdown(
-        fuseResults: Fuse.FuseResult<Product>[],
+        fuseResults: FuseResult<Product>[], // Changed from Fuse.FuseResult
         qualifiers: string[],
     ): Array<Product | ProductTypeGroup> {
         const searchLower = searchQuery.toLowerCase();
@@ -492,8 +492,8 @@
 
     // Legacy function maintained for backward compatibility
     function sortResultsByRelevanceForDropdown(
-        a: Fuse.FuseResult<Product>,
-        b: Fuse.FuseResult<Product>,
+        a: FuseResult<Product>, // Changed from Fuse.FuseResult
+        b: FuseResult<Product>, // Changed from Fuse.FuseResult
         searchTerms: string[],
         qualifiers: string[],
     ): number {
@@ -746,6 +746,22 @@
         }
         showDropdown = false;
     }
+
+    function handleClickType(item: Product | ProductTypeGroup) {
+        // Check for properties unique to ProductTypeGroup
+        if ("type" in item && "sample" in item) {
+            // Now TypeScript should be more confident that 'item' can be treated as ProductTypeGroup
+            handleTypeSelection(item as ProductTypeGroup);
+        }
+    }
+
+    function handleClickProduct(item: Product | ProductTypeGroup) {
+        // Check for properties unique to Product
+        if ("name" in item && "hash" in item) {
+            // Now TypeScript should be more confident that 'item' can be treated as Product
+            selectProduct(item as Product);
+        }
+    }
 </script>
 
 <div class="search-container">
@@ -801,13 +817,13 @@
                     <div class="no-results">No products found</div>
                 {:else}
                     {#each searchResultsForDropdown as result}
-                        {#if result.isType}
+                        {#if result.isType && "type" in result && "sample" in result}
                             <div
                                 class="dropdown-item type-item"
-                                on:click={() => handleTypeSelection(result)}
+                                on:click={() => handleClickType(result)}
                             >
                                 <div class="product-image">
-                                    {#if result.sample?.image_url}
+                                    {#if result.sample && "image_url" in result.sample && result.sample.image_url}
                                         <img
                                             src={result.sample.image_url}
                                             alt={result.type}
@@ -821,13 +837,13 @@
                                     {searchQuery}
                                 </div>
                             </div>
-                        {:else}
+                        {:else if !result.isType && "name" in result && "price" in result}
                             <div
                                 class="dropdown-item"
-                                on:click={() => selectProduct(result)}
+                                on:click={() => handleClickProduct(result)}
                             >
                                 <div class="product-image">
-                                    {#if result.image_url}
+                                    {#if "image_url" in result && result.image_url}
                                         <img
                                             src={result.image_url}
                                             alt={result.name}
@@ -836,7 +852,9 @@
                                 </div>
                                 <div class="product-name">{result.name}</div>
                                 <div class="product-price">
-                                    ${result.price?.toFixed(2)}
+                                    ${typeof result.price === "number"
+                                        ? result.price.toFixed(2)
+                                        : "0.00"}
                                 </div>
                             </div>
                         {/if}

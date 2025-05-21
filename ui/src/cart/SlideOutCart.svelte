@@ -1,5 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
+  import type { Writable } from "svelte/store"; // Import Writable
+  import type { SimpleCartService } from "./SimpleCartService"; // Import SimpleCartService type
   import CartHeader from "./CartHeader.svelte";
   import ProductCartItem from "./ProductCartItem.svelte";
   import CheckoutFlow from "./CheckoutFlow.svelte";
@@ -7,16 +9,23 @@
   import { decode } from "@msgpack/msgpack";
   import { X } from "lucide-svelte";
 
+  // Define an interface for the decoded product group (similar to CheckoutFlow.svelte)
+  interface ProductGroup {
+    products: any[]; // Ideally, replace 'any' with a more specific Product type
+    // Add other expected properties of a product group if known
+  }
+
   // Props
   export let isOpen = false;
   export let onClose = () => {};
 
   // Get cart service directly from the context
-  const cartService = getContext("cartService");
+  const cartServiceStore =
+    getContext<Writable<SimpleCartService | null>>("cartService");
 
   // Get the store for product info
-  const { getStore } = getContext("store");
-  const store = getStore();
+  const storeContext = getContext<import("../store").StoreContext>("store");
+  const store = storeContext.getStore();
   const productStore = store?.productStore;
 
   // State
@@ -36,8 +45,11 @@
   let unsubscribe;
 
   onMount(async () => {
-    if ($cartService && typeof $cartService.subscribe === "function") {
-      unsubscribe = $cartService.subscribe(async (items) => {
+    if (
+      $cartServiceStore &&
+      typeof $cartServiceStore.subscribe === "function"
+    ) {
+      unsubscribe = $cartServiceStore.subscribe(async (items) => {
         // Filter out any invalid items - ones with no groupHash
         cartItems = (items || []).filter((item) => item && item.groupHash);
 
@@ -69,11 +81,11 @@
       });
 
       // Subscribe to cart totals
-      cartTotalUnsubscribe = $cartService.cartTotal.subscribe((total) => {
+      cartTotalUnsubscribe = $cartServiceStore.cartTotal.subscribe((total) => {
         cartTotal = total;
       });
 
-      cartPromoTotalUnsubscribe = $cartService.cartPromoTotal.subscribe(
+      cartPromoTotalUnsubscribe = $cartServiceStore.cartPromoTotal.subscribe(
         (total) => {
           cartPromoTotal = total;
         },
@@ -123,10 +135,20 @@
             payload: groupHash,
           });
 
-          if (result) {
-            const group = decode(result.entry.Present.entry);
+          if (
+            result &&
+            result.entry &&
+            result.entry.Present &&
+            result.entry.Present.entry
+          ) {
+            const group = decode(result.entry.Present.entry) as ProductGroup;
 
-            if (group && group.products && group.products[productIndex]) {
+            if (
+              group &&
+              group.products &&
+              productIndex < group.products.length &&
+              group.products[productIndex]
+            ) {
               return group.products[productIndex];
             }
           }
@@ -156,8 +178,11 @@
   // Clear cart
   async function clearCart() {
     try {
-      if ($cartService && typeof $cartService.clearCart === "function") {
-        await $cartService.clearCart();
+      if (
+        $cartServiceStore &&
+        typeof $cartServiceStore.clearCart === "function"
+      ) {
+        await $cartServiceStore.clearCart();
       }
       closeCart();
     } catch (error) {
@@ -190,7 +215,7 @@
   }
 
   // Get the client for checkout component
-  $: client = $cartService ? $cartService.client : null;
+  $: client = $cartServiceStore ? $cartServiceStore.client : null;
 
   // Safe compare function for sorting
   function safeCompare(a, b) {
@@ -220,7 +245,7 @@
     {#if isShowingCheckoutFlow}
       <CheckoutFlow
         {client}
-        cartService={$cartService}
+        cartService={$cartServiceStore}
         {cartItems}
         {productDetails}
         {cartTotal}

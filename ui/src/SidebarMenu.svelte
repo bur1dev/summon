@@ -104,10 +104,7 @@
 
 {#if showCategoryAdmin}
     <div class="admin-overlay">
-        <CategoryReportsAdmin
-            {store}
-            onClose={() => (showCategoryAdmin = false)}
-        />
+        <CategoryReportsAdmin onClose={() => (showCategoryAdmin = false)} />
     </div>
 {/if}
 

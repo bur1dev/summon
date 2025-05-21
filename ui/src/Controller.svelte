@@ -10,6 +10,7 @@
   } from "svelte";
   import type { AppClient } from "@holochain/client";
   import { encodeHashToBase64 } from "@holochain/client";
+  import type { Writable } from "svelte/store";
 
   import { ProfilesStore } from "@holochain-open-dev/profiles";
   import CategorySidebar from "./CategorySidebar.svelte";
@@ -32,6 +33,7 @@
     isHomeViewStore,
   } from "./UiStateStore";
   import SidebarMenu from "./SidebarMenu.svelte";
+  import type { SimpleCartService } from "./cart/SimpleCartService";
 
   export let roleName = "";
   export let client: AppClient;
@@ -40,7 +42,8 @@
   let shopViewComponent; // Reference to the ShopView component
 
   // Get cart service from context
-  const cartService = getContext("cartService");
+  const cartService =
+    getContext<Writable<SimpleCartService | null>>("cartService");
 
   // Get profiles store from context (passed down from profiles-context)
   const profilesStore = getContext("profiles-store");

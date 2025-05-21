@@ -38,7 +38,7 @@
     let loadedSubcategoriesSet = new Set<string>(); // Tracks observed rows
     let visibleGroups = new Set(); // Tracks initially visible rows
 
-    let resizeTimeouts = {}; // Store separate timeouts for each row
+    let resizeTimeouts: Record<string, number> = {}; // Store separate timeouts for each row
     let isResizing = false;
 
     // Set up resize observer for responsive grid layout
@@ -46,7 +46,7 @@
         for (const entry of entries) {
             const identifier = entry.target.getAttribute("data-subcategory");
             if (identifier) {
-                handleResize(identifier, entry.target);
+                handleResize(identifier, entry.target as HTMLElement);
             }
         }
     });
@@ -611,7 +611,7 @@
                 const identifier =
                     entry.target.getAttribute("data-subcategory");
                 if (identifier) {
-                    handleResize(identifier, entry.target);
+                    handleResize(identifier, entry.target as HTMLElement);
                 }
             }
         });

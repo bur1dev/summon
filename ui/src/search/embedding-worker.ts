@@ -10,7 +10,7 @@ transformersEnv.useBrowserCache = true;
 // Types for messages (should align with EmbeddingService.ts WorkerMessage)
 interface WorkerMessage {
     id: string;
-    type: 'loadModel' | 'embedQuery' | 'rankSimilarity' | // Original types
+    type: 'loadModel' | 'embedQuery' | // Original types
     'initHnswLib' | 'initHnswIndex' | 'addPointsToHnsw' | 'searchHnsw' |
     'loadHnswIndexFile' | 'saveHnswIndexFile' | 'switchHnswContext';
     [key: string]: any;
@@ -73,10 +73,6 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             case 'embedQuery':
                 await handleEmbedQuery(message);
                 break;
-            case 'rankSimilarity': // Brute-force, deprecated but kept for reference
-                await handleRankSimilarityBruteForce(message);
-                break;
-
             // HNSW operations
             case 'initHnswLib':
                 await handleInitHnswLib(message);

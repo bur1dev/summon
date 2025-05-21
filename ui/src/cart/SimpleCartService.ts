@@ -1,6 +1,7 @@
 import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
-import { writable, derived, get } from 'svelte/store';
+import { writable, derived, get, type Writable, type Readable } from 'svelte/store'; // Added Writable, Readable
 import { decode } from "@msgpack/msgpack";
+import type { DecodedProductGroupEntry } from "../search/search-utils";
 
 // Type for delivery time
 export interface DeliveryTimeSlot {
@@ -17,6 +18,13 @@ export interface CheckoutDetails {
 
 // Type alias for base64-encoded action hash
 type ActionHashB64 = string;
+
+// Interface for Svelte context
+export interface CartServiceContext {
+    cartTotal: Writable<number>;
+    uniqueItemCount: Readable<number>; // Derived stores are Readable
+    // If other methods/stores from SimpleCartService are accessed via context, add them here.
+}
 
 export class SimpleCartService {
     // Stores
@@ -386,7 +394,7 @@ export class SimpleCartService {
             });
 
             if (result) {
-                const group = decode(result.entry.Present.entry);
+                const group = decode(result.entry.Present.entry) as DecodedProductGroupEntry | null;
                 if (group?.products?.[productIndex]) {
                     const product = group.products[productIndex];
 
@@ -469,10 +477,9 @@ export class SimpleCartService {
         // Save to localStorage
         this.saveToLocalStorage();
 
-        // Update cart total with a delay to ensure store updates complete
-        setTimeout(() => {
-            this.recalculateCartTotal();
-        }, 0);
+        // NOTE: The explicit recalculateCartTotal() call was removed from here.
+        // addToCart and similar functions should rely on updateCartTotalDelta for incremental updates.
+        // Full recalculations are handled by loadCart, clearCart, etc.
     }
 
     // Force sync before checkout
@@ -606,7 +613,7 @@ export class SimpleCartService {
                 });
 
                 if (result) {
-                    const group = decode(result.entry.Present.entry);
+                    const group = decode(result.entry.Present.entry) as DecodedProductGroupEntry | null;
 
                     // Extract the specific product from the group by index
                     if (group && group.products && group.products[item.productIndex]) {
@@ -710,7 +717,7 @@ export class SimpleCartService {
                     });
 
                     if (result) {
-                        const group = decode(result.entry.Present.entry);
+                        const group = decode(result.entry.Present.entry) as DecodedProductGroupEntry | null;
 
                         if (group && group.products && group.products[product.product_index]) {
                             details = group.products[product.product_index];

@@ -1,9 +1,14 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import { ShoppingCart, ArrowLeft, MapPin, Clock, X } from "lucide-svelte";
-  import { writable, type Writable } from "svelte/store";
+  import type { Writable } from "svelte/store";
   import { AddressService } from "./AddressService";
   import { currentViewStore } from "../UiStateStore";
+  import type { ShopStore } from "../store"; // Adjust path if store.ts is elsewhere
+
+  interface ControllerStoreContext {
+    getStore: () => ShopStore;
+  }
 
   // Import agent-avatar component
   import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
@@ -12,8 +17,8 @@
   const cartService = getContext("cartService") as Writable<any>;
 
   // Get the store for the client
-  const { getStore } = getContext("store");
-  const store = getStore();
+  const storeContext = getContext<ControllerStoreContext>("store");
+  const store = storeContext.getStore();
 
   // Get profiles store from context
   const profilesStore = getContext("profiles-store");

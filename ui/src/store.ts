@@ -7,7 +7,7 @@ import {
 } from '@holochain/client';
 import { writable, type Writable } from "svelte/store";
 import { ProductStore } from "./ProductStore";
-import type { ProductCacheStore } from "./ProductCacheStore";
+import type { Product } from "./search/search-types"; // Added import for Product
 
 export class ShopService {
   constructor(public client: AppClient, public roleName, public zomeName = 'products') { }
@@ -28,27 +28,32 @@ export interface UIProps {
   searchQuery?: string,
   productName?: string,
   selectedProductHash?: string,
-  fuseResults?: any[],
+  searchResults?: Product[], // Changed any[] to Product[]
   isViewAll?: boolean
+}
+
+// Interface for the Svelte context
+export interface StoreContext {
+  getStore: () => ShopStore | null; // ShopStore can be null initially
 }
 
 export class ShopStore {
   myAgentPubKeyB64: AgentPubKeyB64;
   service: ShopService;
   productStore: ProductStore;
-  productCache: ProductCacheStore;
   client: AppClient;
   uiProps: Writable<UIProps> = writable({
     bgUrl: "",
+    // Optional properties will be undefined initially
   });
   dnaHash: DnaHash;
   cartService: any; // Will hold the SimpleCartService instance
 
-  setUIprops(props: {}) {
-    this.uiProps.update((n) => {
-      Object.keys(props).forEach((key) => (n[key] = props[key]));
-      return n;
-    });
+  setUIprops(propsToUpdate: Partial<UIProps>) {
+    this.uiProps.update(currentProps => ({
+      ...currentProps,
+      ...propsToUpdate,
+    }));
   }
 
   get myAgentPubKey() {

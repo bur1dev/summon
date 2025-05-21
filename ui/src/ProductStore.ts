@@ -151,6 +151,7 @@ export class ProductStore {
             image_url: product.image_url || null, // Prioritize the direct image_url field
             sold_by: product.items?.[0]?.soldBy || null,
             productId: product.productId,
+            embedding: product.embedding || null,
           },
           main_category: product.category,
           subcategory: product.subcategory || null,
@@ -191,11 +192,11 @@ export class ProductStore {
             }
 
             const delayMs = 3000 * Math.pow(2, attempts - 1);
-            console.log(`[LOG] Load Saved Data: Retrying in ${delayMs / 1000}s...`);
+            console.log(`[LOG] Load Saved Data: Retrying in ${delayMs / 500}s...`);
 
             this.state.update(state => ({
               ...state,
-              error: `Retry ${attempts}/3: "${productType || 'None'}" failed - Retrying in ${delayMs / 1000}s (${successfullyUploadedProducts}/${totalProductsFromFile} uploaded)`
+              error: `Retry ${attempts}/3: "${productType || 'None'}" failed - Retrying in ${delayMs / 500}s (${successfullyUploadedProducts}/${totalProductsFromFile} uploaded)`
             }));
 
             await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -205,7 +206,7 @@ export class ProductStore {
         // Pause between product types
         if (processedTypes < productTypesCount) {
           console.log(`[LOG] Load Saved Data: Waiting 1 seconds before next product type...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 

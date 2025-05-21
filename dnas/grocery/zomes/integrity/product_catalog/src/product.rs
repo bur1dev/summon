@@ -15,6 +15,7 @@ pub struct Product {
     pub sold_by: Option<String>,
     #[serde(rename = "productId")]
     pub product_id: Option<String>,
+    pub embedding: Option<Vec<f32>>,
 }
 
 // New ProductGroup struct that contains multiple products

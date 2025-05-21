@@ -20,9 +20,14 @@
     isCartOpenStore,
     searchModeStore,
     searchQueryStore,
+    selectedCategoryStore,
+    selectedSubcategoryStore,
+    selectedProductTypeStore,
+    showReportDialogStore,
+    reportedProductStore,
     productNameStore,
     selectedProductHashStore,
-    fuseResultsStore,
+    searchResultsStore, // Changed from fuseResultsStore
     isViewAllStore,
     isHomeViewStore,
   } from "./UiStateStore";

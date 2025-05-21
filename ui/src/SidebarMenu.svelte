@@ -38,7 +38,7 @@
     <div class="sidebar-panel {isClosing ? 'slide-out-left' : 'slide-in-left'}">
         <div class="sidebar-header">
             <button
-                class="close-button btn btn-icon btn-icon-primary btn-icon-sm"
+                class="delete-cart-btn btn btn-icon btn-icon-primary btn-icon-sm"
                 on:click={closeMenu}
             >
                 <X size={20} />
@@ -168,20 +168,7 @@
         align-items: center;
     }
 
-    /* Fix for the close button to prevent shifting on hover */
-    .close-button {
-        position: relative;
-        border: 1px solid transparent; /* Prevents shift on hover if border appears */
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .close-button:hover {
-        border: 1px solid transparent; /* Keep consistent border on hover */
-    }
-
-    :global(.close-button svg) {
+    :global(.delete-cart-btn svg) {
         color: var(--button-text);
         stroke: var(--button-text);
     }

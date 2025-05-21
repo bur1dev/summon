@@ -108,9 +108,6 @@
         const oldCapacity = rowCapacities[identifier] || containerCapacity;
 
         if (newCapacity !== oldCapacity) {
-            console.log(
-                `Resize detected for ${identifier}: ${oldCapacity} -> ${newCapacity}`,
-            );
             // Use separate timeout for each row
             if (resizeTimeouts[identifier]) {
                 clearTimeout(resizeTimeouts[identifier]);
@@ -126,10 +123,6 @@
         newCapacity: number,
         oldCapacity: number,
     ) {
-        console.log(
-            `Updating capacity for ${identifier}: ${oldCapacity} -> ${newCapacity}`,
-        );
-
         rowCapacities[identifier] = newCapacity;
         rowCapacities = { ...rowCapacities };
 
@@ -210,10 +203,6 @@
                     ?.productTypes?.includes(identifier) ??
                     false);
 
-            console.log(
-                `Checking row type for ${identifier}: isInSubcategoryView=${isInSubcategoryView}, isProductTypeRow=${isProductTypeRow}`,
-            );
-
             let result;
             if (isProductTypeRow) {
                 // This is a product type row - use the identifier as the product type
@@ -229,9 +218,7 @@
                 );
             } else {
                 // This is a subcategory row
-                console.log(
-                    `Loading subcategory products for ${category}/${subcategory}`,
-                );
+
                 result = await productDataService.loadSubcategoryProducts(
                     category,
                     subcategory,

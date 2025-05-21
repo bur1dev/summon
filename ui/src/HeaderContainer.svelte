@@ -11,7 +11,7 @@
     searchQueryStore,
     productNameStore,
     selectedProductHashStore,
-    fuseResultsStore,
+    searchResultsStore, // Changed from fuseResultsStore
     isViewAllStore,
     setSearchState,
     showMenuStore,
@@ -110,17 +110,19 @@
             searchQuery: detail.originalQuery,
             productName: detail.productName,
             selectedProductHash: detail.hash,
-            fuseResults: null,
+            searchResults: detail.fuseResults || [], // Changed from fuseResults but keep the event detail name
             isViewAll: false,
+            searchMethod: "product_selection", // Add a method identifier
           })}
         on:viewAll={({ detail }) =>
           setSearchState({
             searchMode: true,
             searchQuery: detail.query,
-            fuseResults: detail.fuseResults || [],
+            searchResults: detail.fuseResults || [], // Changed from fuseResults but keep the event detail name
             isViewAll: detail.isViewAll || false,
             selectedProductHash: null,
             productName: "",
+            searchMethod: detail.searchMethod || "", // Pass searchMethod from event detail
           })}
       />
     </div>

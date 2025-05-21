@@ -1,8 +1,5 @@
-
 import { decode } from "@msgpack/msgpack";
-import Fuse from "fuse.js";
-import type { Product, SearchResult } from "./search-types";
-import { COMMON_QUALIFIERS, CATEGORY_PRIORITY_RULES, BRAND_MAPPINGS } from "./search-constants";
+import type { Product, SearchResult, RankedSearchResult } from "./search-types";
 
 // ==========================================
 // Product Data Processing
@@ -120,14 +117,16 @@ export function groupRelatedProducts(
     };
 }
 
-// Rest of the utility functions remain the same as they handle products by their data
-// rather than their identifiers, and the composite hash pattern we've established works
-// seamlessly with them due to the toString() method on the hash object.
-
 /**
  * Parse a query into main terms and qualifiers
  */
 export function parseQuery(query: string): { mainTerms: string[], qualifiers: string[] } {
+    const COMMON_QUALIFIERS = [
+        "organic", "fresh", "large", "small", "red", "green",
+        "frozen", "canned", "seedless", "ripe", "raw",
+        "low-fat", "whole", "sliced", "diced", "natural"
+    ];
+
     const terms = query.toLowerCase().split(/\s+/);
     const qualifiers = terms.filter(term => COMMON_QUALIFIERS.includes(term));
     const mainTerms = terms.filter(term => !COMMON_QUALIFIERS.includes(term));
@@ -136,24 +135,72 @@ export function parseQuery(query: string): { mainTerms: string[], qualifiers: st
 }
 
 /**
- * Extract possible brand name from query based on product type
+ * Combine semantic and text-based search results
+ * @param semanticResults Results from semantic search
+ * @param textResults Results from text search (e.g., Fuse.js)
+ * @param blendFactor Weight given to semantic results (0-1)
  */
-export function extractBrandName(query: string, productType: string): string {
-    if (!query || !productType) return "";
+export function blendSearchResults(
+    semanticResults: RankedSearchResult[],
+    textResults: SearchResult<Product>[],
+    blendFactor: number = 0.7,
+    limit: number = 100
+): Product[] {
+    if (semanticResults.length === 0) return textResults.map(r => r.item);
+    if (textResults.length === 0) return semanticResults.map(r => r.product);
 
-    const typePart = productType.toLowerCase();
-    if (query.toLowerCase().includes(typePart)) {
-        const parts = query.toLowerCase().split(typePart);
-        // Extract remaining text and clean it
-        return parts[parts.length - 1].trim();
-    }
+    // Create maps for quick lookup
+    const semanticMap = new Map<string, RankedSearchResult>();
+    semanticResults.forEach(result => {
+        semanticMap.set(result.product.hash.toString(), result);
+    });
 
-    return "";
+    const textMap = new Map<string, SearchResult<Product>>();
+    textResults.forEach(result => {
+        textMap.set(result.item.hash.toString(), result);
+    });
+
+    // Combine all unique products
+    const allHashKeys = new Set([
+        ...semanticMap.keys(),
+        ...textMap.keys()
+    ]);
+
+    // Calculate blended scores
+    const blendedResults: Array<{ product: Product, blendedScore: number }> = [];
+
+    allHashKeys.forEach(hashKey => {
+        const semanticResult = semanticMap.get(hashKey);
+        const textResult = textMap.get(hashKey);
+
+        let blendedScore = 1; // Default (worst) score
+
+        if (semanticResult && textResult) {
+            // Both results exist - blend scores
+            blendedScore = (
+                blendFactor * semanticResult.score +
+                (1 - blendFactor) * (textResult.score || 1)
+            );
+        } else if (semanticResult) {
+            // Only semantic result exists
+            blendedScore = semanticResult.score;
+        } else if (textResult) {
+            // Only text result exists
+            blendedScore = textResult.score || 1;
+        }
+
+        blendedResults.push({
+            product: semanticResult?.product || textResult!.item,
+            blendedScore
+        });
+    });
+
+    // Sort by blended score (lower is better)
+    blendedResults.sort((a, b) => a.blendedScore - b.blendedScore);
+
+    // Return top products
+    return blendedResults.slice(0, limit).map(r => r.product);
 }
-
-// ==========================================
-// Relevance Sorting
-// ==========================================
 
 /**
  * Sort products by relevance to search query
@@ -193,186 +240,17 @@ export function sortProductsByRelevance(products: Product[], searchTerm: string)
 export function sortProductsByBrand(products: Product[], brandName: string): void {
     if (!brandName) return;
 
-    // Check for special brand handling
-    const brandKey = Object.keys(BRAND_MAPPINGS).find(key =>
-        brandName.toLowerCase().includes(key));
-
-    const brandInfo = brandKey ? BRAND_MAPPINGS[brandKey] : null;
-    const brandVariations = brandInfo?.variations || [brandName.toLowerCase()];
-
     products.sort((a, b) => {
         const aName = a.name.toLowerCase();
         const bName = b.name.toLowerCase();
 
-        // Check if products match any brand variation
-        const aMatchesBrand = brandVariations.some(v => aName.includes(v));
-        const bMatchesBrand = brandVariations.some(v => bName.includes(v));
+        // Check if products match the brand
+        const aMatchesBrand = aName.includes(brandName.toLowerCase());
+        const bMatchesBrand = bName.includes(brandName.toLowerCase());
 
         if (aMatchesBrand && !bMatchesBrand) return -1;
         if (!aMatchesBrand && bMatchesBrand) return 1;
 
         return 0;
     });
-}
-
-/**
- * Sort products using Fuse relevance scoring
- */
-export function sortByFuseRelevance(products: Product[], searchTerm: string): void {
-    const fuse = new Fuse(products, {
-        keys: [{ name: "name", weight: 2.0 }],
-        threshold: 0.3,
-        includeScore: true,
-    });
-
-    const scoredProducts = fuse.search(searchTerm);
-
-    products.sort((a, b) => {
-        const aScore = scoredProducts.find(
-            p => p.item.hash.toString() === a.hash.toString()
-        )?.score || 1;
-
-        const bScore = scoredProducts.find(
-            p => p.item.hash.toString() === b.hash.toString()
-        )?.score || 1;
-
-        return aScore - bScore;
-    });
-}
-
-// ==========================================
-// Category Prioritization
-// ==========================================
-
-/**
- * Find the best category version of a product based on search context
- */
-export function prioritizeCategoryVersion(matchingProducts: Product[], searchTerm: string): Product | null {
-    if (!matchingProducts.length) return null;
-    if (matchingProducts.length === 1) return matchingProducts[0];
-
-    console.log("Multiple category versions found:", matchingProducts.length);
-
-    const searchTermLower = searchTerm.toLowerCase();
-
-    // Apply context rules
-    for (const rule of CATEGORY_PRIORITY_RULES) {
-        if (searchTermLower.includes(rule.term)) {
-            // Check additional condition if present
-            if (!rule.condition || rule.condition(searchTermLower)) {
-                const preferredVersion = matchingProducts.find(p => p.category === rule.preferredCategory);
-                if (preferredVersion) {
-                    console.log(`Prioritizing ${rule.preferredCategory} for '${rule.term}' products`);
-                    return preferredVersion;
-                }
-            }
-        }
-    }
-
-    // Default to first matching product if no rule matches
-    return matchingProducts[0];
-}
-
-/**
- * Find dominant product type from search results
- */
-export function findDominantProductType(
-    products: Product[],
-    searchTerm: string
-): { dominantType: string, referenceProduct: Product } | null {
-    if (!products.length) return null;
-
-    // Count product types across results
-    const typeCounter: Record<string, number> = {};
-
-    products.slice(0, 10).forEach(p => {
-        if (p.product_type) {
-            typeCounter[p.product_type] = (typeCounter[p.product_type] || 0) + 1;
-        }
-    });
-
-    // Parse query
-    const { mainTerms } = parseQuery(searchTerm);
-
-    // First check for exact matches with search term
-    const exactTypeMatch = Object.keys(typeCounter).find(
-        type => type.toLowerCase() === searchTerm.toLowerCase()
-    );
-
-    if (exactTypeMatch) {
-        const referenceProduct = findReferenceProduct(products, exactTypeMatch, searchTerm);
-        return referenceProduct ? { dominantType: exactTypeMatch, referenceProduct } : null;
-    }
-
-    // Check main term match
-    if (mainTerms.length > 0) {
-        const mainTerm = mainTerms[0];
-        const exactMainTermMatch = Object.keys(typeCounter).find(
-            type => type.toLowerCase() === mainTerm.toLowerCase()
-        );
-
-        if (exactMainTermMatch) {
-            const referenceProduct = findReferenceProduct(products, exactMainTermMatch, searchTerm);
-            return referenceProduct ? { dominantType: exactMainTermMatch, referenceProduct } : null;
-        }
-
-        // Get all product types from results
-        const allTypes = new Set(
-            products.filter(p => p.product_type).map(p => p.product_type)
-        );
-
-        // Look for exact match in all types
-        const exactMatchFromAll = Array.from(allTypes).find(
-            type => type?.toLowerCase() === mainTerm.toLowerCase()
-        );
-
-        if (exactMatchFromAll) {
-            const referenceProduct = findReferenceProduct(products, exactMatchFromAll, searchTerm);
-            return referenceProduct ? { dominantType: exactMatchFromAll, referenceProduct } : null;
-        }
-
-        // Look for types containing the main term
-        const relevantTypes = Object.keys(typeCounter).filter(type =>
-            type.toLowerCase().includes(mainTerm.toLowerCase())
-        );
-
-        if (relevantTypes.length > 0) {
-            relevantTypes.sort((a, b) => typeCounter[b] - typeCounter[a]);
-            const dominantType = relevantTypes[0];
-            const referenceProduct = findReferenceProduct(products, dominantType, searchTerm);
-            return referenceProduct ? { dominantType, referenceProduct } : null;
-        }
-    }
-
-    // Fallback to most frequent type
-    const mostFrequent = Object.entries(typeCounter)
-        .sort((a, b) => b[1] - a[1])
-        .find(([_, count]) => count >= 2);
-
-    if (mostFrequent) {
-        const dominantType = mostFrequent[0];
-        const referenceProduct = findReferenceProduct(products, dominantType, searchTerm);
-        return referenceProduct ? { dominantType, referenceProduct } : null;
-    }
-
-    return null;
-}
-
-/**
- * Find reference product for a dominant type
- */
-// Likely in search-utils.ts
-function findReferenceProduct(products: Product[], dominantType: string, searchTerm: string): Product | null {
-    const searchTermLower = searchTerm.toLowerCase();
-
-    // First prioritize products that match both type and search term
-    const exactBrandMatch = products.find(
-        p => p.product_type === dominantType &&
-            p.name.toLowerCase().includes(searchTermLower)
-    );
-
-    if (exactBrandMatch) return exactBrandMatch;
-
-    // Otherwise use first product of this type
-    return products.find(p => p.product_type === dominantType) || null;
 }

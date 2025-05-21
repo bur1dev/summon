@@ -1,1 +1,1 @@
-extern crate hc_zome_profiles_coordinator;
+pub use hc_zome_profiles_coordinator::*;

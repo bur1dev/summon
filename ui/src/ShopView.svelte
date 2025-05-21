@@ -23,10 +23,11 @@
     reportedProductStore,
     productNameStore,
     selectedProductHashStore,
-    fuseResultsStore,
+    searchResultsStore, // Changed from fuseResultsStore
     isViewAllStore,
     resetSearchState,
     isHomeViewStore,
+    searchMethodStore,
     featuredSubcategories,
   } from "./UiStateStore";
 
@@ -36,8 +37,6 @@
 
   // Get cart service directly from the context
   const cartService = getContext("cartService");
-
-  $: uiProps = store.uiProps;
 
   // Create product data service
   const productDataService = new ProductDataService(store);
@@ -51,6 +50,7 @@
   }
 
   // Sync with UI store when uiProps changes
+  $: uiProps = store.uiProps;
   $: {
     if ($uiProps.searchMode !== undefined)
       $searchModeStore = $uiProps.searchMode;
@@ -60,8 +60,9 @@
       $selectedProductHashStore = $uiProps.selectedProductHash;
     if ($uiProps.productName !== undefined)
       $productNameStore = $uiProps.productName;
-    if ($uiProps.fuseResults !== undefined)
-      $fuseResultsStore = $uiProps.fuseResults || [];
+    if ($uiProps.searchResults !== undefined)
+      // Changed from fuseResults
+      $searchResultsStore = $uiProps.searchResults || []; // Changed from fuseResultsStore
     if ($uiProps.isViewAll !== undefined)
       $isViewAllStore = $uiProps.isViewAll || false;
   }
@@ -180,7 +181,8 @@
             query={$searchQueryStore}
             selectedProductHash={$selectedProductHashStore}
             productName={$productNameStore}
-            fuseResults={$fuseResultsStore}
+            searchResults={$searchResultsStore}
+            searchMethod={$searchMethodStore}
             on:reportCategory={(event) => {
               $reportedProductStore = event.detail;
               $showReportDialogStore = true;

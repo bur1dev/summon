@@ -1331,7 +1331,7 @@ app.post('/api/update-report-category', (req, res) => {
 });
 
 app.get('/api/load-categorized-products', (req, res) => {
-  const categorizedDataPath = path.join(__dirname, '../product-categorization/categorized_products_sorted.json');
+  const categorizedDataPath = path.join(__dirname, '../product-categorization/categorized_products_sorted_with_embeddings.json');
   console.log(`Looking for categorized products at: ${categorizedDataPath}`);
 
   try {

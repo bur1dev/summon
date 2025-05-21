@@ -42,8 +42,9 @@ export const searchModeStore = writable<boolean>(false);
 export const searchQueryStore = writable<string>('');
 export const productNameStore = writable<string>('');
 export const selectedProductHashStore = writable<string | null>(null);
-export const fuseResultsStore = writable<any[]>([]);
+export const searchResultsStore = writable<any[]>([]); // Changed from fuseResultsStore
 export const isViewAllStore = writable<boolean>(false);
+export const searchMethodStore = writable<string>('');
 
 // Helper functions
 export function setSearchState(params: {
@@ -51,15 +52,17 @@ export function setSearchState(params: {
     searchQuery?: string,
     productName?: string,
     selectedProductHash?: string | null,
-    fuseResults?: any[],
-    isViewAll?: boolean
+    searchResults?: any[], // Changed from fuseResults
+    isViewAll?: boolean,
+    searchMethod?: string
 }) {
     if (params.searchMode !== undefined) searchModeStore.set(params.searchMode);
     if (params.searchQuery !== undefined) searchQueryStore.set(params.searchQuery);
     if (params.productName !== undefined) productNameStore.set(params.productName);
     if (params.selectedProductHash !== undefined) selectedProductHashStore.set(params.selectedProductHash);
-    if (params.fuseResults !== undefined) fuseResultsStore.set(params.fuseResults);
+    if (params.searchResults !== undefined) searchResultsStore.set(params.searchResults); // Changed from fuseResults
     if (params.isViewAll !== undefined) isViewAllStore.set(params.isViewAll);
+    if (params.searchMethod !== undefined) searchMethodStore.set(params.searchMethod);
 }
 
 export function resetSearchState() {
@@ -67,6 +70,7 @@ export function resetSearchState() {
     searchQueryStore.set('');
     productNameStore.set('');
     selectedProductHashStore.set(null);
-    fuseResultsStore.set([]);
+    searchResultsStore.set([]); // Changed from fuseResultsStore
     isViewAllStore.set(false);
+    searchMethodStore.set('');
 }

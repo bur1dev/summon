@@ -1,1 +1,1 @@
-extern crate hc_zome_profiles_integrity;
+pub use hc_zome_profiles_integrity::*;

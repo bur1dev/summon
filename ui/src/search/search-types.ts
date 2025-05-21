@@ -1,49 +1,60 @@
-// Type definitions for the search system
-
-// Updated to support composite hash structure
+/**
+ * Product interface with unified hash handling
+ */
 export interface Product {
     name: string;
-    hash: CompositeHash;  // Changed from ActionHash to CompositeHash
+    hash: CompositeHash;
     category?: string;
     subcategory?: string;
     product_type?: string;
     price?: number;
+    promo_price?: number;
     size?: string;
     stocks_status?: string;
     image_url?: string;
+    sold_by?: string;
+    productId?: string;
     brand?: string;
+    embedding?: Float32Array | number[]; // For semantic search
+    isType?: boolean; // Flag for dropdown display
     [key: string]: any;
 }
 
-// Traditional ActionHash type (maintained for compatibility)
+/**
+ * Traditional ActionHash type (maintained for backward compatibility)
+ */
 export type ActionHash = Uint8Array | any;
 
-// New composite hash type that contains group hash and index
+/**
+ * Composite hash type that contains group hash and index
+ */
 export interface CompositeHash {
     groupHash: ActionHash;
     index: number;
-    toString: () => string;  // Method to convert to string for comparison
+    toString: () => string;
 }
 
-export interface SearchResult {
-    item: Product;
+/**
+ * Generic search result that can include score information
+ */
+export interface SearchResult<T = Product> {
+    item: T;
     score?: number;
     matches?: any[];
 }
 
-export interface FuseProductResult {
-    item: Product;
+/**
+ * Search result with relevance information
+ */
+export interface RankedSearchResult {
+    product: Product;
     score: number;
-    matches?: any[];
+    similarity?: number; // For semantic search
 }
 
-export interface ProductTypeGroup {
-    type: string;
-    count: number;
-    sample: Product;
-    isType: boolean;
-}
-
+/**
+ * Grouped products for UI presentation
+ */
 export interface CategoryGroupedProducts {
     sameTypeProducts: Product[];
     sameSubcategoryProducts: Product[];
@@ -51,7 +62,21 @@ export interface CategoryGroupedProducts {
     otherProducts: Product[];
 }
 
-// Updated to work with composite hashes
+/**
+ * Search method types for better tracking
+ */
+export type SearchMethod =
+    | 'text'
+    | 'semantic'
+    | 'hybrid'
+    | 'hybrid_dropdown'
+    | 'product_selection'
+    | 'fuse_type_selection'
+    | '';
+
+/**
+ * Search event detail for component communication
+ */
 export interface SearchEventDetail {
     hash: CompositeHash;
     productName: string;
@@ -59,18 +84,35 @@ export interface SearchEventDetail {
     category?: string;
     subcategory?: string;
     product_type?: string;
-    fuseResults?: Product[];
+    searchResults?: Product[]; // Renamed from fuseResults
+    searchMethod?: SearchMethod;
 }
 
+/**
+ * ViewAll event detail for component communication
+ */
 export interface ViewAllEventDetail {
     query: string;
-    fuseResults?: Product[];
+    searchResults?: Product[]; // Renamed from fuseResults
     isViewAll?: boolean;
     selectedType?: string;
+    searchMethod?: SearchMethod;
 }
 
-// Product reference for backend API
+/**
+ * Product reference for backend API
+ */
 export interface ProductReference {
     group_hash: ActionHash;
     index: number;
+}
+
+/**
+ * Product type grouping for dropdowns
+ */
+export interface ProductTypeGroup {
+    type: string;
+    count: number;
+    sample: Product;
+    isType: boolean;
 }

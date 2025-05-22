@@ -141,8 +141,12 @@
             {#each displayedResults as product (product.hash && typeof product.hash.toString === "function" ? product.hash.toString() : JSON.stringify(product.hash))}
                 <ProductCard
                     {product}
+                    selectedCategory={product.category}
+                    selectedSubcategory={product.subcategory}
                     on:reportCategory={(event) =>
                         dispatch("reportCategory", event.detail)}
+                    on:productTypeSelect={(event) =>
+                        dispatch("productTypeSelect", event.detail)}
                 />
             {/each}
         </div>

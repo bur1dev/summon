@@ -1,11 +1,14 @@
 <script lang="ts">
   import { getContext, onMount, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import { BarChart, Plus, Minus } from "lucide-svelte";
+  import { BarChart, Plus, Minus, Flag } from "lucide-svelte";
   import { encodeHashToBase64 } from "@holochain/client";
   import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
   import ProductDetailModal from "./ProductDetailModal.svelte";
   import { createEventDispatcher } from "svelte";
+
+  export let selectedCategory = "";
+  export let selectedSubcategory = "";
 
   let showReportDialog = false;
   let showProductModal = false;
@@ -398,7 +401,7 @@
     on:click|stopPropagation={handleReportClick}
     title="Report incorrect category"
   >
-    🚩
+    <Flag size={16} />
   </button>
   <div class="product-card-content">
     <!-- Rest of the content remains unchanged -->
@@ -462,7 +465,10 @@
   {product}
   {groupHashBase64}
   {productIndex}
+  {selectedCategory}
+  {selectedSubcategory}
   on:addToCart={handleButtonClick}
+  on:productTypeSelect={(event) => dispatch("productTypeSelect", event.detail)}
 />
 
 <style>

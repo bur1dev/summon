@@ -101,6 +101,9 @@
 
         // Delay calculation slightly to ensure DOM is fully rendered
         setTimeout(() => {
+            // Check again if productsGridRef is still valid inside timeout
+            if (!productsGridRef) return;
+
             // Get actual width of grid container, but don't exceed parent width
             gridWidth = productsGridRef.offsetWidth;
 
@@ -231,8 +234,8 @@
 
         if (productsGridRef) {
             gridWidth = productsGridRef.offsetWidth;
+            recalculateGrid();
         }
-        recalculateGrid();
     }
 
     $: gridId = selectedProductType
@@ -329,6 +332,7 @@
                                 product={products[index]}
                                 on:reportCategory={(event) =>
                                     dispatch("reportCategory", event.detail)}
+                                on:productTypeSelect
                             />
                         </div>
                     {/if}

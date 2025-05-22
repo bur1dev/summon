@@ -166,7 +166,7 @@ export const mainCategories = [
           "Cocktail Syrups",
           "Cocktail Mixers",
           "Non-Alcoholic Beer",
-          "Non-Alcoholic Wine",
+          "Non-Alcoholic Wines",
           "Cocktail Rimmers"
         ]
       }

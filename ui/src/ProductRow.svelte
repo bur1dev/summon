@@ -66,7 +66,10 @@
             {#each products as product (product.hash)}
                 <ProductCard
                     {product}
+                    {selectedCategory}
+                    {selectedSubcategory}
                     on:reportCategory={handleReportCategory}
+                    on:productTypeSelect
                 />
             {/each}
         {/if}

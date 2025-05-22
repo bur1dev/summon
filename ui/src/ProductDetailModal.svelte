@@ -20,6 +20,9 @@
     export let productIndex: number;
     export let forceShowPreferences = false;
 
+    export let selectedCategory = "";
+    export let selectedSubcategory = "";
+
     let quantity = 1;
     let isInCart = false;
     let unsubscribeCartState;
@@ -443,8 +446,36 @@
                         </div>
 
                         <h1 class="product-title">{product.name}</h1>
-                        <div class="shop-all btn-link">
-                            Shop all {product.category}
+                        <div
+                            class="shop-all btn-link"
+                            on:click|stopPropagation={() => {
+                                const productType =
+                                    product.product_type || product.category;
+                                console.log(
+                                    "Shop all clicked for product type:",
+                                    productType,
+                                );
+
+                                const categoryToUse =
+                                    selectedCategory || product.category;
+                                const subcategoryToUse =
+                                    selectedSubcategory || product.subcategory;
+
+                                if (categoryToUse && subcategoryToUse) {
+                                    dispatch("productTypeSelect", {
+                                        category: categoryToUse,
+                                        subcategory: subcategoryToUse,
+                                        productType,
+                                    });
+                                } else {
+                                    dispatch("productTypeSelect", {
+                                        productType,
+                                    });
+                                }
+                                closeModal();
+                            }}
+                        >
+                            Shop all {product.product_type || product.category}
                         </div>
 
                         <div class="product-details">
@@ -727,6 +758,7 @@
         max-width: 100%;
         max-height: 320px;
         object-fit: contain;
+        border-radius: var(--card-border-radius);
     }
 
     .product-info {

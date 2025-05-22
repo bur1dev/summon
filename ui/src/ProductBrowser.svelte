@@ -339,6 +339,13 @@
         if (!selectedCategory || !selectedSubcategory || searchMode) return;
         allCategoryProducts = [];
 
+        console.log(
+            "Loading products for:",
+            selectedCategory,
+            selectedSubcategory,
+            selectedProductType,
+        );
+
         try {
             if (selectedProductType !== "All") {
                 const result = await productDataService.loadProductTypeProducts(
@@ -347,6 +354,8 @@
                     selectedProductType,
                     false, // isPreview = false (fetch all for grid)
                 );
+
+                console.log("ProductDataService result:", result);
 
                 if (result?.products) {
                     allCategoryProducts = result.products;
@@ -731,6 +740,7 @@
                     on:dataLoaded={handleDataLoaded}
                     on:boundariesInitialized={handleBoundariesInitialized}
                     on:reportCategory={handleReportCategory}
+                    on:productTypeSelect
                 />
             {/if}
         {/each}
@@ -763,6 +773,7 @@
                     on:dataLoaded={handleDataLoaded}
                     on:boundariesInitialized={handleBoundariesInitialized}
                     on:reportCategory={handleReportCategory}
+                    on:productTypeSelect
                 />
             {/if}
         {/each}
@@ -775,6 +786,7 @@
             products={allCategoryProducts}
             {allProductsTotal}
             on:reportCategory={handleReportCategory}
+            on:productTypeSelect
         />
     {:else if selectedCategory && selectedSubcategory}
         <!-- Subcategory View -->
@@ -791,6 +803,7 @@
                 products={allCategoryProducts}
                 {allProductsTotal}
                 on:reportCategory={handleReportCategory}
+                on:productTypeSelect
             />
         {:else if selectedProductType === "All"}
             <!-- Row View (when subcategory selected and type is "All") -->
@@ -821,6 +834,7 @@
                         on:dataLoaded={handleDataLoaded}
                         on:boundariesInitialized={handleBoundariesInitialized}
                         on:reportCategory={handleReportCategory}
+                        on:productTypeSelect
                     />
                 {/if}
             {/each}

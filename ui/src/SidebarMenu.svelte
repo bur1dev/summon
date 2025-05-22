@@ -3,7 +3,7 @@
     import CategoryReportsAdmin from "./CategoryReportsAdmin.svelte";
     import ProfileEditor from "./ProfileEditor.svelte";
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
-    import { X } from "lucide-svelte";
+    import { X, Tag, AlertTriangle } from "lucide-svelte";
 
     export let store: any;
     export let myAgentPubKeyB64: string | undefined;
@@ -74,13 +74,14 @@
                 <h3 class="section-title">Admin Tools</h3>
 
                 <button
-                    class="btn btn-menu btn-menu-gradient"
+                    class="btn btn-menu btn-menu-gradient menu-button"
                     on:click={() => {
                         showCategoryAdmin = true;
                         closeMenu();
                     }}
                 >
-                    <span>🏷️</span> Category Admin
+                    <Tag size={24} stroke-width={2} color="white" />
+                    <span>Category Admin</span>
                 </button>
             </div>
 
@@ -90,12 +91,13 @@
 
                 <a
                     href="https://github.com/bur1dev/summon/issues"
-                    class="btn btn-menu"
+                    class="btn btn-menu menu-button"
                     target="_blank"
                     rel="noopener noreferrer"
                     on:click={closeMenu}
                 >
-                    <span>🐞</span> Report a Bug
+                    <AlertTriangle size={24} stroke-width={2} />
+                    <span>Report a Bug</span>
                 </a>
             </div>
         </div>
@@ -235,34 +237,17 @@
         overflow-y: auto;
     }
 
-    /* Sync button styles */
-    .btn-menu {
+    /* Add consistent button styling */
+    .menu-button {
+        height: var(--btn-height-md);
         display: flex;
         align-items: center;
-        padding: var(--spacing-md) var(--spacing-lg);
-        border-radius: 999px;
-        margin-bottom: var(--spacing-sm);
-        cursor: pointer;
-        background-color: var(--bg-lighter);
-        border: none;
-        color: var(--text-primary);
-        font-size: var(--font-size-base);
-        width: 100%;
-        transition: background-color 0.2s ease;
+        gap: var(--spacing-md);
+        margin-bottom: var(--spacing-md);
     }
 
-    .btn-menu:hover {
-        background-color: var(--bg-highlight);
-    }
-
-    .btn-menu span {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: var(--spacing-md);
-        background-color: var(--background);
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
+    .menu-button span {
+        flex: 1;
+        text-align: left;
     }
 </style>

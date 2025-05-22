@@ -18,7 +18,7 @@ DUAL_CATEGORY_MAPPINGS = {
         },
         "Mixers & Non-Alcoholic Drinks": {
             "product_type_to_subcategory": {
-                "Non-Alcoholic Wine": "Non-Alcoholic Wines",
+                "Non-Alcoholic Wines": "Non-Alcoholic Wines",
                 "Non-Alcoholic Beer": "Non-Alcoholic Beers",
             },
             "dual_category": "Wine",  # This will be overridden for beer products by product_type

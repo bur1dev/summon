@@ -111,8 +111,20 @@
     }
   }
 
-  function handleProductTypeSelect({ detail: { productType } }) {
-    $selectedProductTypeStore = productType;
+  function handleProductTypeSelect({ detail }) {
+    console.log("ShopView received productTypeSelect:", detail);
+
+    if (detail.category && detail.subcategory) {
+      // Full navigation from "Shop all"
+      $selectedCategoryStore = detail.category;
+      $selectedSubcategoryStore = detail.subcategory;
+      $selectedProductTypeStore = detail.productType;
+      $isHomeViewStore = false;
+      $searchModeStore = false; // Exit search mode
+    } else {
+      // Just product type change
+      $selectedProductTypeStore = detail.productType;
+    }
   }
 
   function handleViewMore({ detail: { category, subcategory } }) {
@@ -206,6 +218,7 @@
                 $reportedProductStore = event.detail;
                 $showReportDialogStore = true;
               }}
+              on:productTypeSelect={handleProductTypeSelect}
             />
           {:else if $isHomeViewStore}
             <!-- Home view with multiple featured subcategories -->

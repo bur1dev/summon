@@ -40,7 +40,7 @@ pub fn get_paths(input: &CreateProductInput) -> ExternResult<Vec<Path>> {
     }
 
     // Handle additional categorization paths
-for (i, additional) in input.additional_categorizations.iter().enumerate() {
+for (_i, additional) in input.additional_categorizations.iter().enumerate() {
     // Main category for additional categorization
     let additional_main_path_str = format!("categories/{}", additional.main_category);
     paths.push(Path::try_from(additional_main_path_str.clone())?);
@@ -70,15 +70,15 @@ for (i, additional) in input.additional_categorizations.iter().enumerate() {
 
 fn create_links_for_group(group_hash: &ActionHash, paths: Vec<Path>, chunk_id: u32) -> ExternResult<()> {
     // Track success/failure statistics
-    let mut successful_links = 0;
-    let mut failed_links = 0;
+    let mut _successful_links = 0;
+    let mut _failed_links = 0;
     
     // Log all paths for reference
-    for (i, path) in paths.iter().enumerate() {
+    for (_i, _path) in paths.iter().enumerate() {
     }
 
-    for (i, path) in paths.iter().enumerate() {
-        let path_str = format!("{:?}", path); 
+    for (_i, path) in paths.iter().enumerate() {
+        let _path_str = format!("{:?}", path); 
         match path.path_entry_hash() {
             Ok(path_hash) => {
 
@@ -89,8 +89,8 @@ fn create_links_for_group(group_hash: &ActionHash, paths: Vec<Path>, chunk_id: u
                     LinkTypes::ProductTypeToGroup,
                     LinkTag::new(chunk_id.to_le_bytes()),
                 ) {
-                    Ok(link_hash) => {
-                        successful_links += 1;
+                    Ok(_link_hash) => {
+                        _successful_links += 1;
                         
                         // Verify the link was created successfully by getting links
                         match get_links(GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup)?.build()) {
@@ -106,16 +106,16 @@ fn create_links_for_group(group_hash: &ActionHash, paths: Vec<Path>, chunk_id: u
                                 } else {
                                 }
                             },
-                            Err(e) => {}
+                            Err(_e) => {}
                         }
                     },
-                    Err(e) => {
-                        failed_links += 1;
+                    Err(_e) => {
+                        _failed_links += 1;
                     }
                 }
             },
-            Err(e) => {
-                failed_links += 1;
+            Err(_e) => {
+                _failed_links += 1;
             }
         }
     }
@@ -183,7 +183,7 @@ pub fn create_product_group(input: CreateProductGroupInput) -> ExternResult<Acti
 // Helper function to get the latest group for a specific path
 fn get_latest_group_for_path(path: &Path) -> ExternResult<Option<(ActionHash, ProductGroup, u32)>> {
     // Enhanced path lookup logging
-    let path_string = format!("{:?}", path);
+    let _path_string = format!("{:?}", path);
     
     match path.path_entry_hash() {
         Ok(path_hash) => {
@@ -191,15 +191,15 @@ fn get_latest_group_for_path(path: &Path) -> ExternResult<Option<(ActionHash, Pr
                 GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup)?.build(),
             )?;
             
-            let link_count = links.len();
+            let _link_count = links.len();
             
             if links.is_empty() {
                 return Ok(None);
             }
             
             // Detailed logging of all links
-            for (i, link) in links.iter().enumerate() {
-                let chunk_id = if link.tag.0.len() >= 4 {
+            for (_i, link) in links.iter().enumerate() {
+                let _chunk_id = if link.tag.0.len() >= 4 {
                     u32::from_le_bytes(link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]))
                 } else {
                     0
@@ -266,7 +266,7 @@ fn get_latest_group_for_path(path: &Path) -> ExternResult<Option<(ActionHash, Pr
                             return Ok(Some((target_hash, group, latest_chunk_id.unwrap_or(0))));
                         } else {
                             // Add more detailed error info
-                            if let Some(entry) = record.entry().as_option() {
+                            if let Some(_entry) = record.entry().as_option() {
                             } else {
                             }
                         }
@@ -277,33 +277,34 @@ fn get_latest_group_for_path(path: &Path) -> ExternResult<Option<(ActionHash, Pr
             
             Ok(None)
         },
-        Err(e) => {
+        Err(_e) => {
             Ok(None)
         },
     }
 }
 
 // Helper function to identify gaps in chunk ID sequence
-fn find_gaps_in_sequence(ids: &[u32]) -> String {
-    if ids.is_empty() {
-        return "No chunks found".to_string();
-    }
+// fn find_gaps_in_sequence(ids: &[u32]) -> String {
+//     if ids.is_empty() {
+//         return "No chunks found".to_string();
+//     }
     
-    let mut gaps = Vec::new();
-    for i in 1..ids.len() {
-        if ids[i] > ids[i-1] + 1 {
-            for missing in (ids[i-1] + 1)..ids[i] {
-                gaps.push(missing);
-            }
-        }
-    }
+//     let mut gaps = Vec::new();
+//     for i in 1..ids.len() {
+//         if ids[i] > ids[i-1] + 1 {
+//             for missing in (ids[i-1] + 1)..ids[i] {
+//                 gaps.push(missing);
+//             }
+//         }
+//     }
     
-    if gaps.is_empty() {
-        format!("No gaps, continuous sequence 0-{}", ids.last().unwrap_or(&0))
-    } else {
-        format!("Missing chunk IDs: {:?}", gaps)
-    }
-}
+//     if gaps.is_empty() {
+//         format!("No gaps, continuous sequence 0-{}", ids.last().unwrap_or(&0))
+//     } else {
+//         format!("Missing chunk IDs: {:?}", gaps)
+//     }
+// }
+
 
 // Optimized batch creation of products using groups
 #[hdk_extern]
@@ -368,8 +369,8 @@ pub fn create_product_batch(products: Vec<CreateProductInput>) -> ExternResult<V
     }
 
     let mut all_group_hashes = Vec::new();
-    let mut total_groups_created = 0;
-    let mut total_groups_failed = 0;
+    let mut _total_groups_created = 0;
+    let mut _total_groups_failed = 0; // Prefixed again
 
     // --- Process each PRIMARY category group ---
     for (key, group_products_inputs) in grouped_products {
@@ -389,7 +390,7 @@ pub fn create_product_batch(products: Vec<CreateProductInput>) -> ExternResult<V
             
             // Log first few products in this category group
             let max_to_show = 3.min(group_products_inputs.len());
-            for i in 0..max_to_show {
+            for _i in 0..max_to_show {
             }
         } else {
         }
@@ -410,8 +411,9 @@ pub fn create_product_batch(products: Vec<CreateProductInput>) -> ExternResult<V
 
         let specific_path = match Path::try_from(specific_path_str.clone()) {
             Ok(path) => path,
-            Err(e) => {
-                total_groups_failed += group_products_inputs.len(); // Count products in failed group
+            Err(_e) => { // Prefixed e
+                // Prefixed total_groups_failed again
+                _total_groups_failed += group_products_inputs.len(); // Count products in failed group
                 continue;
             }
         };
@@ -431,7 +433,7 @@ pub fn create_product_batch(products: Vec<CreateProductInput>) -> ExternResult<V
 
             // Log the raw result of the lookup
             match &latest_group_info_res {
-                Ok(Some((hash, _, chunk_id))) => {
+                Ok(Some((_hash, _, _chunk_id))) => {
                     if is_tracked_category {
                     }
                 },
@@ -439,7 +441,7 @@ pub fn create_product_batch(products: Vec<CreateProductInput>) -> ExternResult<V
                      if is_tracked_category {
                     }
                 },
-                Err(e) => {
+                Err(_e) => {
                      if is_tracked_category {
                     }
                 }
@@ -492,7 +494,7 @@ let next_chunk_id = match latest_group_info_res {
                 
                 // Log first few products 
                 let max_to_show = 3.min(group_input.products.len());
-                for i in 0..max_to_show {
+                for _i in 0..max_to_show {
                 }
             }
 
@@ -503,14 +505,14 @@ let next_chunk_id = match latest_group_info_res {
                     }
                     
                     all_group_hashes.push(hash);
-                    total_groups_created += 1;
+                    _total_groups_created += 1;
                 },
-                Err(e) => {
+                Err(_e) => {
                     
                     if is_tracked_category {
                     }
-                    
-                    total_groups_failed += product_chunk_inputs.len(); // Count products in failed chunk
+                    // Prefixed total_groups_failed again
+                    _total_groups_failed += product_chunk_inputs.len(); // Count products in failed chunk
                 }
             }
         }
@@ -570,7 +572,7 @@ pub fn get_product_count_for_group(params: GetProductsParams) -> ExternResult<us
         GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup)?.build(),
     ) {
         Ok(links) => links,
-        Err(e) => {
+        Err(_e) => {
             return Ok(0);
         }
     };
@@ -660,8 +662,8 @@ pub fn get_all_group_counts_for_path(params: GetProductsParams) -> ExternResult<
 
     
     // Log all links found with their chunk IDs
-    for (i, link) in all_links.iter().enumerate() {
-        let chunk_id = if link.tag.0.len() >= 4 {
+    for (_i, link) in all_links.iter().enumerate() {
+        let _chunk_id = if link.tag.0.len() >= 4 {
             u32::from_le_bytes(link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]))
         } else {
             0
@@ -681,12 +683,12 @@ pub fn get_all_group_counts_for_path(params: GetProductsParams) -> ExternResult<
 
     // Get count for each group
     let mut counts = Vec::new();
-    let mut total_products = 0;
-    let mut failed_fetches = 0;
-    let mut failed_deserializations = 0;
+    let mut _total_products = 0;
+    let mut _failed_fetches = 0;
+    let mut _failed_deserializations = 0;
     
     
-    for (i, link) in all_links.iter().enumerate() {
+    for (_i, link) in all_links.iter().enumerate() {
         let target_hash_opt = link.target.clone().into_action_hash();
         
         if let Some(target_hash) = target_hash_opt {
@@ -698,28 +700,28 @@ pub fn get_all_group_counts_for_path(params: GetProductsParams) -> ExternResult<
                         Ok(Some(group)) => {
                             let product_count = group.products.len();
                             counts.push(product_count);
-                            total_products += product_count;
+                            _total_products += product_count;
                         },
                         Ok(None) => {
-                            failed_deserializations += 1;
+                            _failed_deserializations += 1;
                         },
-                        Err(e) => {
-                            failed_deserializations += 1;
+                        Err(_e) => {
+                            _failed_deserializations += 1;
                         }
                     }
                 },
                 Ok(None) => {
-                    failed_fetches += 1;
+                    _failed_fetches += 1;
                 },
-                Err(e) => {
-                    failed_fetches += 1;
+                Err(_e) => {
+                    _failed_fetches += 1;
                 }
             }
         } else {
         }
     }
     
-    let count_sum: usize = counts.iter().sum();
+    let _count_sum: usize = counts.iter().sum();
     
     
     Ok(counts)

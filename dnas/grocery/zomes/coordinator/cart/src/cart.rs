@@ -30,20 +30,20 @@ pub(crate) fn replace_private_cart_impl(input: ReplacePrivateCartInput) -> Exter
     
     for item in input.items {
         // Decode the base64 hash string to ActionHash
-        match decode_base64_to_hash(&item.groupHash) {
+        match decode_base64_to_hash(&item.group_hash) {
             Ok(hash) => {
-                warn!("Successfully decoded hash: {}", item.groupHash);
+                warn!("Successfully decoded hash: {}", item.group_hash);
                 
                 cart_items.push(CartProduct {
                     group_hash: hash,
-                    product_index: item.productIndex,
+                    product_index: item.product_index,
                     quantity: item.quantity,
                     timestamp: item.timestamp,
                     note: item.note,
                 });
             },
             Err(e) => {
-                warn!("Error decoding hash {}: {:?}", item.groupHash, e);
+                warn!("Error decoding hash {}: {:?}", item.group_hash, e);
                 continue; // Skip invalid items
             }
         };

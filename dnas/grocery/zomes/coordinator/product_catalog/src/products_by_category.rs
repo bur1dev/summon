@@ -3,7 +3,7 @@ use products_integrity::*;
 use crate::utils::concurrent_get_records;
 
 // Define the constant here or import if defined elsewhere
-const PRODUCTS_PER_GROUP: usize = 1000;
+// const PRODUCTS_PER_GROUP: usize = 1000;
 
 // Updated to return product groups instead of individual products
 #[derive(Serialize, Deserialize, Debug)]
@@ -74,8 +74,8 @@ let all_links = match get_links(
 let total_groups = all_links.len(); // This is the actual total number of groups
 
 // Log each link with its chunk_id from tag
-for (i, link) in all_links.iter().enumerate() {
-    let chunk_id = if link.tag.0.len() >= 4 {
+for (_i, link) in all_links.iter().enumerate() {
+    let _chunk_id = if link.tag.0.len() >= 4 {
         u32::from_le_bytes(link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]))
     } else {
         0
@@ -112,7 +112,7 @@ let product_groups_records = concurrent_get_records(target_hashes)?;
 let mut total_products_count = 0;
 let mut group_product_counts = Vec::new();
 
-for (i, record) in product_groups_records.iter().enumerate() {
+for (_i, record) in product_groups_records.iter().enumerate() {
     match record.entry().to_app_option::<ProductGroup>() {
         Ok(Some(group)) => {
             let product_count = group.products.len();
@@ -121,14 +121,14 @@ for (i, record) in product_groups_records.iter().enumerate() {
             
             // Log first few product names for verification
             if product_count > 0 {
-                for j in 0..std::cmp::min(3, product_count) {
+                for _j in 0..std::cmp::min(3, product_count) {
                 }
             } else {
             }
         },
         Ok(None) => {
         },
-        Err(e) => {
+        Err(_e) => {
         }
     }
 }
@@ -178,8 +178,8 @@ pub fn get_all_category_products(category: String) -> ExternResult<CategorizedPr
     let total_groups = links.len();
 
     // Log all links found with their chunk IDs
-    for (i, link) in links.iter().enumerate() {
-        let chunk_id = if link.tag.0.len() >= 4 {
+    for (_i, link) in links.iter().enumerate() {
+        let _chunk_id = if link.tag.0.len() >= 4 {
             u32::from_le_bytes(link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]))
         } else {
             0
@@ -206,7 +206,7 @@ let product_groups_records = match concurrent_get_records(all_hashes.clone()) {
             let returned_hashes: Vec<ActionHash> = records.iter()
                 .map(|r| r.action_address().clone())
                 .collect();
-            for (i, hash) in all_hashes.iter().enumerate() {
+            for (_i, hash) in all_hashes.iter().enumerate() {
                 if !returned_hashes.contains(hash) {
                 }
             }
@@ -218,24 +218,24 @@ let product_groups_records = match concurrent_get_records(all_hashes.clone()) {
     }
 };
     
-    let mut deserialize_success = 0;
-    let mut deserialize_empty = 0;
-    let mut deserialize_error = 0;
-    let mut total_products_count = 0;
+    let mut _deserialize_success = 0;
+    let mut _deserialize_empty = 0;
+    let mut _deserialize_error = 0;
+    let mut _total_products_count = 0;
     
-    for (i, record) in product_groups_records.iter().enumerate() {
+    for (_i, record) in product_groups_records.iter().enumerate() {
         match record.entry().to_app_option::<ProductGroup>() {
             Ok(Some(group)) => {
                 let product_count = group.products.len();
-                total_products_count += product_count;
-                deserialize_success += 1;
+                _total_products_count += product_count;
+                _deserialize_success += 1;
                 
             },
             Ok(None) => {
-                deserialize_empty += 1;
+                _deserialize_empty += 1;
             },
-            Err(e) => {
-                deserialize_error += 1;
+            Err(_e) => {
+                _deserialize_error += 1;
             }
         }
     }
@@ -278,7 +278,7 @@ pub fn extract_products_from_group(group_hash: ActionHash) -> ExternResult<Vec<P
          }
     };
 
-    let count = product_group.products.len();
+    let _count = product_group.products.len();
 
     Ok(product_group.products)
 }

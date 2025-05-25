@@ -24,8 +24,8 @@ pub struct AddToPrivateCartInput {
 // NEW: Input for cart item from JavaScript using matching field names
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CartItemInput {
-    pub groupHash: String,       // Accept base64 string from JS
-    pub productIndex: u32,       // Match JS camelCase
+    pub group_hash: String,       // Accept base64 string from JS
+    pub product_index: u32,       // Match JS camelCase
     pub quantity: f64,
     pub timestamp: u64,
     pub note: Option<String>,

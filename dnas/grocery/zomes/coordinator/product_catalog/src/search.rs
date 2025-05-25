@@ -34,24 +34,21 @@ pub fn get_products_by_references(references: Vec<ProductReference>) -> ExternRe
     }
     
     // Fetch all required ProductGroups
-    let mut all_group_records = Vec::new();
     let group_hashes: Vec<ActionHash> = group_map.keys().cloned().collect();
     
-    match get_records_from_hashes(group_hashes) {
-        Ok(groups) => {
-            all_group_records = groups;
-        }
+    let all_group_records = match get_records_from_hashes(group_hashes) {
+        Ok(groups) => groups,
         Err(e) => {
             return Err(e);
         }
-    }
+    };
     
     // Extract requested products from groups
     let mut product_records = Vec::new();
     
     for record in all_group_records {
         let group_hash = record.action_address().clone().into_hash();
-if let Some(indices) = group_map.get(&group_hash) {
+if let Some(_indices) = group_map.get(&group_hash) { // Prefixed the first, shadowed `indices`
             if let Some(indices) = group_map.get(&group_hash) {
                 // Extract ProductGroup from record
                 if let Ok(Some(group)) = record.entry().to_app_option::<ProductGroup>() {
@@ -95,7 +92,7 @@ fn get_records_from_hashes(hashes: Vec<ActionHash>) -> ExternResult<Vec<Record>>
     const BATCH_SIZE: usize = 1000;
     let mut all_records = Vec::new();
 
-    for (batch_index, batch) in hashes.chunks(BATCH_SIZE).enumerate() {
+    for (_batch_index, batch) in hashes.chunks(BATCH_SIZE).enumerate() {
 
         let input: Vec<_> = batch
             .iter()
@@ -156,15 +153,15 @@ pub fn get_all_products_for_search_index() -> ExternResult<SearchResult> {
                                 Ok(builder) => {
                                     get_links_inputs.push(builder.build());
                                 },
-                                Err(e) => {
+                                Err(_e) => {
                                 }
                             }
                         },
-                        Err(e) => {
+                        Err(_e) => {
                         }
                     }
                 },
-                Err(e) => {
+                Err(_e) => {
                 }
             }
         }
@@ -180,7 +177,7 @@ pub fn get_all_products_for_search_index() -> ExternResult<SearchResult> {
                     }
                 }
             },
-            Err(e) => {
+            Err(_e) => {
             }
         }
     }

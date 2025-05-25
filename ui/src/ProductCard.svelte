@@ -12,6 +12,24 @@
 
   let showReportDialog = false;
   let showProductModal = false;
+  let buttonHovered = false;
+  let buttonElevated = false;
+  let elevationTimeout;
+
+  function handleButtonMouseEnter() {
+    buttonHovered = true;
+    buttonElevated = true;
+    clearTimeout(elevationTimeout);
+  }
+
+  function handleButtonMouseLeave() {
+    buttonHovered = false;
+    // Keep elevated during shrink animation
+    elevationTimeout = setTimeout(() => {
+      buttonElevated = false;
+    }, 300); // Match transition duration
+  }
+
   const dispatch = createEventDispatcher();
 
   // Define types for the cart service
@@ -36,34 +54,6 @@
 
   // Get cart service directly from the context and type it as a Svelte store
   const cartService = getContext<Writable<CartServiceAPI>>("cartService");
-
-  // Updated lazyLoad action for images
-  const lazyLoad = (imageNode: HTMLImageElement, srcUrl: string) => {
-    if (!srcUrl) return; // Do nothing if no srcUrl
-
-    const observer = new IntersectionObserver(
-      (entries, obs) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            imageNode.src = srcUrl; // Load the image
-            obs.unobserve(imageNode); // Stop observing once loaded
-          }
-        });
-      },
-      {
-        rootMargin: "200px 0px", // Load when 200px away from viewport
-        threshold: 0.01, // Trigger even if 1% is visible
-      },
-    );
-
-    observer.observe(imageNode);
-
-    return {
-      destroy() {
-        observer.disconnect();
-      },
-    };
-  };
 
   export let product;
   export let actionHash = undefined;
@@ -200,6 +190,7 @@
       if (isServiceReady) {
         const items = $cartService.getCartItems();
         updateItemCount(items);
+        clearTimeout(elevationTimeout);
       }
     }
   });
@@ -369,7 +360,10 @@
   }
 </script>
 
-<div class="product-card fade-in" on:click={handleCardClick}>
+<div
+  class="product-card fade-in {buttonElevated ? 'button-elevated' : ''}"
+  on:click={handleCardClick}
+>
   <button
     class="add-btn btn {displayAmount > 0
       ? 'counter-btn-group expanded'
@@ -378,6 +372,8 @@
       console.log("Add button clicked");
       handleButtonClick(e);
     }}
+    on:mouseenter={handleButtonMouseEnter}
+    on:mouseleave={handleButtonMouseLeave}
   >
     {#if displayAmount > 0}
       <span class="minus counter-btn" on:click|stopPropagation={decrementCount}>
@@ -406,13 +402,7 @@
   <div class="product-card-content">
     <!-- Rest of the content remains unchanged -->
     {#if product.image_url}
-      <img
-        use:lazyLoad={product.image_url}
-        data-src={product.image_url}
-        alt={product.name}
-        class="product-image"
-        loading="lazy"
-      />
+      <img src={product.image_url} alt={product.name} class="product-image" />
     {:else}
       <!-- Optional: Placeholder for products without images -->
       <div class="product-image placeholder-image">No Image</div>
@@ -488,6 +478,11 @@
     border: none;
     border-radius: var(--card-border-radius);
     box-sizing: border-box;
+  }
+
+  .product-card.button-elevated {
+    z-index: 50;
+    position: relative;
   }
 
   .product-card-content {

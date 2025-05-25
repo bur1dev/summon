@@ -142,6 +142,22 @@ class ProductCategorizer {
 
     async categorizeProducts(products, batchSize = 20) {
         console.log(`[API_CATEGORIZER START] Received products array of length: ${products.length}`);
+
+        // Add is_organic flag based on product.categories
+        for (const product of products) {
+            if (product.categories && Array.isArray(product.categories) && product.categories.includes("Natural & Organic")) {
+                product.is_organic = true;
+            } else {
+                // Ensure the field exists, even if false, for consistent data structure
+                product.is_organic = false;
+            }
+        }
+        // Log if any product was marked as organic
+        const organicProductsCount = products.filter(p => p.is_organic).length;
+        if (organicProductsCount > 0) {
+            console.log(`[API_CATEGORIZER] Marked ${organicProductsCount} products as is_organic.`);
+        }
+
         const processedProductsCollector = []; // Use a single collector for all products that go through the full pipeline
         const failedProducts = [];
 

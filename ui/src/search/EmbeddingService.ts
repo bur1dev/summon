@@ -48,7 +48,7 @@ export class EmbeddingService {
     private embeddingCache: Map<string, { embedding: Float32Array, timestamp: number }> = new Map();
 
     private config: EmbeddingServiceConfig = {
-        modelName: 'Xenova/all-MiniLM-L6-v2',
+        modelName: 'Xenova/all-mpnet-base-v2',
         workerUrl: '/embedding-worker.js', // Path to the worker script
         maxCacheSize: 100,
         hnswIndexFilename: 'hnsw_index_main.dat'
@@ -66,7 +66,8 @@ export class EmbeddingService {
     // Track current worker context
     private currentWorkerIndexContext: 'global' | 'temporary' = 'global'; // Track which index the worker currently has active
 
-    private readonly HNSW_DIMENSION = 384;
+    private readonly HNSW_DIMENSION = 768;
+    private latestTemporaryOperationId: string | null = null;
     // --- End HNSW state tracking ---
 
     constructor(config?: EmbeddingServiceConfig) {
@@ -172,6 +173,64 @@ export class EmbeddingService {
         }
     }
 
+    public async getAverageEmbedding(queries: string[]): Promise<Float32Array | null> {
+        if (!queries || queries.length === 0) {
+            console.warn('[EmbeddingService.getAverageEmbedding] Received empty or null queries array.');
+            return null;
+        }
+
+        // Ensure service is initialized
+        await this.initialize();
+        if (!this.isInitialized) {
+            console.error("[EmbeddingService.getAverageEmbedding] Service not initialized after attempt.");
+            throw new Error("Embedding service not initialized for getAverageEmbedding.");
+        }
+
+        const individualEmbeddings: Float32Array[] = [];
+
+        try {
+            const embeddingPromises = queries.map(query => this.getQueryEmbedding(query.trim().toLowerCase()));
+            const results = await Promise.all(embeddingPromises);
+
+            for (const embedding of results) {
+                if (embedding === null) {
+                    console.warn('[EmbeddingService.getAverageEmbedding] One of the queries resulted in a null embedding. Averaging cannot proceed reliably.');
+                    return null; // If any embedding fails, we can't reliably average.
+                }
+                if (embedding.length !== this.HNSW_DIMENSION) {
+                    console.error(`[EmbeddingService.getAverageEmbedding] Embedding dimension mismatch. Expected ${this.HNSW_DIMENSION}, got ${embedding.length}.`);
+                    return null;
+                }
+                individualEmbeddings.push(embedding);
+            }
+        } catch (error) {
+            console.error('[EmbeddingService.getAverageEmbedding] Error fetching individual embeddings:', error);
+            return null;
+        }
+
+        if (individualEmbeddings.length === 0) {
+            console.warn('[EmbeddingService.getAverageEmbedding] No valid embeddings collected to average.');
+            return null;
+        }
+
+        // Average the embeddings
+        const numEmbeddings = individualEmbeddings.length;
+        const dimension = this.HNSW_DIMENSION; // All embeddings should have this dimension
+        const averageEmbedding = new Float32Array(dimension).fill(0);
+
+        for (const embedding of individualEmbeddings) {
+            for (let i = 0; i < dimension; i++) {
+                averageEmbedding[i] += embedding[i];
+            }
+        }
+
+        for (let i = 0; i < dimension; i++) {
+            averageEmbedding[i] /= numEmbeddings;
+        }
+
+        return averageEmbedding;
+    }
+
     private async processEmbeddingQueue(): Promise<void> {
         if (this.processingQueue || this.embeddingQueue.length === 0) return;
         this.processingQueue = true;
@@ -230,239 +289,173 @@ export class EmbeddingService {
         persistIndex: boolean = true,
         customFilename?: string
     ): Promise<void> {
-        // Ensure service and HNSW library in worker are initialized
         if (!this.isInitialized && !this.isLoading) {
-            console.log("[EmbeddingService.prepareHnswIndex] Service not initialized, initializing now...");
             await this.initialize();
         } else if (this.isLoading) {
-            console.log("[EmbeddingService.prepareHnswIndex] Service is currently loading, awaiting existing initialization...");
+            // Await existing initialization if multiple calls happen during initial load
+            // This requires `initialize` to return a promise that can be awaited multiple times
+            // or manage an initialization promise internally. For now, just log.
+            console.log("[EmbeddingService.prepareHnswIndex] Service is currently loading, awaiting existing initialization call to complete.");
+            // A simple way to wait if another init is ongoing:
+            while (this.isLoading && !this.isInitialized) {
+                await new Promise(r => setTimeout(r, 100));
+            }
         }
 
         if (!this.isInitialized || !this.isHnswLibInitializedInWorker) {
-            console.error("[EmbeddingService.prepareHnswIndex] Critical: Service or HNSW Lib in worker still not initialized.");
+            console.error("[EmbeddingService.prepareHnswIndex] Critical: Service or HNSW Lib in worker still not initialized after waiting.");
             throw new Error("EmbeddingService or HNSW Lib in worker not initialized. Cannot prepare index.");
         }
 
         const filename = customFilename || this.config.hnswIndexFilename!;
         const numSourceProducts = sourceProducts ? sourceProducts.length : 0;
+        const isTemporaryIndexOperation = !persistIndex;
+        let operationId: string | undefined = undefined;
 
-        console.log(
-            `[EmbeddingService PREPARE START] For ${numSourceProducts} products. Filename: "${filename}", forceRebuild: ${forceRebuild}, persistIndex: ${persistIndex}`
-        );
-
-        // --- Start of new detailed check logs ---
-        console.log(`[EmbeddingService PREPARE CHECK] Current state before deciding to skip/proceed:`);
-        console.log(`    - forceRebuild: ${forceRebuild}`);
-        console.log(`    - this.isHnswIndexReadyInWorker: ${this.isHnswIndexReadyInWorker}`);
-
-        if (persistIndex) {
-            console.log(`    - this.isGlobalHnswIndexReadyInWorker: ${this.isGlobalHnswIndexReadyInWorker}`);
-            console.log(`    - this.globalHnswIndexSourceProductsRef exists: ${!!this.globalHnswIndexSourceProductsRef}`);
-            if (this.globalHnswIndexSourceProductsRef) {
-                console.log(`    - this.globalHnswIndexSourceProductsRef.length: ${this.globalHnswIndexSourceProductsRef.length}`);
-            }
-            const isRefTheSameInstance = this.globalHnswIndexSourceProductsRef === sourceProducts;
-            console.log(`    - REFERENCE CHECK: this.globalHnswIndexSourceProductsRef === sourceProducts (current call): ${isRefTheSameInstance}`);
+        if (isTemporaryIndexOperation) {
+            operationId = nanoid(); // Generate unique ID for this temporary operation
+            this.latestTemporaryOperationId = operationId; // Track the latest one
+            console.log(`[EmbeddingService PREPARE START] Temporary Index Op (ID: ${operationId}). For ${numSourceProducts} products. Filename hint: "${filename}", forceRebuild: ${forceRebuild}`);
         } else {
-            console.log(`    - this.hnswIndexSourceProductsRef exists: ${!!this.hnswIndexSourceProductsRef}`);
-            if (this.hnswIndexSourceProductsRef) {
-                console.log(`    - this.hnswIndexSourceProductsRef.length: ${this.hnswIndexSourceProductsRef.length}`);
-            }
-            const isRefTheSameInstance = this.hnswIndexSourceProductsRef === sourceProducts;
-            console.log(`    - REFERENCE CHECK: this.hnswIndexSourceProductsRef === sourceProducts (current call): ${isRefTheSameInstance}`);
+            console.log(`[EmbeddingService PREPARE START] Global Index Op. For ${numSourceProducts} products. Filename: "${filename}", forceRebuild: ${forceRebuild}`);
         }
-        console.log(`    - Current worker index context: ${this.currentWorkerIndexContext}`);
-        // --- End of new detailed check logs ---
 
-        // Check if we can skip index preparation based on type (global vs temporary)
-        if (persistIndex) {
-            // GLOBAL INDEX - check global state
+
+        // --- Skip logic (remains largely the same) ---
+        if (persistIndex) { // Global index
             if (!forceRebuild && this.isGlobalHnswIndexReadyInWorker && this.globalHnswIndexSourceProductsRef === sourceProducts) {
-                console.log(`[EmbeddingService PREPARE SKIP] GLOBAL HNSW index in worker ALREADY PREPARED for the current exact source products list (filename: "${filename}"). Skipping further action.`);
-                // Still ensure active index in worker matches global
-                this.hnswIndexSourceProductsRef = sourceProducts;
-                this.isHnswIndexReadyInWorker = true;
-
-                // Make sure worker has global context active if it's not already
-                if (this.currentWorkerIndexContext !== 'global') {
-                    console.log(`[EmbeddingService PREPARE] Switching worker context to global index for "${filename}"...`);
-                    await this.ensureCorrectWorkerContext('global', filename);
-                }
-
+                console.log(`[EmbeddingService PREPARE SKIP] GLOBAL HNSW index for "${filename}" already prepared.`);
+                if (this.currentWorkerIndexContext !== 'global') await this.ensureCorrectWorkerContext('global', filename);
+                this.isHnswIndexReadyInWorker = true; // Ensure active is also marked ready
+                this.hnswIndexSourceProductsRef = sourceProducts; // And ref is correct
                 return;
             }
-        } else {
-            // TEMPORARY INDEX - check temporary state
+        } else { // Temporary index
+            // For temporary, we rely on forceRebuild=true from HybridDropdownStrategy.
+            // The skip logic based on sourceProductsRef matching is less reliable for rapid dropdown changes.
+            // The worker-side operationId check is the main guard for temporary indexes.
+            // However, if somehow forceRebuild was false AND it's temporary AND sourceProducts matched, we could skip.
+            // But HybridDropdownStrategy always sends forceRebuild=true.
             if (!forceRebuild && this.isHnswIndexReadyInWorker && this.hnswIndexSourceProductsRef === sourceProducts) {
-                console.log(`[EmbeddingService PREPARE SKIP] TEMPORARY HNSW index in worker ALREADY PREPARED for the current exact source products list. Skipping further action.`);
-
-                // Make sure worker has temporary context active
-                if (this.currentWorkerIndexContext !== 'temporary') {
-                    console.log(`[EmbeddingService PREPARE] Switching worker context to temporary index...`);
-                    await this.ensureCorrectWorkerContext('temporary');
-                }
-
+                console.log(`[EmbeddingService PREPARE SKIP] TEMPORARY HNSW index (OpID: ${operationId}) already prepared for exact same products and not forcing rebuild. This case should be rare for dropdowns.`);
+                if (this.currentWorkerIndexContext !== 'temporary') await this.ensureCorrectWorkerContext('temporary');
                 return;
             }
         }
+        console.log(`[EmbeddingService PREPARE PROCEED] OpID: ${operationId || 'N/A (Global)'}. Requesting worker to prepare HNSW index.`);
 
-        console.log(`[EmbeddingService PREPARE PROCEED] Conditions not met to skip. Requesting worker to prepare HNSW index (forceRebuild: ${forceRebuild}, persist: ${persistIndex}, file: ${filename})...`);
 
-        // Set ready flags based on index type
         if (persistIndex) {
-            this.isGlobalHnswIndexReadyInWorker = false; // Mark global as not ready until completion
+            this.isGlobalHnswIndexReadyInWorker = false;
         }
-        this.isHnswIndexReadyInWorker = false; // Mark active index as not ready
+        this.isHnswIndexReadyInWorker = false;
 
         const productsWithEmbeddingsData = sourceProducts
-            .map((p, originalIndex) => ({
-                embedding: p.embedding,
-                originalIndex: originalIndex,
-            }))
+            .map((p, originalIndex) => ({ embedding: p.embedding, originalIndex }))
             .filter(p => p.embedding && p.embedding.length === this.HNSW_DIMENSION);
 
         if (productsWithEmbeddingsData.length === 0) {
-            console.warn('[EmbeddingService PREPARE ABORT] No products with valid embeddings to send to worker for HNSW index build.');
-
-            // Update state based on index type
-            if (persistIndex) {
-                this.globalHnswIndexSourceProductsRef = sourceProducts;
-                this.isGlobalHnswIndexReadyInWorker = false;
-            }
+            console.warn(`[EmbeddingService PREPARE ABORT] OpID: ${operationId || 'N/A (Global)'}. No products with valid embeddings.`);
+            if (persistIndex) this.globalHnswIndexSourceProductsRef = sourceProducts; // Still update ref
             this.hnswIndexSourceProductsRef = sourceProducts;
-            this.isHnswIndexReadyInWorker = false;
+            // Flags remain false
             return;
         }
 
         let initResult;
         try {
-            console.log(`[EmbeddingService PREPARE] Sending 'initHnswIndex' to worker. MaxElements: ${productsWithEmbeddingsData.length}, Filename: "${filename}", ForceRebuild: ${forceRebuild}, PersistForWorker: ${persistIndex}`);
+            console.log(`[EmbeddingService PREPARE] Sending 'initHnswIndex' to worker. OpID: ${operationId || 'N/A (Global)'}, MaxElements: ${productsWithEmbeddingsData.length}, Persist: ${persistIndex}`);
             initResult = await this.sendWorkerMessage({
                 type: 'initHnswIndex',
                 data: {
-                    maxElements: productsWithEmbeddingsData.length,
-                    M: 16,
-                    efConstruction: 200,
-                    efSearch: 32,
-                    filename: filename,
-                    forceRebuild: forceRebuild,
-                    persistIndex: persistIndex, // Worker needs to know if it should try loading from its FS
-                    indexContext: persistIndex ? 'global' : 'temporary' // Tell worker which context this is for
+                    maxElements: productsWithEmbeddingsData.length, M: 16, efConstruction: 200, efSearch: 64,
+                    filename: filename, forceRebuild: forceRebuild, persistIndex: persistIndex,
+                    indexContext: persistIndex ? 'global' : 'temporary',
+                    operationId: operationId // Pass operationId
                 }
-            }, 'initHnswIndex');
+            }, `initHnswIndex (OpID: ${operationId || 'Global'})`);
         } catch (error) {
-            // Update state based on index type on error
-            if (persistIndex) {
-                this.isGlobalHnswIndexReadyInWorker = false;
-                this.globalHnswIndexSourceProductsRef = null;
-            }
-            this.isHnswIndexReadyInWorker = false;
+            console.error(`[EmbeddingService PREPARE] Error sending 'initHnswIndex' (OpID: ${operationId || 'Global'}):`, error);
+            if (persistIndex) this.globalHnswIndexSourceProductsRef = null;
             this.hnswIndexSourceProductsRef = null;
-            console.error(`[EmbeddingService PREPARE] Error sending 'initHnswIndex' message to worker:`, error);
-            throw error; // Re-throw to be caught by caller
+            throw error;
         }
 
         if (!initResult || !initResult.success) {
-            // Update state based on index type on failure
-            if (persistIndex) {
-                this.isGlobalHnswIndexReadyInWorker = false;
-                this.globalHnswIndexSourceProductsRef = null;
-            }
-            this.isHnswIndexReadyInWorker = false;
-            this.hnswIndexSourceProductsRef = null;
-            throw new Error(`[EmbeddingService PREPARE] Worker failed to initialize HNSW index: ${initResult?.error || 'Unknown worker error during init'}`);
+            throw new Error(`[EmbeddingService PREPARE] Worker failed 'initHnswIndex' (OpID: ${operationId || 'Global'}): ${initResult?.error || 'Unknown worker error'}`);
         }
 
-        const initData = initResult.data; // Contains { loadedFromSave: boolean, itemCount: number }
-
-        // Update worker context tracking
+        const initData = initResult.data;
         this.currentWorkerIndexContext = persistIndex ? 'global' : 'temporary';
-
-        // CRITICAL: Update the source products reference AFTER successful init/load by worker
-        // Only update global state for persistent index
-        if (persistIndex) {
-            this.globalHnswIndexSourceProductsRef = sourceProducts;
-        }
-        // Always update active index reference
+        if (persistIndex) this.globalHnswIndexSourceProductsRef = sourceProducts;
         this.hnswIndexSourceProductsRef = sourceProducts;
 
-        if (initData?.loadedFromSave) {
-            console.log(`[EmbeddingService PREPARE] Worker loaded HNSW index "${filename}" with ${initData.itemCount} items. Setting index as ready.`);
 
-            // Update state based on index type
-            if (persistIndex) {
-                this.isGlobalHnswIndexReadyInWorker = true;
-            }
+        if (initData?.loadedFromSave) {
+            console.log(`[EmbeddingService PREPARE] Worker loaded HNSW index "${filename}" (OpID: ${operationId || 'Global'}) with ${initData.itemCount} items.`);
+            if (persistIndex) this.isGlobalHnswIndexReadyInWorker = true;
             this.isHnswIndexReadyInWorker = true;
-            return; // IMPORTANT: Return here, no need to add points if loaded
+            return;
         }
 
-        // If not loaded from save, then we need to build it by adding points
-        console.log(`[EmbeddingService PREPARE] Requesting worker to build HNSW index with ${productsWithEmbeddingsData.length} items for "${filename}" (since it was not loaded from save).`);
+        // If execution reaches here, we need to build the index by adding points.
+        // For temporary indexes, check if this operation is still the latest one.
+        if (isTemporaryIndexOperation && operationId !== this.latestTemporaryOperationId) {
+            console.log(`[EmbeddingService PREPARE] Stale temporary operation (ID: ${operationId}) detected before adding points. Current latest is ${this.latestTemporaryOperationId}. Aborting addPoints for this stale op.`);
+            // Mark as not ready, as addPoints was skipped.
+            this.isHnswIndexReadyInWorker = false;
+            // Do not throw an error, just don't proceed with addPoints for this stale operation.
+            // The newer operation will handle setting the index ready.
+            return;
+        }
 
+        console.log(`[EmbeddingService PREPARE] Requesting worker to build HNSW index (OpID: ${operationId || 'Global'}) with ${productsWithEmbeddingsData.length} items.`);
         let buildResult;
         try {
             buildResult = await this.sendWorkerMessage({
                 type: 'addPointsToHnsw',
                 data: {
-                    points: productsWithEmbeddingsData.map(p => ({
-                        embedding: p.embedding,
-                        label: p.originalIndex // This originalIndex is relative to the current sourceProducts
-                    })),
-                    indexContext: persistIndex ? 'global' : 'temporary' // Specify which context we're adding points to
+                    points: productsWithEmbeddingsData.map(p => ({ embedding: p.embedding, label: p.originalIndex })),
+                    indexContext: persistIndex ? 'global' : 'temporary',
+                    operationId: operationId // Pass operationId
                 }
-            }, 'addPointsToHnsw');
+            }, `addPointsToHnsw (OpID: ${operationId || 'Global'})`);
         } catch (error) {
-            // Update state based on index type on error
-            if (persistIndex) {
-                this.isGlobalHnswIndexReadyInWorker = false;
-            }
+            console.error(`[EmbeddingService PREPARE] Error sending 'addPointsToHnsw' (OpID: ${operationId || 'Global'}):`, error);
+            // Reset ready flags as build failed
+            if (persistIndex) this.isGlobalHnswIndexReadyInWorker = false;
             this.isHnswIndexReadyInWorker = false;
-            console.error(`[EmbeddingService PREPARE] Error sending 'addPointsToHnsw' message to worker:`, error);
-            throw error; // Re-throw
+            throw error;
         }
 
         if (!buildResult || !buildResult.success) {
-            // Update state based on index type on failure
-            if (persistIndex) {
-                this.isGlobalHnswIndexReadyInWorker = false;
+            // If the worker explicitly said it was a stale operation, don't throw an error,
+            // as another operation is likely taking over.
+            if (buildResult?.error === 'Stale addPoints operation for temporary context.') {
+                console.warn(`[EmbeddingService PREPARE] Worker reported stale addPoints for OpID: ${operationId}. Another temp op likely active.`);
+                this.isHnswIndexReadyInWorker = false; // This specific operation did not complete successfully.
+                return;
             }
-            this.isHnswIndexReadyInWorker = false;
-            throw new Error(`[EmbeddingService PREPARE] Worker failed to build HNSW index: ${buildResult?.error || 'Unknown worker error during build'}`);
+            throw new Error(`[EmbeddingService PREPARE] Worker failed 'addPointsToHnsw' (OpID: ${operationId || 'Global'}): ${buildResult?.error || 'Unknown worker error'}`);
         }
 
-        console.log(`[EmbeddingService PREPARE] Worker built HNSW index for "${filename}" with ${buildResult.data?.itemCount || 'unknown'} items. Setting index as ready.`);
 
-        // Update state based on index type after successful build
-        if (persistIndex) {
-            this.isGlobalHnswIndexReadyInWorker = true;
-        }
+        console.log(`[EmbeddingService PREPARE] Worker built HNSW index (OpID: ${operationId || 'Global'}) with ${buildResult.data?.itemCount || 'unknown'} items.`);
+        if (persistIndex) this.isGlobalHnswIndexReadyInWorker = true;
         this.isHnswIndexReadyInWorker = true;
 
-        // Only attempt to save if persistIndex is true for this specific operation (passed as param)
         if (persistIndex) {
-            console.log(`[EmbeddingService PREPARE] Requesting worker to save HNSW index to "${filename}" (as persistIndex is true for this call)...`);
-            let saveResult;
-            try {
-                saveResult = await this.sendWorkerMessage({
-                    type: 'saveHnswIndexFile',
-                    data: {
-                        filename: filename, // Worker saves its current index to this filename
-                        indexContext: 'global' // Always save to global context
-                    }
-                }, 'saveHnswIndexFile');
-            } catch (error) {
-                console.warn(`[EmbeddingService PREPARE] Error sending 'saveHnswIndexFile' message to worker:`, error);
-                // Decide if this is critical enough to mark index as not ready or affect persist status
-            }
-
-            if (saveResult && !saveResult.success) {
-                console.warn(`[EmbeddingService PREPARE] Worker failed to save HNSW index to "${filename}": ${saveResult.error}`);
-            } else if (saveResult && saveResult.success) {
-                console.log(`[EmbeddingService PREPARE] Worker confirmed HNSW index saved to "${filename}".`);
-            }
+            console.log(`[EmbeddingService PREPARE] Requesting worker to save GLOBAL HNSW index "${filename}".`);
+            // Fire and forget save for global index, or await if critical
+            this.sendWorkerMessage({
+                type: 'saveHnswIndexFile',
+                data: { filename: filename, indexContext: 'global' }
+            }, `saveHnswIndexFile (Global)`).then(saveResult => {
+                if (saveResult && saveResult.success) console.log(`[EmbeddingService PREPARE] Worker confirmed GLOBAL HNSW index saved to "${filename}".`);
+                else console.warn(`[EmbeddingService PREPARE] Worker failed to save GLOBAL HNSW index to "${filename}": ${saveResult?.error}`);
+            }).catch(err => console.warn(`[EmbeddingService PREPARE] Error message for saving GLOBAL HNSW index to "${filename}":`, err));
         } else {
-            console.log(`[EmbeddingService PREPARE] Skipping save for "${filename}" (as persistIndex is false for this call).`);
+            console.log(`[EmbeddingService PREPARE] OpID: ${operationId}. Skipping save for temporary index.`);
         }
     }
 

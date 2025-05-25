@@ -419,34 +419,34 @@ export default class SearchCacheService {
 
     private static async buildIndexFromCategories(store: HolochainStore): Promise<ProcessedProduct[]> {
         let allProducts: ProcessedProduct[] = [];
-        const limit = 1000;
-        let totalProductCount = 0;
 
         this.initializeLookupTables();
 
         try {
-            console.log('[SearchCacheService] Building search index from Holochain DHT');
-            const categoriesToLoad = [...TOP_CATEGORIES, ...ALL_CATEGORIES.filter(c => !TOP_CATEGORIES.includes(c))];
+            console.log('[SearchCacheService] Building search index from Holochain DHT using bulk fetch');
 
-            for (const category of categoriesToLoad) {
-                try {
-                    // Type the response from callZome if possible, here assumed any
-                    const response: { product_groups: ProductGroupRecord[] } | null = await store.service.client.callZome({
-                        role_name: "grocery",
-                        zome_name: "products", // Assuming zome name is "products" not "product_catalog"
-                        fn_name: "get_products_by_category",
-                        payload: { category, limit },
-                    });
+            // Single bulk call to get all products
+            console.time('[SearchCacheService] Bulk fetch all products');
+            const response: { products: ProductGroupRecord[], total: number } = await store.service.client.callZome({
+                role_name: "grocery",
+                zome_name: "products",
+                fn_name: "get_all_products_for_search_index",
+                payload: null,
+            });
+            console.timeEnd('[SearchCacheService] Bulk fetch all products');
 
-                    if (response && response.product_groups && response.product_groups.length > 0) {
-                        const productsFromGroups = this.extractProductsFromGroups(response.product_groups);
-                        allProducts.push(...productsFromGroups);
-                        totalProductCount += productsFromGroups.length; // productsFromGroups is already a count of individual products
-                        console.log(`[SearchCacheService] Loaded ${productsFromGroups.length} products from category ${category}`);
-                    }
-                } catch (error) {
-                    console.error(`[SearchCacheService] Error loading category ${category}:`, error);
-                }
+            if (response && response.products && response.products.length > 0) {
+                console.log(`[SearchCacheService] Received ${response.products.length} ProductGroups containing ${response.total} total products`);
+
+                // Extract products from all groups
+                console.time('[SearchCacheService] Extract and process products');
+                const productsFromGroups = this.extractProductsFromGroups(response.products);
+                allProducts.push(...productsFromGroups);
+                console.timeEnd('[SearchCacheService] Extract and process products');
+
+                console.log(`[SearchCacheService] Extracted ${allProducts.length} products from groups`);
+            } else {
+                console.warn('[SearchCacheService] No products returned from bulk fetch');
             }
 
             console.log(`[SearchCacheService] Lookup tables created:`, {

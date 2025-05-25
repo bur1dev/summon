@@ -41,6 +41,13 @@
     let resizeTimeouts: Record<string, number> = {}; // Store separate timeouts for each row
     let isResizing = false;
 
+    // Add state tracking to prevent stale operations
+    let currentNavigationState = {
+        category: null as string | null,
+        subcategory: null as string | null,
+        productType: "All",
+    };
+
     // Set up resize observer for responsive grid layout
     let resizeObserver = new ResizeObserver((entries) => {
         for (const entry of entries) {
@@ -63,11 +70,7 @@
     };
 
     onMount(() => {
-        if (isHomeView) {
-            loadHomeView();
-        } else if (selectedCategory) {
-            loadProductsForCategory();
-        }
+        // Initial load handled by consolidated reactive statement
     });
 
     onDestroy(() => {
@@ -80,24 +83,31 @@
         );
     });
 
-    // Watch for category/subcategory changes
-    $: if (!isHomeView && (selectedCategory || selectedSubcategory)) {
-        loadProductsForCategory();
-    }
+    // CONSOLIDATED REACTIVE STATEMENT - REPLACES ALL THREE PREVIOUS ONES
+    $: {
+        // Skip if in search mode
+        if (searchMode) {
+            resetState();
+        } else {
+            // Update navigation state
+            currentNavigationState = {
+                category: selectedCategory,
+                subcategory: selectedSubcategory,
+                productType: selectedProductType,
+            };
 
-    // Watch for product type changes (specifically for grid view)
-    $: if (
-        !isHomeView &&
-        selectedProductType &&
-        selectedCategory &&
-        selectedSubcategory
-    ) {
-        loadProductsForProductType();
-    }
-
-    // Watch for home view changes
-    $: if (isHomeView && featuredSubcategories.length > 0) {
-        loadHomeView();
+            // Determine which loading function to call based on COMPLETE state
+            if (isHomeView && featuredSubcategories.length > 0) {
+                loadHomeView();
+            } else if (selectedCategory && selectedSubcategory) {
+                // We have both category AND subcategory - load specific view
+                loadProductsForCategory();
+            } else if (selectedCategory && !selectedSubcategory) {
+                // We have category but NOT subcategory - load main category view
+                loadProductsForCategory();
+            }
+            // If no category selected, do nothing (avoid incomplete state loads)
+        }
     }
 
     function handleResize(identifier: string, container: HTMLElement) {
@@ -337,6 +347,19 @@
 
     async function loadProductsForProductType() {
         if (!selectedCategory || !selectedSubcategory || searchMode) return;
+
+        // STATE GUARD: Check if we're still in the same navigation state
+        if (
+            currentNavigationState.category !== selectedCategory ||
+            currentNavigationState.subcategory !== selectedSubcategory ||
+            currentNavigationState.productType !== selectedProductType
+        ) {
+            console.log(
+                "Navigation state changed, aborting loadProductsForProductType",
+            );
+            return;
+        }
+
         allCategoryProducts = [];
 
         console.log(
@@ -396,17 +419,12 @@
         await tick();
 
         if (subcategories.length > 3) {
-            setTimeout(async () => {
-                await loadRemainingSubcategories(
-                    subcategories.slice(3),
-                    capacity,
-                );
-            }, 100);
+            // REMOVED setTimeout - load remaining subcategories immediately
+            await loadRemainingSubcategories(subcategories.slice(3), capacity);
         }
 
-        setTimeout(() => {
-            loadAllCategoryProducts();
-        }, 200);
+        // REMOVED setTimeout - load all category products immediately
+        await loadAllCategoryProducts();
     }
 
     async function loadRemainingSubcategories(
@@ -456,6 +474,17 @@
     }
 
     async function loadGridOnlySubcategory() {
+        // STATE GUARD: Check if we're still in the same navigation state
+        if (
+            currentNavigationState.category !== selectedCategory ||
+            currentNavigationState.subcategory !== selectedSubcategory
+        ) {
+            console.log(
+                "Navigation state changed, aborting loadGridOnlySubcategory",
+            );
+            return;
+        }
+
         const result = await productDataService.loadProductTypeProducts(
             selectedCategory,
             selectedSubcategory,
@@ -501,14 +530,33 @@
     }
 
     async function loadAllCategoryProducts() {
+        // STATE GUARD: Only load if we're still in main category view
+        if (currentNavigationState.subcategory !== null) {
+            console.log(
+                "Not in main category view anymore, skipping loadAllCategoryProducts",
+            );
+            return;
+        }
+
         const gridData =
             await productDataService.loadAllCategoryProducts(selectedCategory);
-        if (gridData?.products) {
-            allCategoryProducts = gridData.products;
-            allProductsTotal = gridData.total;
+
+        // DOUBLE CHECK: Verify we're still in the right state before updating
+        if (
+            currentNavigationState.category === selectedCategory &&
+            currentNavigationState.subcategory === null
+        ) {
+            if (gridData?.products) {
+                allCategoryProducts = gridData.products;
+                allProductsTotal = gridData.total;
+            } else {
+                allCategoryProducts = [];
+                allProductsTotal = 0;
+            }
         } else {
-            allCategoryProducts = [];
-            allProductsTotal = 0;
+            console.log(
+                "Navigation state changed during loadAllCategoryProducts, discarding results",
+            );
         }
     }
 

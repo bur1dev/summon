@@ -447,7 +447,7 @@
 
                         <h1 class="product-title">{product.name}</h1>
                         <div
-                            class="shop-all btn-link"
+                            class="shop-all btn btn-text"
                             on:click|stopPropagation={() => {
                                 const productType =
                                     product.product_type || product.category;
@@ -475,7 +475,10 @@
                                 closeModal();
                             }}
                         >
-                            Shop all {product.product_type || product.category}
+                            Shop all {selectedSubcategory || product.subcategory
+                                ? (selectedSubcategory || product.subcategory) +
+                                  "/"
+                                : ""}{product.product_type || product.category}
                         </div>
 
                         <div class="product-details">
@@ -792,9 +795,12 @@
     }
 
     .shop-all {
-        font-size: 15px;
+        font-size: var(--spacing-lg);
+        font-weight: var(--font-weight-bold);
         margin-bottom: var(--spacing-md);
         cursor: pointer;
+        padding-left: 1px;
+        justify-content: flex-start;
     }
 
     .product-details {

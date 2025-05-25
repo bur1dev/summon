@@ -193,7 +193,7 @@
     align-items: center;
     justify-content: space-between;
     box-shadow: var(--shadow-subtle);
-    z-index: var(--z-index-modal);
+    z-index: var(--z-index-modal); /* Restored original z-index */
     padding-left: var(
       --sidebar-width-category
     ); /* Keeps left side aligned as it is now */

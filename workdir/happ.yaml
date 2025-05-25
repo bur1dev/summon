@@ -10,7 +10,8 @@ roles:
     bundled: ../dnas/grocery/workdir/grocery.dna
     modifiers:
       network_seed: null
-      properties: null
+      properties:
+        admin_pub_key_str: "uhCAksk61qsIzF-F_O_1YBss60nJlroCf2EqFqtB3UmBdDp57apLM"
 
     installed_hash: null
     clone_limit: 0

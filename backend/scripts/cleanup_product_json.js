@@ -142,6 +142,17 @@ function runCleanup() {
             if (updatedProduct._originalAdditionalCategorizations === undefined) { updatedProduct._originalAdditionalCategorizations = null; productWasUpdated = true; }
         }
 
+        if (typeof updatedProduct.brand !== 'string' && updatedProduct.brand !== null) {
+            updatedProduct.brand = null;
+            productWasUpdated = true;
+        }
+
+        // 11. Normalize 'is_organic'
+        if (typeof updatedProduct.is_organic !== 'boolean') {
+            updatedProduct.is_organic = false;
+            productWasUpdated = true;
+        }
+
 
         if (productWasUpdated) {
             updatedCount++;

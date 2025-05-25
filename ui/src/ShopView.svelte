@@ -11,6 +11,11 @@
   import { ProductDataService } from "./ProductDataService";
   import ProductBrowser from "./ProductBrowser.svelte";
   import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte";
+  import {
+    sortByStore,
+    selectedBrandsStore,
+    selectedOrganicStore,
+  } from "./UiStateStore";
 
   // Import UI state stores
   import {
@@ -82,6 +87,11 @@
   }
 
   function handleCategorySelect({ detail: { category, subcategory } }) {
+    // Reset sort/filter state when changing categories
+    sortByStore.set("best");
+    selectedBrandsStore.set(new Set());
+    selectedOrganicStore.set("all");
+
     if (category === null && subcategory === null) {
       // This is a navigation to the home view
       $isHomeViewStore = true;
@@ -93,7 +103,6 @@
       $isHomeViewStore = false;
       $searchModeStore = false;
       if (store && uiProps && $uiProps) {
-        // MODIFIED: Check store and uiProps
         store.setUIprops({ ...($uiProps || {}), searchMode: false });
       }
       $selectedCategoryStore = category;
@@ -106,7 +115,6 @@
     if (scrollContainer) {
       scrollContainer.scrollTop = 0;
     } else {
-      // Fallback
       window.scrollTo(0, 0);
     }
   }
@@ -335,7 +343,7 @@
   .product-type-nav {
     position: sticky;
     top: var(--component-header-height);
-    z-index: 11;
+    z-index: 200;
     background: var(--background);
     min-height: var(--component-header-height);
     box-sizing: border-box;

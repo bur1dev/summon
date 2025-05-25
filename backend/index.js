@@ -1,8 +1,15 @@
 // backend/index.js
 import dotenv from 'dotenv';
-import fs from 'fs'; // fs needs to be imported for existsSync
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Corrected imports for stream-json
+import StreamJsonDefault from 'stream-json'; // Import the default for the main package
+const { parser } = StreamJsonDefault;      // Destructure 'parser' from the default
+
+import StreamArrayDefault from 'stream-json/streamers/StreamArray.js';
+const { streamArray } = StreamArrayDefault; // This import was likely fine once .js was added
 
 // Get directory name in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -410,7 +417,7 @@ app.post('/api/categorize', async (req, res) => {
     }
 
     const transformedProducts = categorizedProductList.map((product, index) => { // Added index for logging
-      const nestedProductObject = { // Create the nested object first
+      const nestedProductObject = {
         productId: product.productId,
         name: product.description,
         price: product.items?.[0]?.price?.regular || 0,
@@ -424,7 +431,9 @@ app.post('/api/categorize', async (req, res) => {
         subcategory: product.subcategory || null,
         product_type: product.product_type || null,
         image_url: product.image_url || null,
-        sold_by: product.items?.[0]?.soldBy || null
+        sold_by: product.items?.[0]?.soldBy || null,
+        brand: product.brand || null,
+        is_organic: typeof product.is_organic === 'boolean' ? product.is_organic : false
       };
 
       // ADD THIS LOG
@@ -842,16 +851,15 @@ app.post('/api/process-recategorization-queue', async (req, res) => {
 
         // First, create a copy of the original product with the recategorized primary category
         const tempUpdatedProduct = {
-          ...originalProduct, // Start with all fields from the existing product in the file
-          // Override with new primary categorization from the recategorization result
+          ...originalProduct,
           category: recategorizedProduct.category,
           subcategory: recategorizedProduct.subcategory,
           product_type: recategorizedProduct.product_type,
-          // Preserve other fields as necessary
           image_url: recategorizedProduct.image_url || originalProduct.image_url,
           name: recategorizedProduct.description || originalProduct.name || originalProduct.description,
           description: recategorizedProduct.description || originalProduct.description || originalProduct.name,
-          // Set metadata flags
+          brand: recategorizedProduct.brand || originalProduct.brand || null,
+          is_organic: typeof recategorizedProduct.is_organic === 'boolean' ? recategorizedProduct.is_organic : originalProduct.is_organic === true,
           _categoryChanged: true,
           _originalCategory: originalProduct.category,
           _originalSubcategory: originalProduct.subcategory,
@@ -930,18 +938,15 @@ app.post('/api/process-recategorization-queue', async (req, res) => {
         // Add it as a new product, but flag it as if it just came from API for consistency.
         console.warn(`Product from recat queue (ID: ${productId}, Desc: ${description}) not found in categorized_products.json. Adding as new.`);
         const newProductToAdd = {
-          // Spread all properties from recategorizedProduct (which has the API categorizer's output structure)
           ...recategorizedProduct,
-          // Ensure essential fields from original Kroger data if not on recategorizedProduct (items, upc, etc.)
-          // This might require fetching original Kroger data for products in queue if they are minimal.
-          // For now, assume recategorizedProduct has enough data or was enriched by api_categorizer.
-          name: recategorizedProduct.description, // Ensure name is set from description
-          _categoryChanged: false, // It's "new" to this file in this state
+          name: recategorizedProduct.description,
+          brand: recategorizedProduct.brand || null,
+          is_organic: typeof recategorizedProduct.is_organic === 'boolean' ? recategorizedProduct.is_organic : false,
+          _categoryChanged: false,
           _originalCategory: null,
           _originalSubcategory: null,
           _originalProductType: null,
           _originalAdditionalCategorizations: null,
-          // Default other necessary fields if not present on recategorizedProduct
           price: recategorizedProduct.price ?? recategorizedProduct.items?.[0]?.price?.regular ?? 0,
           promo_price: recategorizedProduct.promo_price ?? recategorizedProduct.items?.[0]?.price?.promo ?? null,
           size: recategorizedProduct.size ?? recategorizedProduct.items?.[0]?.size ?? "",
@@ -1334,20 +1339,49 @@ app.get('/api/load-categorized-products', (req, res) => {
   const categorizedDataPath = path.join(__dirname, '../product-categorization/categorized_products_sorted_with_embeddings.json');
   console.log(`Looking for categorized products at: ${categorizedDataPath}`);
 
-  try {
-    if (fs.existsSync(categorizedDataPath)) {
-      const data = fs.readFileSync(categorizedDataPath, 'utf8');
-      const products = JSON.parse(data);
-      console.log(`Loaded ${products.length} categorized products from saved file`);
-      res.json(products);
-    } else {
-      console.log('No saved categorized products file found');
-      res.json([]); // Return empty array instead of 404 to avoid errors
-    }
-  } catch (error) {
-    console.error('Error loading categorized products:', error);
-    res.status(500).json({ error: `Failed to load categorized products: ${error.message}` });
+  if (!fs.existsSync(categorizedDataPath)) {
+    console.log('No saved categorized products file found');
+    return res.json([]); // Return empty array if file doesn't exist
   }
+
+  const products = [];
+  const fileStream = fs.createReadStream(categorizedDataPath, { encoding: 'utf8' });
+  // Create the JSON parsing pipeline
+  const jsonPipeline = fileStream.pipe(parser()).pipe(streamArray());
+
+  let count = 0; // To count products as they are streamed
+
+  // Event listener for each product object streamed from the array
+  jsonPipeline.on('data', ({ key, value }) => {
+    // 'key' is the array index (0, 1, 2,...), 'value' is the actual product object
+    products.push(value);
+    count++;
+    if (count % 10000 === 0) { // Optional: Log progress for very large files
+      console.log(`[STREAM LOAD] Streaming... Loaded ${count} products so far.`);
+    }
+  });
+
+  // Event listener for the end of the stream
+  jsonPipeline.on('end', () => {
+    console.log(`Loaded ${products.length} categorized products from saved file via stream.`);
+    res.json(products); // Send the complete array of products
+  });
+
+  // Error handling for the JSON parsing pipeline
+  jsonPipeline.on('error', (err) => {
+    console.error('Error streaming or parsing categorized products JSON:', err);
+    if (!res.headersSent) { // Check if headers are already sent to avoid Express error
+      res.status(500).json({ error: `Failed to load categorized products via stream: ${err.message}` });
+    }
+  });
+
+  // Error handling for the file stream itself (e.g., file not readable, permissions issues)
+  fileStream.on('error', (err) => {
+    console.error('Error reading categorized products file stream:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: `Failed to read categorized products file: ${err.message}` });
+    }
+  });
 });
 
 app.get('/api/check-dht-upload-flag', (req, res) => {

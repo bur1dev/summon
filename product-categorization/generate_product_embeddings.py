@@ -9,7 +9,7 @@ INPUT_FILE_PATH = (
     "categorized_products_sorted.json"  # Assumes this script is in the same dir
 )
 OUTPUT_FILE_PATH = "categorized_products_sorted_with_embeddings.json"
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "all-mpnet-base-v2"
 BATCH_SIZE = 32  # Adjust based on your RAM capacity
 
 
@@ -86,7 +86,7 @@ def main():
     total_products = len(products)
     start_time_total = time.time()
 
-    print(f"\n3. Generating and quantizing embeddings in batches of {BATCH_SIZE}...")
+    print(f"\n3. Generating embeddings in batches of {BATCH_SIZE}...")
 
     for i in range(0, total_products, BATCH_SIZE):
         batch_products = products[i : i + BATCH_SIZE]
@@ -109,17 +109,21 @@ def main():
             # Generate FP32 embeddings
             embeddings_fp32 = model.encode(batch_texts, show_progress_bar=False)
 
-            # Quantize to FP16
-            embeddings_fp16 = embeddings_fp32.astype(np.float16)
+            # The FP16 quantization step is now removed.
 
             batch_end_time = time.time()
             print(
-                f"     Batch encoded and quantized in {batch_end_time - batch_start_time:.2f} seconds."
+                f"     Batch encoded in {batch_end_time - batch_start_time:.2f} seconds."  # Message updated
             )
 
-            for product, embedding_fp16 in zip(batch_products, embeddings_fp16):
-                # Convert numpy FP16 array to a Python list of floats for JSON serialization
-                product["embedding"] = embedding_fp16.tolist()
+            # Iterate through the original FP32 embeddings
+            for product, embedding_fp32_single in zip(
+                batch_products, embeddings_fp32
+            ):  # Use embeddings_fp32
+                # Convert numpy FP32 array to a Python list of floats for JSON serialization
+                product["embedding"] = (
+                    embedding_fp32_single.tolist()
+                )  # Use embedding_fp32_single
                 products_with_embeddings.append(product)
 
         except Exception as e:
@@ -138,7 +142,7 @@ def main():
 
     end_time_total = time.time()
     print(
-        f"\n   Total embedding generation and quantization took {end_time_total - start_time_total:.2f} seconds."
+        f"\n   Total embedding generation took {end_time_total - start_time_total:.2f} seconds."
     )
 
     print(

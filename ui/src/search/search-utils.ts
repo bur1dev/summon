@@ -16,6 +16,8 @@ export interface DecodedProductGroupEntry {
         subcategory?: string;
         product_type?: string;
         price?: number;
+        brand?: string; // Explicitly add brand
+        is_organic?: boolean; // Add is_organic
         // Add any other fields that are directly in the decoded product object
         [key: string]: any; // If products can have arbitrary other fields
     }>;

@@ -180,6 +180,8 @@ export class ProductStore {
             sold_by: product.sold_by || null,
             productId: product.productId,
             embedding: product.embedding || null,
+            brand: product.brand || null, // Add brand
+            is_organic: product.is_organic || false, // Add is_organic
           },
           main_category: product.category,
           subcategory: product.subcategory || null,
@@ -657,6 +659,8 @@ export class ProductStore {
               image_url: product.image_url || null, // Prioritize the direct image_url field
               sold_by: product.sold_by || null,
               productId: product.productId || null,
+              brand: product.brand || null, // Add brand
+              is_organic: product.is_organic || false, // Add is_organic
             },
             // These top-level category fields in the Zome payload for create_product_batch
             // should represent the path for which this batch is being sent.

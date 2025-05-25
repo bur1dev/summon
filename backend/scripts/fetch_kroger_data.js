@@ -35,20 +35,7 @@ let tokenExpiresAt = null;
 
 
 const searchTerms = [
-    'guacamole',
-    'avocado dip',
-    'hummus',
-    'chickpea dip',
-    'tahini dip',
-    'cheese dip',
-    'queso',
-    'nacho cheese',
-    'feta dip',
-    'spinach dip',
-    'artichoke dip',
-    'bean dip',
-    'dip',
-    'spread'
+    '0004126001922'
 ];
 
 

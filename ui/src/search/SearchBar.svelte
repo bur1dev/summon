@@ -19,6 +19,10 @@
         HybridDropdownStrategy,
     } from "./search-strategy";
     import { embeddingService } from "./EmbeddingService";
+    import {
+        isAmbiguousSingleFoodTerm,
+        generateExpandedQueriesForAmbiguity,
+    } from "./query-utils";
 
     export let store;
     export let productCache;
@@ -50,7 +54,7 @@
     const DROPDOWN_RESULTS_LIMIT = 15;
     const PRE_FILTER_LIMIT = 30; // Get more candidates for semantic ranking
     const MINIMUM_QUERY_LENGTH_FOR_EMBEDDING = 4; // Increased from 3 to 4
-    const MINIMUM_KEYSTROKE_INTERVAL = 600; // ms to wait before calculating embeddings
+    const MINIMUM_KEYSTROKE_INTERVAL = 400; // ms to wait before calculating embeddings
     const MIN_QUERY_LENGTH = 3;
 
     function portal(node) {
@@ -190,13 +194,13 @@
             let finalEmbedding: Float32Array | number[] = new Float32Array(0);
             if (
                 p.embedding instanceof Float32Array &&
-                p.embedding.length === 384
+                p.embedding.length === 768
             ) {
                 finalEmbedding = p.embedding;
             } else if (
                 p.embedding &&
                 Array.isArray(p.embedding) &&
-                p.embedding.length === 384
+                p.embedding.length === 768
             ) {
                 try {
                     finalEmbedding = new Float32Array(p.embedding);
@@ -587,8 +591,8 @@
         });
     }
 
-    // Enhanced semantic search using the worker
-    const performSemanticSearch = debounce(async () => {
+    // Extract the actual search logic (not debounced)
+    const executeSemanticSearch = async () => {
         if (!searchQuery.trim()) {
             return;
         }
@@ -603,14 +607,49 @@
             console.time(
                 `[SearchBar PSS] Query Embedding for "${searchQuery}"`,
             );
-            const queryEmbedding = await getQueryEmbedding(searchQuery);
+
+            let queryEmbedding: Float32Array | null = null;
+            const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+            if (isAmbiguousSingleFoodTerm(normalizedSearchQuery)) {
+                console.log(
+                    `[SearchBar PSS] Ambiguous single term detected: "${normalizedSearchQuery}". Generating expanded queries.`,
+                );
+                const expandedQueries = generateExpandedQueriesForAmbiguity(
+                    normalizedSearchQuery,
+                );
+                console.log(
+                    `[SearchBar PSS] Expanded queries for "${normalizedSearchQuery}":`,
+                    expandedQueries,
+                );
+                queryEmbedding =
+                    await embeddingService.getAverageEmbedding(expandedQueries);
+                if (queryEmbedding) {
+                    console.log(
+                        `[SearchBar PSS] Successfully generated averaged embedding for "${normalizedSearchQuery}".`,
+                    );
+                } else {
+                    console.warn(
+                        `[SearchBar PSS] Failed to generate averaged embedding for "${normalizedSearchQuery}". Falling back to single query embedding.`,
+                    );
+                    // Fallback to single query embedding if averaging fails for some reason
+                    queryEmbedding = await embeddingService.getQueryEmbedding(
+                        normalizedSearchQuery,
+                    );
+                }
+            } else {
+                queryEmbedding = await embeddingService.getQueryEmbedding(
+                    normalizedSearchQuery,
+                );
+            }
+
             console.timeEnd(
                 `[SearchBar PSS] Query Embedding for "${searchQuery}"`,
             );
 
             if (!queryEmbedding) {
                 console.warn(
-                    `[SearchBar PSS] Unable to generate embedding for "${searchQuery}", falling back to text.`,
+                    `[SearchBar PSS] Unable to generate embedding for "${searchQuery}" (final attempt), falling back to text.`,
                 );
                 console.time(
                     `[SearchBar PSS] Fallback Fuse Search for "${searchQuery}"`,
@@ -694,7 +733,10 @@
             isLoading = false;
             console.timeEnd(`[SearchBar PSS] Total for "${searchQuery}"`);
         }
-    }, 700);
+    };
+
+    // Keep debounced version for typing
+    const performSemanticSearch = debounce(executeSemanticSearch, 700);
 
     function handleViewAllResults() {
         // Use semantic search when "View all results" is clicked
@@ -742,7 +784,7 @@
             );
             debouncedSearchForDropdown.cancel();
             performSemanticSearch.cancel();
-            performSemanticSearch();
+            executeSemanticSearch(); // Call the unwrapped version directly
         }
         showDropdown = false;
     }

@@ -41,15 +41,6 @@ fn default_limit() -> usize {
 // Modified to work with product groups and return correct total_products
 #[hdk_extern]
 pub fn get_products_by_category(params: GetProductsParams) -> ExternResult<CategorizedProducts> {
-    warn!(
-        "START get_products_by_category: Cat={}, Subcat={}, Type={}, Offset(groups)={}, Limit(groups)={}",
-        params.category,
-        params.subcategory.as_deref().unwrap_or("None"),
-        params.product_type.as_deref().unwrap_or("None"),
-        params.offset,
-        params.limit
-    );
-
     // Determine the path based on category/subcategory/product_type
     let base_path = match (&params.subcategory, &params.product_type) {
         (Some(subcategory), Some(product_type)) => format!(
@@ -62,32 +53,25 @@ pub fn get_products_by_category(params: GetProductsParams) -> ExternResult<Categ
         ),
         (None, None) => format!("categories/{}", params.category),
         (None, Some(_)) => {
-            warn!("ERROR get_products_by_category: Cannot have product type without subcategory");
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Cannot have product type without subcategory".into()
             )))
         }
     };
 
-    warn!("get_products_by_category: Using path: {}", base_path);
      let chunk_path = Path::try_from(base_path.clone())?;
     let path_hash = chunk_path.path_entry_hash()?;
 
-warn!("get_products_by_category: Querying path '{}' (hash: {})", base_path, path_hash);
 let all_links = match get_links(
     GetLinksInputBuilder::try_new(path_hash.clone(), LinkTypes::ProductTypeToGroup)?.build(),
 ) {
     Ok(links) => links,
     Err(e) => {
-         warn!("ERROR get_products_by_category: Failed to get links for path '{}' (hash: {}): {:?}", 
-               base_path, path_hash, e);
          return Err(e);
     }
 };
 
 let total_groups = all_links.len(); // This is the actual total number of groups
-warn!("get_products_by_category: Found {} total product group links for path '{}' (hash: {})", 
-      total_groups, base_path, path_hash);
 
 // Log each link with its chunk_id from tag
 for (i, link) in all_links.iter().enumerate() {
@@ -96,7 +80,6 @@ for (i, link) in all_links.iter().enumerate() {
     } else {
         0
     };
-    warn!("  Link #{}: Target={}, ChunkID={}", i, link.target, chunk_id);
 }
 
     // Sort links by chunk_id from tag before pagination
@@ -116,22 +99,16 @@ for (i, link) in all_links.iter().enumerate() {
         .take(params.limit)
         .collect::<Vec<_>>();
 
-    warn!("get_products_by_category: After pagination (offset={}, limit={}), {} links remain", params.offset, params.limit, paginated_links.len());
-
     // Extract action hashes from the paginated links
     let target_hashes: Vec<_> = paginated_links
         .into_iter()
         .filter_map(|link| link.target.into_action_hash())
         .collect();
 
-    warn!("get_products_by_category: Retrieving {} product group records", target_hashes.len());
-
     // Get the records for the paginated product groups
 let product_groups_records = concurrent_get_records(target_hashes)?;
-warn!("get_products_by_category: Successfully retrieved {} product group records", product_groups_records.len());
 
 // Add detailed product count verification
-warn!("🧮 PRODUCT COUNT VERIFICATION: Analyzing contents of {} groups", product_groups_records.len());
 let mut total_products_count = 0;
 let mut group_product_counts = Vec::new();
 
@@ -142,40 +119,22 @@ for (i, record) in product_groups_records.iter().enumerate() {
             total_products_count += product_count;
             group_product_counts.push(product_count);
             
-            warn!("  🧮 Group #{} (ChunkID={}): Contains {} products, Hash={}", 
-                  i, group.chunk_id, product_count, record.action_address());
-            
             // Log first few product names for verification
             if product_count > 0 {
                 for j in 0..std::cmp::min(3, product_count) {
-                    warn!("     - Sample product {}: '{}'", j, group.products[j].name);
                 }
             } else {
-                warn!("     ⚠️ Group is EMPTY!");
             }
         },
         Ok(None) => {
-            warn!("  ❌ Group #{}: Failed to deserialize as ProductGroup (empty result)", i);
         },
         Err(e) => {
-            warn!("  ❌ Group #{}: Error deserializing: {:?}", i, e);
         }
     }
 }
 
-warn!("🧮 PRODUCT COUNT VERIFICATION: Total products across all groups: {}", total_products_count);
-warn!("🧮 PRODUCT COUNT VERIFICATION: Product counts by group: {:?}", group_product_counts);
-
 // Determine if there are more groups beyond the current page
 let has_more = (params.offset + params.limit) < total_groups;
-
-warn!(
-    "END get_products_by_category: Returning {} groups with {} total products. Total Groups: {}. Has More: {}",
-    product_groups_records.len(),
-    total_products_count,
-    total_groups,
-    has_more
-);
 
 Ok(CategorizedProducts {
     category: params.category,
@@ -190,15 +149,11 @@ Ok(CategorizedProducts {
 
 #[hdk_extern]
 pub fn get_all_category_products(category: String) -> ExternResult<CategorizedProducts> {
-    warn!("🔍 START get_all_category_products: Category='{}'", category);
-
     let path_str = format!("categories/{}", category);
-    warn!("  🛣️ Path string: '{}'", path_str);
     
     let chunk_path = match Path::try_from(path_str.clone()) {
         Ok(path) => path,
         Err(e) => {
-            warn!("  ❌ Failed to create Path from '{}': {:?}", path_str, e);
             return Err(e.into());
         }
     };
@@ -206,26 +161,21 @@ pub fn get_all_category_products(category: String) -> ExternResult<CategorizedPr
     let path_hash = match chunk_path.path_entry_hash() {
         Ok(hash) => hash,
         Err(e) => {
-            warn!("  ❌ Failed to get hash for path '{}': {:?}", path_str, e);
             return Err(e);
         }
     };
     
-    warn!("  🧩 Path hash for '{}': {}", path_str, path_hash);
-
     // Get links to product groups at the category level
     let links = match get_links(
         GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup)?.build()
     ) {
         Ok(links) => links,
         Err(e) => {
-            warn!("  ❌ ERROR get_all_category_products: Failed to get links for path '{}': {:?}", path_str, e);
             return Err(e);
         }
     };
 
     let total_groups = links.len();
-    warn!("  🔗 Found {} product group links at category level for '{}'", total_groups, path_str);
 
     // Log all links found with their chunk IDs
     for (i, link) in links.iter().enumerate() {
@@ -234,7 +184,6 @@ pub fn get_all_category_products(category: String) -> ExternResult<CategorizedPr
         } else {
             0
         };
-        warn!("    🔗 Link #{}: Target={}, ChunkID={}", i, link.target, chunk_id);
     }
 
     // Extract action hashes from links
@@ -243,43 +192,32 @@ pub fn get_all_category_products(category: String) -> ExternResult<CategorizedPr
         .filter_map(|link| {
             let hash_opt = link.target.clone().into_action_hash();
             if hash_opt.is_none() {
-                warn!("    ⚠️ Link target is not an ActionHash: {}", link.target);
             }
             hash_opt
         })
         .collect();
     
-    warn!("  🎯 Extracted {} valid action hashes from {} links", all_hashes.len(), total_groups);
-
     // Get all product group records
     // Get all product group records
-warn!("  📥 Fetching {} group records using concurrent_get_records...", all_hashes.len());
 let product_groups_records = match concurrent_get_records(all_hashes.clone()) {
     Ok(records) => {
-        warn!("  ✅ concurrent_get_records returned {} records", records.len());
         if records.len() < all_hashes.len() {
-            warn!("  ⚠️ Some records not returned: requested {} but got {}", all_hashes.len(), records.len());
             // Log the missing hashes
             let returned_hashes: Vec<ActionHash> = records.iter()
                 .map(|r| r.action_address().clone())
                 .collect();
             for (i, hash) in all_hashes.iter().enumerate() {
                 if !returned_hashes.contains(hash) {
-                    warn!("  ❌ Missing record #{}: Hash={}", i, hash);
                 }
             }
         }
         records
     },
     Err(e) => {
-        warn!("  ❌ Failed to fetch product group records: {:?}", e);
         return Err(e);
     }
 };
     
-    warn!("  ✅ Retrieved {} product group records", product_groups_records.len());
-
-    warn!("  🔍 Inspecting fetched group records (count: {})...", product_groups_records.len());
     let mut deserialize_success = 0;
     let mut deserialize_empty = 0;
     let mut deserialize_error = 0;
@@ -292,19 +230,12 @@ let product_groups_records = match concurrent_get_records(all_hashes.clone()) {
                 total_products_count += product_count;
                 deserialize_success += 1;
                 
-                warn!("    ✅ Group #{}: Hash={}, ChunkID={}, Products={}, Cat='{}', Subcat='{:?}', Type='{:?}'", 
-                      i, record.action_address(), group.chunk_id, product_count,
-                      group.category, group.subcategory, group.product_type);
             },
             Ok(None) => {
                 deserialize_empty += 1;
-                warn!("    ⚠️ Group #{}: Hash={} - Could not deserialize to ProductGroup (empty result)", 
-                      i, record.action_address());
             },
             Err(e) => {
                 deserialize_error += 1;
-                warn!("    ❌ Group #{}: Hash={} - Deserialization Error: {:?}", 
-                      i, record.action_address(), e);
             }
         }
     }
@@ -316,19 +247,6 @@ let product_groups_records = match concurrent_get_records(all_hashes.clone()) {
         })
         .map(|group| group.products.len()) // Get count of products in each group
         .sum(); // Sum counts
-
-    warn!("  📊 Result summary:");
-    warn!("    - Total groups found: {}", total_groups);
-    warn!("    - Groups successfully fetched: {}", product_groups_records.len());
-    warn!("    - Groups successfully deserialized: {}", deserialize_success);
-    warn!("    - Groups with empty deserialization: {}", deserialize_empty);
-    warn!("    - Groups with deserialization errors: {}", deserialize_error);
-    warn!("    - Manual product count: {}", total_products_count);
-    warn!("    - Calculated actual total products: {}", actual_total_products);
-    warn!("    - Cross-check: {} (should match)", total_products_count);
-
-    warn!("🏁 END get_all_category_products: Returning {} groups with {} total products",
-          product_groups_records.len(), actual_total_products);
 
     Ok(CategorizedProducts {
         category,
@@ -344,13 +262,10 @@ let product_groups_records = match concurrent_get_records(all_hashes.clone()) {
 // New function to extract individual products from a group
 #[hdk_extern]
 pub fn extract_products_from_group(group_hash: ActionHash) -> ExternResult<Vec<Product>> {
-    warn!("START extract_products_from_group: GroupHash={}", group_hash);
-
     // Get the product group record
     let group_record = match get(group_hash.clone(), GetOptions::default())? {
          Some(record) => record,
          None => {
-             warn!("ERROR extract_products_from_group: Group not found for hash {}", group_hash);
              return Err(wasm_error!(WasmErrorInner::Guest("Group not found".into())));
          }
     };
@@ -359,13 +274,11 @@ pub fn extract_products_from_group(group_hash: ActionHash) -> ExternResult<Vec<P
     let product_group = match ProductGroup::try_from(group_record) {
          Ok(group) => group,
          Err(e) => {
-             warn!("ERROR extract_products_from_group: Failed to deserialize ProductGroup: {:?}", e);
              return Err(wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize ProductGroup: {:?}", e))));
          }
     };
 
     let count = product_group.products.len();
-    warn!("END extract_products_from_group: Extracted {} products", count);
 
     Ok(product_group.products)
 }
@@ -387,16 +300,10 @@ pub struct PaginatedProducts {
 
 #[hdk_extern]
 pub fn get_paginated_products_from_group(params: GroupProductsParams) -> ExternResult<PaginatedProducts> {
-    warn!(
-        "START get_paginated_products_from_group: GroupHash={}, Offset={}, Limit={}",
-        params.group_hash, params.offset, params.limit
-    );
-
     // Get the product group record
      let group_record = match get(params.group_hash.clone(), GetOptions::default())? {
          Some(record) => record,
          None => {
-             warn!("ERROR get_paginated_products_from_group: Group not found for hash {}", params.group_hash);
              return Err(wasm_error!(WasmErrorInner::Guest("Group not found".into())));
          }
     };
@@ -405,7 +312,6 @@ pub fn get_paginated_products_from_group(params: GroupProductsParams) -> ExternR
     let product_group = match ProductGroup::try_from(group_record) {
          Ok(group) => group,
          Err(e) => {
-             warn!("ERROR get_paginated_products_from_group: Failed to deserialize ProductGroup: {:?}", e);
              return Err(wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize ProductGroup: {:?}", e))));
          }
     };
@@ -420,11 +326,6 @@ pub fn get_paginated_products_from_group(params: GroupProductsParams) -> ExternR
         .collect();
 
     let has_more = (params.offset + params.limit) < total;
-
-    warn!(
-        "END get_paginated_products_from_group: Returning {} products (Total in group: {}). Has More: {}",
-        products.len(), total, has_more
-    );
 
     Ok(PaginatedProducts {
         products,

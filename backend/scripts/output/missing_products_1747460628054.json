@@ -74,7 +74,7 @@
       {
         "itemId": "0000000003094",
         "inventory": {
-          "stockLevel": "TEMPORARILY_OUT_OF_STOCK"
+          "stockLevel": "HIGH"
         },
         "favorite": false,
         "fulfillment": {
@@ -84,8 +84,8 @@
           "shipToHome": false
         },
         "price": {
-          "regular": 3.99,
-          "promo": 0
+          "regular": 9.99,
+          "promo": 1
         },
         "size": "1 lb",
         "soldBy": "WEIGHT"
@@ -12805,8 +12805,8 @@
           "shipToHome": false
         },
         "price": {
-          "regular": 4.29,
-          "promo": 0
+          "regular": 5.29,
+          "promo": 2
         },
         "size": "12 pk",
         "soldBy": "UNIT"

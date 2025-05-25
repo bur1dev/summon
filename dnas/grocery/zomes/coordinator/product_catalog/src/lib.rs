@@ -7,6 +7,33 @@ mod utils;
 use hdk::prelude::*;
 use products_integrity::*;
 
+#[derive(Serialize, Deserialize, Debug)]
+struct DnaProperties {
+    admin_pub_key_str: String,
+}
+
+#[hdk_extern]
+fn is_admin(_: ()) -> ExternResult<bool> {
+    let agent_info = agent_info()?;
+    let caller_pub_key = agent_info.agent_initial_pubkey;
+
+    let dna_info = dna_info()?;
+    let properties_sb = dna_info.modifiers.properties; // This is SerializedBytes
+    let properties: DnaProperties = hdk::prelude::decode(properties_sb.bytes())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode DNA properties: {:?}", e))))?;
+
+    let caller_str = caller_pub_key.to_string();
+    let admin_str = properties.admin_pub_key_str.clone(); // Clone for logging if needed, or use as is.
+
+    debug!("[is_admin] Caller PubKey: {}", caller_str);
+    debug!("[is_admin] Admin PubKey from Props: {}", admin_str);
+
+    let is_match = caller_str == admin_str;
+    debug!("[is_admin] Comparison result (is_match): {}", is_match);
+
+    Ok(is_match)
+}
+
 // Called the first time a zome call is made to the cell containing this zome
 #[hdk_extern]
 pub fn init() -> ExternResult<InitCallbackResult> {

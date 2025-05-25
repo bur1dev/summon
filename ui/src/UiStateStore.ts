@@ -47,6 +47,11 @@ export const searchResultsStore = writable<Product[]>([]); // Changed from fuseR
 export const isViewAllStore = writable<boolean>(false);
 export const searchMethodStore = writable<SearchMethod>(''); // Changed type to SearchMethod
 
+// Sort and filter state
+export const sortByStore = writable<string>('best');
+export const selectedBrandsStore = writable<Set<string>>(new Set());
+export const selectedOrganicStore = writable<"all" | "organic" | "non-organic">("all");
+
 // Helper functions
 export function setSearchState(params: {
     searchMode?: boolean,
@@ -74,4 +79,7 @@ export function resetSearchState() {
     searchResultsStore.set([]); // Changed from fuseResultsStore
     isViewAllStore.set(false);
     searchMethodStore.set('');
+    sortByStore.set('best');
+    selectedBrandsStore.set(new Set());
+    selectedOrganicStore.set("all");
 }

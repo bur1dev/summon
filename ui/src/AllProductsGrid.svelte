@@ -1,8 +1,15 @@
 <script lang="ts">
-    import { getContext, onMount, onDestroy } from "svelte";
+    import { getContext, onMount, onDestroy, tick } from "svelte";
     import type { StoreContext } from "./store"; // Corrected import path
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
+    import SortFilterDropdown from "./SortFilterDropdown.svelte";
+    import {
+        sortByStore,
+        selectedBrandsStore,
+        selectedOrganicStore,
+    } from "./UiStateStore";
+    import { mainCategories } from "./categoryData";
 
     export let selectedCategory: string;
     export let selectedSubcategory: string | null = null;
@@ -36,6 +43,81 @@
     let renderFrameId = null;
     let lastRenderTime = 0;
     let prevIndicesString = "";
+
+    // ResizeObserver for scroll container
+    let scrollContainerObserver: ResizeObserver;
+    let resizeDebounceTimeout: number;
+
+    // Sort and filter state
+    let sortDropdownOpen = false;
+    let brandsDropdownOpen = false;
+    let organicDropdownOpen = false; // For the new dropdown
+
+    // Determine if we should show sort/filter controls
+    $: shouldShowControls = (() => {
+        if (!selectedCategory || !selectedSubcategory) return false;
+
+        // Check if this is a gridOnly subcategory
+        const subcategoryConfig = mainCategories
+            .find((c) => c.name === selectedCategory)
+            ?.subcategories.find((s) => s.name === selectedSubcategory);
+
+        const isGridOnly = subcategoryConfig?.gridOnly === true;
+        const isProductTypeView =
+            selectedProductType !== null && selectedProductType !== "All";
+
+        return isGridOnly || isProductTypeView;
+    })();
+
+    // Extract unique brands from products
+    $: availableBrands = (() => {
+        const brands = new Set<string>();
+        products.forEach((product) => {
+            if (product.brand && product.brand.trim()) {
+                brands.add(product.brand.trim());
+            }
+        });
+        return Array.from(brands).sort();
+    })();
+
+    // Apply sorting and filtering to products
+    $: sortedFilteredProducts = (() => {
+        let result = [...products];
+
+        // Apply brand filter
+        if ($selectedBrandsStore.size > 0) {
+            result = result.filter(
+                (product) =>
+                    product.brand &&
+                    $selectedBrandsStore.has(product.brand.trim()),
+            );
+        }
+
+        // Apply organic filter
+        if ($selectedOrganicStore === "organic") {
+            result = result.filter((product) => product.is_organic === true);
+        } else if ($selectedOrganicStore === "non-organic") {
+            result = result.filter(
+                (product) =>
+                    product.is_organic === false ||
+                    product.is_organic === undefined,
+            );
+        }
+        // 'all' does no organic filtering
+
+        // Apply sorting
+        if ($sortByStore === "price-asc") {
+            result.sort((a, b) => (a.price || 0) - (b.price || 0));
+        } else if ($sortByStore === "price-desc") {
+            result.sort((a, b) => (b.price || 0) - (a.price || 0));
+        }
+        // 'best' uses original order
+
+        return result;
+    })();
+
+    // Use sortedFilteredProducts instead of products for rendering
+    $: virtualProducts = sortedFilteredProducts;
 
     function startRenderLoop() {
         if (renderLoopActive) return;
@@ -89,6 +171,8 @@
         renderLoopActive = false;
         if (renderFrameId) cancelAnimationFrame(renderFrameId);
         if (zoomTimeout) clearTimeout(zoomTimeout);
+        if (scrollContainerObserver) scrollContainerObserver.disconnect();
+        clearTimeout(resizeDebounceTimeout);
 
         // Remove zoom detection events
         window.removeEventListener("mouseup", checkZoom);
@@ -96,29 +180,36 @@
     });
 
     // Calculate the columns per row and visible products
-    function recalculateGrid() {
+    async function recalculateGrid() {
+        // Made async to potentially await tick
         if (!productsGridRef) return;
 
         // Delay calculation slightly to ensure DOM is fully rendered
-        setTimeout(() => {
+        // This timeout might be less critical with ResizeObserver but can stay for now.
+        setTimeout(async () => {
             // Check again if productsGridRef is still valid inside timeout
             if (!productsGridRef) return;
 
-            // Get actual width of grid container, but don't exceed parent width
+            await tick(); // Ensure Svelte DOM updates are flushed
+
+            // Get actual width of grid container
             gridWidth = productsGridRef.offsetWidth;
+            console.log(
+                `Recalculating grid. productsGridRef.offsetWidth: ${gridWidth}`,
+            );
 
             // Calculate how many items fit per row (floor to ensure no overflow)
-            columnsPerRow = Math.floor(gridWidth / itemWidth);
+            columnsPerRow = Math.max(1, Math.floor(gridWidth / itemWidth)); // Ensure at least 1 column
 
             // Update container height based on how many rows we need
-            const rowCount = Math.ceil(products.length / columnsPerRow);
-            totalHeight = rowCount * 450;
+            const rowCount = Math.ceil(virtualProducts.length / columnsPerRow);
+            totalHeight = rowCount * rowHeight; // Use rowHeight variable
 
             calculateVisibleIndices();
 
             // Force update position cache after width calculation
             updatePositionCache();
-        }, 50);
+        }, 10); // Keeping a small delay
     }
 
     // Pre-compute all positions once
@@ -138,7 +229,7 @@
             columnsPerRow > 1 ? remainingSpace / (columnsPerRow - 1) : 0;
 
         // Calculate position for each item
-        for (let i = 0; i < products.length; i++) {
+        for (let i = 0; i < virtualProducts.length; i++) {
             const row = Math.floor(i / columnsPerRow);
             const col = i % columnsPerRow;
 
@@ -174,7 +265,7 @@
         const visibleRows = Math.ceil(viewportHeight / rowHeight) + 4;
         const startIndex = Math.max(0, (startRow - 3) * columnsPerRow);
         const endIndex = Math.min(
-            products.length,
+            virtualProducts.length,
             (startRow + visibleRows + 3) * columnsPerRow,
         );
 
@@ -215,10 +306,10 @@
         const visibleRows = Math.min(3, Math.ceil(viewportHeight / rowHeight));
 
         // Limit buffer to 2 rows above and below
-        const startIndex = Math.max(0, (startRow - 2) * columnsPerRow);
+        const startIndex = Math.max(0, (startRow - 3) * columnsPerRow);
         const endIndex = Math.min(
-            products.length,
-            (startRow + visibleRows + 2) * columnsPerRow,
+            virtualProducts.length,
+            (startRow + visibleRows + 3) * columnsPerRow,
         );
 
         // Reset target indices completely each time
@@ -248,8 +339,39 @@
             : selectedSubcategory || "All Products";
 
     // Recalculate grid layout when products change
-    $: if (products.length && productsGridRef) {
+    $: if (virtualProducts.length && productsGridRef) {
         recalculateGrid();
+    }
+
+    // Event handlers for dropdowns
+    function handleSortChange(event) {
+        sortByStore.set(event.detail);
+        sortDropdownOpen = false;
+    }
+
+    function handleBrandsChange(event) {
+        selectedBrandsStore.set(event.detail);
+        brandsDropdownOpen = false;
+    }
+
+    function handleOrganicChange(event) {
+        selectedOrganicStore.set(event.detail);
+        organicDropdownOpen = false;
+    }
+
+    function handleSortOpen() {
+        brandsDropdownOpen = false;
+        organicDropdownOpen = false;
+    }
+
+    function handleBrandsOpen() {
+        sortDropdownOpen = false;
+        organicDropdownOpen = false;
+    }
+
+    function handleOrganicOpen() {
+        sortDropdownOpen = false;
+        brandsDropdownOpen = false;
     }
 
     onMount(() => {
@@ -269,15 +391,30 @@
             );
             parentScrollContainer.style.willChange = "transform";
 
+            // Setup ResizeObserver for the scroll container
+            scrollContainerObserver = new ResizeObserver((entries) => {
+                clearTimeout(resizeDebounceTimeout);
+                resizeDebounceTimeout = window.setTimeout(async () => {
+                    console.log(
+                        "AllProductsGrid: Global scroll container resized, recalculating grid...",
+                    );
+                    await tick(); // Ensure Svelte has processed DOM changes
+                    recalculateGrid();
+                }, 50); // Debounce for 50ms
+            });
+            scrollContainerObserver.observe(parentScrollContainer);
+
             // Force initial calculation
             setTimeout(() => {
-                handleScroll();
-            }, 100);
+                handleScroll(); // This will call calculateVisibleIndices
+            }, 100); // Initial scroll/visibility check
         } else {
-            console.error("Global scroll container not found!");
+            console.error(
+                "Global scroll container not found! ResizeObserver for scrollbar changes will not be active.",
+            );
         }
 
-        window.addEventListener("resize", handleResize);
+        window.addEventListener("resize", handleResize); // Handles general window resize and zoom
 
         // Add zoom detection events - only triggers on user actions
         window.addEventListener("mouseup", checkZoom);
@@ -295,6 +432,12 @@
             window.removeEventListener("resize", handleResize);
             window.removeEventListener("mouseup", checkZoom);
             window.removeEventListener("keyup", checkZoom);
+
+            if (scrollContainerObserver) {
+                scrollContainerObserver.disconnect();
+            }
+            clearTimeout(resizeDebounceTimeout);
+
             renderLoopActive = false; // Stop the render loop
             if (renderFrameId) cancelAnimationFrame(renderFrameId);
             if (zoomTimeout) clearTimeout(zoomTimeout);
@@ -308,28 +451,51 @@
             <div class="all-products-title">
                 <b>{title}</b>
             </div>
+            {#if shouldShowControls}
+                <div class="sort-filter-controls">
+                    <SortFilterDropdown
+                        type="sort"
+                        currentSort={$sortByStore}
+                        bind:isOpen={sortDropdownOpen}
+                        on:sortChange={handleSortChange}
+                        on:open={handleSortOpen}
+                    />
+                    <SortFilterDropdown
+                        type="brands"
+                        selectedBrands={$selectedBrandsStore}
+                        {availableBrands}
+                        bind:isOpen={brandsDropdownOpen}
+                        on:brandsChange={handleBrandsChange}
+                        on:open={handleBrandsOpen}
+                    />
+                    <SortFilterDropdown
+                        type="organic"
+                        selectedOrganic={$selectedOrganicStore}
+                        bind:isOpen={organicDropdownOpen}
+                        on:organicChange={handleOrganicChange}
+                        on:open={handleOrganicOpen}
+                    />
+                </div>
+            {/if}
         </div>
     {/if}
     <div class="products-grid" bind:this={productsGridRef}>
-        {#if products.length > 0}
+        {#if virtualProducts.length > 0}
             <div class="grid-container" style="height: {totalHeight}px;">
-                {#each visibleIndices as index (products[index]?.hash || index)}
-                    {#if products[index]}
+                {#each visibleIndices as index (virtualProducts[index]?.hash || index)}
+                    {#if virtualProducts[index]}
                         <div
                             class="product-container"
                             style="position: absolute; top: {positionCache.get(
                                 index,
-                            )?.top ||
+                            )?.top ??
                                 Math.floor(index / columnsPerRow) *
-                                    450}px; left: {positionCache.get(index)
-                                ?.left ||
-                                (index % columnsPerRow) *
-                                    (gridWidth /
-                                        columnsPerRow)}px; width: calc({100 /
-                                columnsPerRow}%);"
+                                    rowHeight}px; left: {positionCache.get(
+                                index,
+                            )?.left ?? 0}px; width: {itemWidth}px;"
                         >
                             <ProductCard
-                                product={products[index]}
+                                product={virtualProducts[index]}
                                 on:reportCategory={(event) =>
                                     dispatch("reportCategory", event.detail)}
                                 on:productTypeSelect
@@ -363,9 +529,16 @@
     .section-header {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         width: 100%;
         margin-bottom: 20px;
         position: relative;
+    }
+
+    .sort-filter-controls {
+        display: flex;
+        gap: var(--spacing-sm);
+        align-items: center;
     }
 
     .products-grid {
@@ -390,13 +563,14 @@
     }
 
     .product-container {
-        height: 450px;
+        height: 100%; /* Occupy the full height of the space allocated by rowHeight logic */
+        /* width is set inline: style="... width: {itemWidth}px;" */
         padding: 0;
         transform: translateZ(0);
-        will-change: transform;
-        contain: layout size;
-        box-sizing: border-box; /* Add this */
-        max-width: 100%; /* Add this */
+        will-change: transform; /* Consider removing if not strictly needed for performance */
+        /* contain: layout size; */ /* Can sometimes interfere with dynamic content or measurement */
+        box-sizing: border-box;
+        overflow: hidden; /* Prevent internal content from visually overflowing the card boundaries */
     }
 
     .loading-message {

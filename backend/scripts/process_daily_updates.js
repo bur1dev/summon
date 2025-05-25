@@ -243,6 +243,12 @@ function normalizeProductForStorageAndComparison(productData, isFromApiSource = 
     if (typeof normalized.subcategory === 'undefined') normalized.subcategory = null;
     if (typeof normalized.product_type === 'undefined') normalized.product_type = null;
 
+    // --- Brand ---
+    normalized.brand = (typeof productData.brand === 'string') ? sanitizeStringForJSON(productData.brand) : null;
+
+    // --- Is Organic ---
+    normalized.is_organic = productData.is_organic === true;
+
     return normalized;
 }
 
@@ -436,36 +442,23 @@ async function processDailyUpdates() {
             if (correctionMapEntry) {
                 const productName = productFromApiInput.description || productFromApiInput.name || "Unknown Product";
                 console.log(`[CorrectionMap] Processing: ${productName}`);
-                // (The rest of your existing correctionMapEntry block can largely remain,
-                // as its output (correctedProduct) will be normalized by saveResults.
-                // The key change is ensuring the _priceChanged and _stocksChanged flags
-                // within this block also use normalized comparison if they are set here.)
 
-                // --- Modified section within correctionMapEntry block ---
                 let categoryActuallyChangedThisRun = false;
                 let finalOriginalCategory = null;
                 let finalOriginalSubcategory = null;
                 let finalOriginalProductType = null;
                 let determinedOriginalAdditionalCategorizations = null;
-                // `preserveExistingFlags` is removed as its behavior is now directly incorporated
 
-                // Normalize the correctionMapEntry values just in case they have subtle issues
-                // (e.g. whitespace, casing) that our main normalizer would fix.
-                // This ensures we compare normalized file data with normalized map data.
                 const normalizedCorrectionMapEntry = {
                     category: sanitizeStringForJSON(String(correctionMapEntry.category || "")),
                     subcategory: sanitizeStringForJSON(String(correctionMapEntry.subcategory || "")),
                     product_type: sanitizeStringForJSON(String(correctionMapEntry.product_type || "")),
                 };
-                // Ensure nulls for empty strings if that's the canonical form from normalizeProductForStorageAndComparison
                 if (normalizedCorrectionMapEntry.subcategory === "") normalizedCorrectionMapEntry.subcategory = null;
                 if (normalizedCorrectionMapEntry.product_type === "") normalizedCorrectionMapEntry.product_type = null;
 
-
                 if (existingProductFromFile) {
                     const normalizedExistingFile = normalizeProductForStorageAndComparison(existingProductFromFile, false);
-
-                    // Check if the current category in the file (normalized) differs from the (normalized) correction map.
                     const mapDiffersFromFile = normalizedExistingFile.category !== normalizedCorrectionMapEntry.category ||
                         normalizedExistingFile.subcategory !== normalizedCorrectionMapEntry.subcategory ||
                         normalizedExistingFile.product_type !== normalizedCorrectionMapEntry.product_type;
@@ -478,39 +471,38 @@ async function processDailyUpdates() {
                         determinedOriginalAdditionalCategorizations = normalizedExistingFile.additional_categorizations
                             ? JSON.parse(JSON.stringify(normalizedExistingFile.additional_categorizations))
                             : [];
-
                     } else {
-                        // Map matches the current file state.
                         if (normalizedExistingFile._categoryChanged === true && normalizedExistingFile._originalCategory) {
                             categoryActuallyChangedThisRun = true;
                             finalOriginalCategory = normalizedExistingFile._originalCategory;
                             finalOriginalSubcategory = normalizedExistingFile._originalSubcategory;
                             finalOriginalProductType = normalizedExistingFile._originalProductType;
                             determinedOriginalAdditionalCategorizations = normalizedExistingFile._originalAdditionalCategorizations;
-
-
-
                             console.log(`[CorrectionMap] Map matches file, but file already has _categoryChanged=true. Preserving existing original details for "${productName}". PID: ${productId}`);
                         } else {
                             console.log(`[CorrectionMap] No category change for "${productName}" (normalized map matches normalized file, no prior _categoryChanged flag). PID: ${productId}`);
                         }
                     }
-                } else { // Product is new to the system but is in the correction map
-                    categoryActuallyChangedThisRun = true; // It's new, so its category is effectively "changing" from nothing to the map's value.
-                    // No _originalCategory as it's new.
+                } else {
+                    categoryActuallyChangedThisRun = true;
                     finalOriginalCategory = null;
                     finalOriginalSubcategory = null;
                     finalOriginalProductType = null;
-                    determinedOriginalAdditionalCategorizations = []; // New products start with no additional cats unless LLM adds them.
+                    determinedOriginalAdditionalCategorizations = [];
                     console.log(`[CorrectionMap] New product to system "${productName}", using correction map. Flagging _categoryChanged=true. PID: ${productId}`);
                 }
 
-                // Construct correctedProduct
+                let derivedIsOrganic = false;
+                if (productFromApiInput.categories && Array.isArray(productFromApiInput.categories) && productFromApiInput.categories.includes("Natural & Organic")) {
+                    derivedIsOrganic = true;
+                }
+
                 const correctedProduct = {
                     ...productFromApiInput,
                     category: normalizedCorrectionMapEntry.category,
                     subcategory: normalizedCorrectionMapEntry.subcategory,
                     product_type: normalizedCorrectionMapEntry.product_type,
+                    is_organic: derivedIsOrganic,
                     additional_categorizations: (() => {
                         if (existingProductFromFile) {
                             const normalizedExistingFileForAddCat = normalizeProductForStorageAndComparison(existingProductFromFile, false);
@@ -544,8 +536,7 @@ async function processDailyUpdates() {
                         correctedProduct._priceChanged = false;
                         correctedProduct._stocksChanged = false;
                     }
-
-                    console.log(`[CorrectionMapLogic] Adding "${productName}" to unchangedProducts. PriceChg: ${correctedProduct._priceChanged}, StockChg: ${correctedProduct._stocksChanged}. PID: ${productId}`);
+                    console.log(`[CorrectionMapLogic] Adding "${productName}" to unchangedProducts. PriceChg: ${correctedProduct._priceChanged}, StockChg: ${correctedProduct._stocksChanged}. PID: ${productId}. is_organic will be: ${correctedProduct.is_organic}`);
                     unchangedProducts.push(correctedProduct);
                 }
                 continue;
@@ -667,11 +658,23 @@ function trackChangedProductTypes(allFinalProducts, isFirstRun = false, newProdu
     console.log(`[DEBUG_TRACK] trackChangedProductTypes CALLED. Received allFinalProducts list length: ${allFinalProducts.length}, isFirstRun: ${isFirstRun}, New products in this run: ${newProductIdsFromCurrentRun.size}`);
 
     const addPathsToSet = (productData, context_msg = "") => {
-        const pName = productData.description || productData.name || `Unknown Product (${context_msg})`;
+        let pName, primaryCat, primarySub, primaryType, currentAdditionalCategorizations;
 
-        const primaryCat = productData.category;
-        const primarySub = productData.subcategory;
-        const primaryType = productData.product_type;
+        if (productData.product && typeof productData.main_category !== 'undefined') {
+            // This structure comes from resultsFromCategorizer (API response wrapper)
+            pName = (productData.product.description || productData.product.name) || `Unknown Product (${context_msg} - from API wrapper)`;
+            primaryCat = productData.main_category;
+            primarySub = productData.subcategory;
+            primaryType = productData.product_type;
+            currentAdditionalCategorizations = productData.additional_categorizations || [];
+        } else {
+            // This structure is for direct product objects (e.g., from unchangedProducts or old file format)
+            pName = productData.description || productData.name || `Unknown Product (${context_msg} - direct object)`;
+            primaryCat = productData.category;
+            primarySub = productData.subcategory;
+            primaryType = productData.product_type;
+            currentAdditionalCategorizations = productData.additional_categorizations || [];
+        }
 
         if (primaryCat) {
             const primaryKey = JSON.stringify({
@@ -682,11 +685,11 @@ function trackChangedProductTypes(allFinalProducts, isFirstRun = false, newProdu
             console.log(`[DEBUG_TRACK ${context_msg}] Adding primary path for ${pName}: ${primaryKey}`);
             changedTypes.add(primaryKey);
         } else {
-            console.warn(`[DEBUG_TRACK ${context_msg}] Skipping primary path for ${pName} due to missing primary category.`);
+            console.warn(`[DEBUG_TRACK ${context_msg}] Skipping primary path for ${pName} (ID: ${productData.productId || 'N/A'}) due to missing primary category.`);
         }
 
-        if (productData.additional_categorizations && productData.additional_categorizations.length > 0) {
-            for (const addCat of productData.additional_categorizations) {
+        if (currentAdditionalCategorizations && currentAdditionalCategorizations.length > 0) {
+            for (const addCat of currentAdditionalCategorizations) {
                 if (addCat.main_category) {
                     const additionalKey = JSON.stringify({
                         category: addCat.main_category,

@@ -16,10 +16,8 @@ pub struct ProductReference {
 // New function to handle product references (group_hash + index)
 #[hdk_extern]
 pub fn get_products_by_references(references: Vec<ProductReference>) -> ExternResult<SearchResult> {
-    debug!("get_products_by_references called with {} references", references.len());
     
     if references.is_empty() {
-        debug!("No references provided in request");
         return Ok(SearchResult {
             products: vec![],
             total: 0,
@@ -35,19 +33,15 @@ pub fn get_products_by_references(references: Vec<ProductReference>) -> ExternRe
             .push(reference.index);
     }
     
-    debug!("Organized references into {} unique group hashes", group_map.len());
-    
     // Fetch all required ProductGroups
     let mut all_group_records = Vec::new();
     let group_hashes: Vec<ActionHash> = group_map.keys().cloned().collect();
     
     match get_records_from_hashes(group_hashes) {
         Ok(groups) => {
-            debug!("Successfully retrieved {} product groups", groups.len());
             all_group_records = groups;
         }
         Err(e) => {
-            debug!("Error retrieving product groups: {:?}", e);
             return Err(e);
         }
     }
@@ -69,13 +63,11 @@ if let Some(indices) = group_map.get(&group_hash) {
                         }
                     }
                 } else {
-                    debug!("Failed to deserialize record as ProductGroup");
                 }
             }
         }
     }
     
-    debug!("Returning {} product records", product_records.len());
     Ok(SearchResult {
         products: product_records.clone(),
         total: product_records.len(),
@@ -85,7 +77,6 @@ if let Some(indices) = group_map.get(&group_hash) {
 // Maintained for backward compatibility - will be deprecated
 #[hdk_extern]
 pub fn get_products_by_hashes(hashes: Vec<ActionHash>) -> ExternResult<SearchResult> {
-    debug!("get_products_by_hashes called with {} hashes - now using groups", hashes.len());
     
     // Convert to the new format assuming these are group hashes
     let references: Vec<ProductReference> = hashes
@@ -104,18 +95,7 @@ fn get_records_from_hashes(hashes: Vec<ActionHash>) -> ExternResult<Vec<Record>>
     const BATCH_SIZE: usize = 1000;
     let mut all_records = Vec::new();
 
-    debug!(
-        "get_records_from_hashes processing {} hashes in batches of {}",
-        hashes.len(),
-        BATCH_SIZE
-    );
-
     for (batch_index, batch) in hashes.chunks(BATCH_SIZE).enumerate() {
-        debug!(
-            "Processing batch {} with {} hashes",
-            batch_index + 1,
-            batch.len()
-        );
 
         let input: Vec<_> = batch
             .iter()
@@ -124,18 +104,109 @@ fn get_records_from_hashes(hashes: Vec<ActionHash>) -> ExternResult<Vec<Record>>
 
         match HDK.with(|hdk| hdk.borrow().get(input)) {
             Ok(records) => {
-                debug!("Got {} record responses", records.len());
                 let valid_records: Vec<_> = records.into_iter().flatten().collect();
-                debug!("Found {} valid records", valid_records.len());
                 all_records.extend(valid_records);
             }
             Err(e) => {
-                debug!("HDK.get failed with error: {:?}", e);
                 return Err(e);
             }
         }
     }
 
-    debug!("Returning {} total records", all_records.len());
     Ok(all_records)
+}
+
+#[hdk_extern]
+pub fn get_all_products_for_search_index() -> ExternResult<SearchResult> {
+    
+    // All categories that need to be indexed
+    let categories = vec![
+        "Produce", "Beverages", "Dairy & Eggs", "Snacks & Candy", "Meat & Seafood",
+        "Wine", "Frozen", "Prepared Foods", "Liquor", "Floral", "Household", "Bakery",
+        "Deli", "Canned Goods & Soups", "Beer", "Pets", "Breakfast", "Condiments & Sauces",
+        "Personal Care", "Dry Goods & Pasta", "Oils, Vinegars, & Spices", "Health Care",
+        "Baking Essentials", "Kitchen Supplies", "Hard Beverages", "Miscellaneous",
+        "Party & Gift Supplies", "Office & Craft", "Baby"
+    ];
+    
+    // Collect all unique ProductGroup hashes from all category paths
+    let mut all_group_hashes = std::collections::HashSet::new();
+    
+    // Build all possible paths and collect links in parallel batches
+    let mut all_paths = Vec::new();
+    
+    // Add main category paths
+    for category in &categories {
+        all_paths.push(format!("categories/{}", category));
+    }
+    
+    // Process paths in batches to get all links
+    const PATH_BATCH_SIZE: usize = 10;
+    
+    for path_batch in all_paths.chunks(PATH_BATCH_SIZE) {
+        // Create GetLinks inputs for this batch
+        let mut get_links_inputs = Vec::new();
+        
+        for path_str in path_batch {
+            match Path::try_from(path_str.clone()) {
+                Ok(path) => {
+                    match path.path_entry_hash() {
+                        Ok(path_hash) => {
+                            match GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup) {
+                                Ok(builder) => {
+                                    get_links_inputs.push(builder.build());
+                                },
+                                Err(e) => {
+                                }
+                            }
+                        },
+                        Err(e) => {
+                        }
+                    }
+                },
+                Err(e) => {
+                }
+            }
+        }
+        
+        // Get all links for this batch of paths
+        match HDK.with(|hdk| hdk.borrow().get_links(get_links_inputs)) {
+            Ok(link_results) => {
+                for links in link_results {
+                    for link in links {
+                        if let Some(hash) = link.target.into_action_hash() {
+                            all_group_hashes.insert(hash);
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+            }
+        }
+    }
+    
+    // Convert HashSet to Vec for concurrent_get_records
+    let group_hashes: Vec<ActionHash> = all_group_hashes.into_iter().collect();
+    
+    // Fetch all ProductGroups using the efficient concurrent function
+    match get_records_from_hashes(group_hashes) {
+        Ok(records) => {
+            
+            // Count total products across all groups
+            let mut total_products = 0;
+            for record in &records {
+                if let Ok(Some(group)) = record.entry().to_app_option::<ProductGroup>() {
+                    total_products += group.products.len();
+                }
+            }
+            
+            Ok(SearchResult {
+                products: records,
+                total: total_products,
+            })
+        },
+        Err(e) => {
+            Err(e)
+        }
+    }
 }

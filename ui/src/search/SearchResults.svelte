@@ -127,7 +127,11 @@
 </script>
 
 <div class="search-results">
-    <h2>Search Results for "{query}"</h2>
+    <div class="section-header">
+        <div class="search-results-title">
+            <b>Search Results for "{query}"</b>
+        </div>
+    </div>
 
     {#if isLoading}
         <div class="loading">Searching...</div>
@@ -159,14 +163,32 @@
         padding: 20px 0;
     }
 
-    h2 {
-        font-size: 24px;
-        margin-bottom: 20px;
+    .section-header {
+        display: flex;
+        justify-content: space-between; /* or space-around, or flex-start depending on desired alignment if other elements were present */
+        width: 100%;
+        margin-bottom: 20px; /* Matches AllProductsGrid and ProductRow (assuming --spacing-lg is 20px) */
+        position: relative;
+    }
+
+    .search-results-title {
+        font-size: 30px; /* Matches AllProductsGrid and ProductRow */
+        font-weight: bold; /* Achieved by <b> tag, but can be explicit */
+        text-align: left;
+        margin-bottom: 0px; /* Parent .section-header handles bottom margin */
+        color: #343538; /* Matches AllProductsGrid */
     }
 
     .products-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+        grid-template-columns: repeat(
+            auto-fill,
+            245px
+        ); /* Fixed width for columns */
+        justify-content: space-between; /* Distribute extra space as gaps */
+        width: 100%;
+        box-sizing: border-box;
+        max-width: 100%;
     }
 
     .loading,

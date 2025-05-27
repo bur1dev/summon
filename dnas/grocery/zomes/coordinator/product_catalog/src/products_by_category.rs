@@ -59,40 +59,21 @@ pub fn get_products_by_category(params: GetProductsParams) -> ExternResult<Categ
         }
     };
 
-     let chunk_path = Path::try_from(base_path.clone())?;
+    let chunk_path = Path::try_from(base_path.clone())?;
     let path_hash = chunk_path.path_entry_hash()?;
 
-let all_links = match get_links(
-    GetLinksInputBuilder::try_new(path_hash.clone(), LinkTypes::ProductTypeToGroup)?.build(),
-) {
-    Ok(links) => links,
-    Err(e) => {
-         return Err(e);
-    }
-};
-
-let total_groups = all_links.len(); // This is the actual total number of groups
-
-// Log each link with its chunk_id from tag
-for (_i, link) in all_links.iter().enumerate() {
-    let _chunk_id = if link.tag.0.len() >= 4 {
-        u32::from_le_bytes(link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]))
-    } else {
-        0
-    };
-}
-
-    // Sort links by chunk_id from tag before pagination
-    let mut all_links = all_links;
-    all_links.sort_by_key(|link| {
-        if link.tag.0.len() >= 4 {
-            u32::from_le_bytes(link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]))
-        } else {
-            0
+    let all_links = match get_links(
+        GetLinksInputBuilder::try_new(path_hash.clone(), LinkTypes::ProductTypeToGroup)?.build(),
+    ) {
+        Ok(links) => links,
+        Err(e) => {
+            return Err(e);
         }
-    });
+    };
 
-    // Apply pagination on the sorted links
+    let total_groups = all_links.len();
+
+    // Apply pagination directly (no sorting needed)
     let paginated_links = all_links
         .into_iter()
         .skip(params.offset)
@@ -106,45 +87,33 @@ for (_i, link) in all_links.iter().enumerate() {
         .collect();
 
     // Get the records for the paginated product groups
-let product_groups_records = concurrent_get_records(target_hashes)?;
+    let product_groups_records = concurrent_get_records(target_hashes)?;
 
-// Add detailed product count verification
-let mut total_products_count = 0;
-let mut group_product_counts = Vec::new();
+    // Calculate total products count
+    let mut total_products_count = 0;
 
-for (_i, record) in product_groups_records.iter().enumerate() {
-    match record.entry().to_app_option::<ProductGroup>() {
-        Ok(Some(group)) => {
-            let product_count = group.products.len();
-            total_products_count += product_count;
-            group_product_counts.push(product_count);
-            
-            // Log first few product names for verification
-            if product_count > 0 {
-                for _j in 0..std::cmp::min(3, product_count) {
-                }
-            } else {
-            }
-        },
-        Ok(None) => {
-        },
-        Err(_e) => {
+    for record in product_groups_records.iter() {
+        match record.entry().to_app_option::<ProductGroup>() {
+            Ok(Some(group)) => {
+                total_products_count += group.products.len();
+            },
+            Ok(None) => {},
+            Err(_e) => {}
         }
     }
-}
 
-// Determine if there are more groups beyond the current page
-let has_more = (params.offset + params.limit) < total_groups;
+    // Determine if there are more groups beyond the current page
+    let has_more = (params.offset + params.limit) < total_groups;
 
-Ok(CategorizedProducts {
-    category: params.category,
-    subcategory: params.subcategory,
-    product_type: params.product_type,
-    product_groups: product_groups_records,
-    total_groups,
-    total_products: total_products_count, // Now setting the actual count
-    has_more,
-})
+    Ok(CategorizedProducts {
+        category: params.category,
+        subcategory: params.subcategory,
+        product_type: params.product_type,
+        product_groups: product_groups_records,
+        total_groups,
+        total_products: total_products_count,
+        has_more,
+    })
 }
 
 #[hdk_extern]

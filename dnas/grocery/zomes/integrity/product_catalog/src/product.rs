@@ -28,8 +28,7 @@ pub struct ProductGroup {
     pub subcategory: Option<String>,
     pub product_type: Option<String>,
     pub products: Vec<Product>,
-    pub chunk_id: u32,
-    pub additional_categorizations: Vec<DualCategorization>,  // For pagination and chunking large groups
+    pub additional_categorizations: Vec<DualCategorization>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -48,7 +47,6 @@ pub struct CreateProductGroupInput {
     pub subcategory: Option<String>,
     pub product_type: Option<String>,
     pub products: Vec<Product>,
-    pub chunk_id: u32,
     pub additional_categorizations: Vec<DualCategorization>,
 }
 

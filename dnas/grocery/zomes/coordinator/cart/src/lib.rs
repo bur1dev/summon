@@ -5,14 +5,6 @@ mod address;
 mod cart;
 mod preference;
 
-// Input for adding product to cart (legacy)
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AddToCartInput {
-    pub product_hash: ActionHash,
-    pub quantity: u32,
-}
-
-// Input for adding to private cart
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AddToPrivateCartInput {
     pub group_hash: ActionHash,
@@ -21,17 +13,17 @@ pub struct AddToPrivateCartInput {
     pub note: Option<String>,
 }
 
-// NEW: Input for cart item from JavaScript using matching field names
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CartItemInput {
-    pub group_hash: String,       // Accept base64 string from JS
-    pub product_index: u32,       // Match JS camelCase
+    #[serde(rename = "groupHash")]
+    pub group_hash: String,
+    #[serde(rename = "productIndex")]
+    pub product_index: u32,
     pub quantity: f64,
     pub timestamp: u64,
     pub note: Option<String>,
 }
 
-// NEW: Input for replacing the entire private cart with JS-friendly field names
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ReplacePrivateCartInput {
     pub items: Vec<CartItemInput>,
@@ -72,18 +64,6 @@ pub fn get_private_cart(_: ()) -> ExternResult<PrivateCart> {
     cart::get_private_cart_impl()
 }
 
-// Legacy function - redirects to add_to_private_cart internally
-#[hdk_extern]
-pub fn add_to_cart(input: AddToCartInput) -> ExternResult<()> {
-    cart::add_to_cart_impl(input)
-}
-
-// Legacy function - redirects to get_private_cart internally
-#[hdk_extern]
-pub fn get_cart(_: ()) -> ExternResult<Vec<CartProduct>> {
-    cart::get_cart_impl()
-}
-
 // Check out all items in the cart with delivery details
 #[hdk_extern]
 pub fn checkout_cart(input: CheckoutCartInput) -> ExternResult<ActionHash> {
@@ -106,11 +86,6 @@ pub fn get_checked_out_cart(action_hash: ActionHash) -> ExternResult<Option<Chec
 #[hdk_extern]
 pub fn return_to_shopping(cart_hash: ActionHash) -> ExternResult<()> {
     cart::return_to_shopping_impl(cart_hash)
-}
-
-#[hdk_extern]
-pub fn get_product(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    get(action_hash, GetOptions::default())
 }
 
 // Address-related functions

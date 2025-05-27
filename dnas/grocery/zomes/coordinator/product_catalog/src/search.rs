@@ -71,22 +71,6 @@ if let Some(_indices) = group_map.get(&group_hash) { // Prefixed the first, shad
     })
 }
 
-// Maintained for backward compatibility - will be deprecated
-#[hdk_extern]
-pub fn get_products_by_hashes(hashes: Vec<ActionHash>) -> ExternResult<SearchResult> {
-    
-    // Convert to the new format assuming these are group hashes
-    let references: Vec<ProductReference> = hashes
-        .into_iter()
-        .map(|hash| ProductReference {
-            group_hash: hash,
-            index: 0, // Default to first product in group
-        })
-        .collect();
-    
-    get_products_by_references(references)
-}
-
 fn get_records_from_hashes(hashes: Vec<ActionHash>) -> ExternResult<Vec<Record>> {
     // Process in batches of 100 to prevent timeouts
     const BATCH_SIZE: usize = 1000;

@@ -453,18 +453,3 @@ pub(crate) fn return_to_shopping_impl(cart_hash: ActionHash) -> ExternResult<()>
     warn!("Return to shopping completed successfully");
     Ok(())
 }
-
-// Deprecated in new architecture but kept for compatibility
-pub(crate) fn add_to_cart_impl(_input: crate::AddToCartInput) -> ExternResult<()> {
-    // No-op - use add_to_private_cart instead
-    Ok(())
-}
-
-// Deprecated in new architecture but kept for compatibility
-pub(crate) fn get_cart_impl() -> ExternResult<Vec<CartProduct>> {
-    // Forward to get_private_cart for compatibility
-    match get_private_cart_impl() {
-        Ok(private_cart) => Ok(private_cart.items),
-        Err(e) => Err(e),
-    }
-}

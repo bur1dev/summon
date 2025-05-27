@@ -26,14 +26,6 @@ pub struct CartProduct {
     pub note: Option<String>,      // Customer note for shopper
 }
 
-// Tag structure for product links
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QuantityTag {
-    pub quantity: u32,
-    pub timestamp: u64,
-    pub status: Option<String>, // "active" or "checked_out"
-}
-
 // New structure for the private cart (stored as private entry)
 #[hdk_entry_helper]
 #[derive(Clone)]

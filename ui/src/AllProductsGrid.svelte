@@ -570,7 +570,7 @@
         will-change: transform; /* Consider removing if not strictly needed for performance */
         /* contain: layout size; */ /* Can sometimes interfere with dynamic content or measurement */
         box-sizing: border-box;
-        overflow: hidden; /* Prevent internal content from visually overflowing the card boundaries */
+        overflow: visible; /* Prevent internal content from visually overflowing the card boundaries */
     }
 
     .loading-message {

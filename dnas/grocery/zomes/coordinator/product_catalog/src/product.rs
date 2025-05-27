@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use crate::utils::concurrent_get_records;
 use crate::products_by_category::GetProductsParams;
 // Constants remain the same
-pub const BATCH_SIZE: usize = 25; // This seems unused here, maybe intended for frontend?
 pub const PRODUCTS_PER_GROUP: usize = 1000; // Maximum products per group
 
 // Get appropriate paths for a product or product group
@@ -534,15 +533,6 @@ let next_chunk_id = match latest_group_info_res {
 #[hdk_extern]
 pub fn get_product_group(hash: ActionHash) -> ExternResult<Option<Record>> {
     let result = get(hash, GetOptions::default());
-    result
-}
-
-// Function to get an individual product by its hash (Note: Products are inside groups now)
-// This function might be misleading as individual products don't have their own top-level entries anymore.
-// Consider removing or clarifying its purpose.
-#[hdk_extern]
-pub fn get_product(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    let result = get(action_hash, GetOptions::default());
     result
 }
 

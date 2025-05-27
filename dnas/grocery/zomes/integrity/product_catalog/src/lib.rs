@@ -15,13 +15,7 @@ pub enum EntryTypes {
 #[derive(Serialize, Deserialize)]
 #[hdk_link_types]
 pub enum LinkTypes {
-    ProductsByCategory,
-    CategoryToSubcategory,
-    SubcategoryToProductType,
     ProductTypeToGroup,
-    ChunkToProduct,
-    CategoryToGroup,    // New - link directly from category to group
-    SubcategoryToGroup, // New - link directly from subcategory to group
 }
 
 // Validation you perform during the genesis process. Nobody else on the network performs it, only you.
@@ -173,42 +167,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         }
         FlatOp::RegisterCreateLink {
             link_type,
-            base_address,
-            target_address,
-            tag,
-            action,
+            base_address: _,
+            target_address: _,
+            tag: _,
+            action: _,
         } => match link_type {
-            LinkTypes::ProductsByCategory => {
-                validate_create_link_products_by_category(action, base_address, target_address, tag)
-            }
-            LinkTypes::CategoryToSubcategory | 
-            LinkTypes::SubcategoryToProductType | 
-            LinkTypes::ProductTypeToGroup | 
-            LinkTypes::ChunkToProduct |
-            LinkTypes::CategoryToGroup |
-            LinkTypes::SubcategoryToGroup => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ProductTypeToGroup => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
-            base_address,
-            target_address,
-            tag,
-            original_action,
-            action,
+            base_address: _,
+            target_address: _,
+            tag: _,
+            original_action: _,
+            action: _,
         } => match link_type {
-            LinkTypes::ProductsByCategory => validate_delete_link_products_by_category(
-                action,
-                original_action,
-                base_address,
-                target_address,
-                tag,
-            ),
-            LinkTypes::CategoryToSubcategory | 
-            LinkTypes::SubcategoryToProductType | 
-            LinkTypes::ProductTypeToGroup | 
-            LinkTypes::ChunkToProduct |
-            LinkTypes::CategoryToGroup |
-            LinkTypes::SubcategoryToGroup => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ProductTypeToGroup => Ok(ValidateCallbackResult::Valid),
         },
         // The rest of the validation callbacks remain the same as in the original file
         FlatOp::StoreRecord(store_record) => match store_record {

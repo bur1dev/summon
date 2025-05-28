@@ -115,46 +115,6 @@ pub fn create_product_group(input: CreateProductGroupInput) -> ExternResult<Acti
     Ok(group_hash)
 }
 
-// Helper function to get the latest group for a specific path
-fn get_latest_group_for_path(path: &Path) -> ExternResult<Option<(ActionHash, ProductGroup)>> {
-    match path.path_entry_hash() {
-        Ok(path_hash) => {
-            let links = get_links(
-                GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup)?.build(),
-            )?;
-            
-            if let Some(link) = links.first() {
-                if let Some(target_hash) = link.target.clone().into_action_hash() {
-                    if let Some(record) = get(target_hash.clone(), GetOptions::default())? {
-                        if let Ok(Some(mut group)) = record.entry().to_app_option::<ProductGroup>() {
-                            // Normalize empty strings
-                            if group.subcategory == Some("".to_string()) {
-                                group.subcategory = None;
-                            }
-                            if group.product_type == Some("".to_string()) {
-                                group.product_type = None;
-                            }
-                            
-                            for product in &mut group.products {
-                                if product.subcategory == Some("".to_string()) {
-                                    product.subcategory = None;
-                                }
-                                if product.product_type == Some("".to_string()) {
-                                    product.product_type = None;
-                                }
-                            }
-                            
-                            return Ok(Some((target_hash, group)));
-                        }
-                    }
-                }
-            }
-            Ok(None)
-        },
-        Err(_) => Ok(None),
-    }
-}
-
 #[hdk_extern]
 pub fn create_product_batch(products: Vec<CreateProductInput>) -> ExternResult<Vec<Record>> {
     if products.is_empty() {
@@ -241,73 +201,6 @@ pub fn get_product_group(hash: ActionHash) -> ExternResult<Option<Record>> {
     result
 }
 
-// Lightweight function to get just the product count for a group at a specific offset
-#[hdk_extern]
-pub fn get_product_count_for_group(params: GetProductsParams) -> ExternResult<usize> {
-    
-    let base_path = match (&params.subcategory, &params.product_type) {
-        (Some(subcategory), Some(product_type)) => format!(
-            "categories/{}/subcategories/{}/types/{}", 
-            params.category, subcategory, product_type
-        ),
-        (Some(subcategory), None) => format!(
-            "categories/{}/subcategories/{}", 
-            params.category, subcategory
-        ),
-        (None, None) => format!("categories/{}", params.category),
-        (None, Some(_)) => {
-            return Ok(0)
-        }
-    };
-
-    let chunk_path = Path::try_from(base_path)?;
-    let path_hash = chunk_path.path_entry_hash()?;
-
-    let all_links = match get_links(
-        GetLinksInputBuilder::try_new(path_hash, LinkTypes::ProductTypeToGroup)?.build(),
-    ) {
-        Ok(links) => links,
-        Err(_e) => {
-            return Ok(0);
-        }
-    };
-
-    // Sort by chunk_id
-    let mut all_links = all_links;
-    all_links.sort_by_key(|link| {
-        if link.tag.0.len() >= 4 {
-            u32::from_le_bytes(link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]))
-        } else {
-            0
-        }
-    });
-
-    // Get the specific group at offset and fetch its count
-    if let Some(link) = all_links.get(params.offset) {
-        if let Some(target_hash) = link.target.clone().into_action_hash() {
-            match get(target_hash, GetOptions::default())? {
-                Some(record) => {
-                    match record.entry().to_app_option::<ProductGroup>().map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))? {
-                        Some(group) => {
-                            debug!("get_product_count_for_group: Found group with {} products", group.products.len());
-                            Ok(group.products.len())
-                        },
-                        None => {
-                            Ok(0)
-                        }
-                    }
-                },
-                None => {
-                    Ok(0)
-                }
-            }
-        } else {
-            Ok(0)
-        }
-    } else {
-        Ok(0)
-    }
-}
 
 #[hdk_extern]
 pub fn get_all_group_counts_for_path(params: GetProductsParams) -> ExternResult<Vec<usize>> {

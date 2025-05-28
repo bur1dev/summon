@@ -228,30 +228,6 @@ let product_groups_records = match concurrent_get_records(all_hashes.clone()) {
     })
 }
 
-// New function to extract individual products from a group
-#[hdk_extern]
-pub fn extract_products_from_group(group_hash: ActionHash) -> ExternResult<Vec<Product>> {
-    // Get the product group record
-    let group_record = match get(group_hash.clone(), GetOptions::default())? {
-         Some(record) => record,
-         None => {
-             return Err(wasm_error!(WasmErrorInner::Guest("Group not found".into())));
-         }
-    };
-
-    // Extract the ProductGroup from the record
-    let product_group = match ProductGroup::try_from(group_record) {
-         Ok(group) => group,
-         Err(e) => {
-             return Err(wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize ProductGroup: {:?}", e))));
-         }
-    };
-
-    let _count = product_group.products.len();
-
-    Ok(product_group.products)
-}
-
 // New function to get paginated products from a group
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GroupProductsParams {

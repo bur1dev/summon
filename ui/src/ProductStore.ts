@@ -236,8 +236,8 @@ export class ProductStore {
 
         // Pause between product types
         if (processedTypes < productTypesCount) {
-          console.log(`[LOG] Load Saved Data: Waiting 500 milliseconds before next product type...`); // Corrected log message
-          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log(`[LOG] Load Saved Data: Waiting 250 milliseconds before next product type...`); // Corrected log message
+          await new Promise(resolve => setTimeout(resolve, 250));
         }
       }
 
@@ -706,8 +706,8 @@ export class ProductStore {
       }
 
       if (processedTypeCount < changedTypes.length) {
-        console.log(`[LOG] Sync (Selective): Waiting 500ms before next product type...`);
-        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log(`[LOG] Sync (Selective): Waiting 250ms before next product type...`);
+        await new Promise(resolve => setTimeout(resolve, 250));
       }
     } // End loop over changedTypes
 

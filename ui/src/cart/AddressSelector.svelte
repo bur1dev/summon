@@ -22,7 +22,7 @@
     let isValidating = false;
     let validationError = "";
 
-    onMount(async () => {
+    onMount(() => {
         addressService = new AddressService(client);
 
         // Subscribe to addresses
@@ -58,7 +58,7 @@
     }
 
     // Add new address
-    async function handleAddAddress(event) {
+    async function handleAddAddress(event: CustomEvent) {
         isValidating = true;
         validationError = "";
 
@@ -75,7 +75,7 @@
             // Save the address
             const result = await addressService.createAddress(newAddress);
 
-            if (result.success) {
+            if (result.success && result.hash) {
                 // Select the new address
                 selectAddress(result.hash);
                 showNewAddressForm = false;
@@ -136,7 +136,13 @@
                             class="address-card {selectedAddressHash === hash
                                 ? 'selected'
                                 : ''}"
+                            role="button"
+                            tabindex="0"
                             on:click={() => selectAddress(hash)}
+                            on:keydown={(e) => {
+                                if (e.key === "Enter" || e.key === " ")
+                                    selectAddress(hash);
+                            }}
                         >
                             <div class="address-icon">
                                 <MapPin size={18} />

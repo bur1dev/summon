@@ -222,7 +222,7 @@ export function useVirtualGrid(config: VirtualGridConfig) {
         gridContainer = element;
 
         // Find the global scroll container
-        parentScrollContainer = document.querySelector('.global-scroll-container');
+        parentScrollContainer = document.querySelector('.global-scroll-container') as HTMLElement;
 
         if (parentScrollContainer) {
             boundScrollHandler = handleScroll;
@@ -257,7 +257,7 @@ export function useVirtualGrid(config: VirtualGridConfig) {
                 if (renderFrameId) cancelAnimationFrame(renderFrameId);
                 if (zoomTimeout) clearTimeout(zoomTimeout);
 
-                if (parentScrollContainer) {
+                if (parentScrollContainer && boundScrollHandler) {
                     parentScrollContainer.removeEventListener('scroll', boundScrollHandler);
                 }
                 window.removeEventListener('resize', handleResize);

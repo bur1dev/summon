@@ -41,7 +41,7 @@
   export let client: AppClient;
 
   let store: ShopStore = new ShopStore(client, roleName);
-  let shopViewComponent; // Reference to the ShopView component
+  let shopViewComponent: ShopView; // Reference to the ShopView component
 
   // Create ProductDataService during initialization
   // Create global cache service instance if it doesn't exist
@@ -49,8 +49,8 @@
     window.productRowCache = new ProductRowCacheService();
   }
 
-  const cacheService =
-    typeof window !== "undefined"
+  const cacheService: ProductRowCacheService =
+    typeof window !== "undefined" && window.productRowCache
       ? window.productRowCache
       : new ProductRowCacheService();
   const productDataService = new ProductDataService(store, cacheService);
@@ -77,7 +77,7 @@
   $: bgUrl = $uiProps.bgUrl ? $uiProps.bgUrl : DEFAULT_BG_IMG;
 
   // Handle category selection from sidebar
-  function handleCategorySelect(event) {
+  function handleCategorySelect(event: CustomEvent) {
     if (shopViewComponent) {
       shopViewComponent.selectCategory(
         event.detail.category,
@@ -118,7 +118,6 @@
 
     <!-- SidebarMenu at root level -->
     <SidebarMenu
-      {store}
       myAgentPubKeyB64={store.myAgentPubKey
         ? encodeHashToBase64(store.myAgentPubKey)
         : undefined}
@@ -138,7 +137,7 @@
         {#if $currentViewStore === "active"}
           <!-- The global scroll container with header and shop view -->
           <div class="global-scroll-container scroll-container">
-            <HeaderContainer cartTotal={cartTotalValue} standAlone={false} />
+            <HeaderContainer cartTotal={cartTotalValue} />
             <div class="workspace">
               <ShopView bind:this={shopViewComponent} />
             </div>

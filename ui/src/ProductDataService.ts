@@ -424,7 +424,7 @@ export class ProductDataService {
                     groupLimit
                 );
 
-                if (result?.products?.length >= containerCapacity || !result?.hasMore) {
+                if (!result || !result.products || result.products.length >= containerCapacity || !result.hasMore) {
                     break;
                 }
 
@@ -460,7 +460,7 @@ export class ProductDataService {
                         groupLimit
                     );
 
-                    if (result?.products?.length >= containerCapacity || !result?.hasMore) {
+                    if (!result || !result.products || result.products.length >= containerCapacity || !result.hasMore) {
                         break;
                     }
 

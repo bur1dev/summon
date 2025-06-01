@@ -3,22 +3,23 @@
     import "@shoelace-style/shoelace/dist/components/dialog/dialog.js";
     import { createEventDispatcher } from "svelte";
 
-    // Export open/close methods
-    export const close = () => {
-        if (dialog) dialog.hide();
-    };
-    export const open = () => {
-        if (dialog) dialog.show();
-    };
-
-    // Dialog reference
-    let dialog;
+    // Dialog reference with proper typing
+    let dialog: any;
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
 
+    // Export open/close methods
+    export const close = () => {
+        if (dialog) dialog.hide();
+    };
+
+    export const open = () => {
+        if (dialog) dialog.show();
+    };
+
     // Handle profile updated event
-    function handleProfileUpdated(event) {
+    function handleProfileUpdated(event: any) {
         console.log("Profile updated:", event);
         dispatch("profile-updated", event.detail);
         close();
@@ -174,79 +175,6 @@
     /* Direct button part styling for gradient and effects */
     :global(update-profile) ::part(button) {
         transition: all 0.25s ease !important;
-    }
-
-    :global(update-profile form) sl-button[variant="primary"]::part(base) {
-        background: linear-gradient(
-            135deg,
-            var(--primary, #00cfbb),
-            var(--secondary, #8d72e1)
-        ) !important;
-        border-color: transparent !important;
-        box-shadow: var(
-            --shadow-button,
-            0 4px 5px rgba(0, 0, 0, 0.2)
-        ) !important;
-        transition: var(--btn-transition, all 0.25s ease) !important;
-    }
-
-    :global(update-profile form)
-        sl-button[variant="primary"]::part(base):hover {
-        background: linear-gradient(
-            135deg,
-            var(--primary-dark, #00b3a1),
-            var(--secondary, #8d72e1)
-        ) !important;
-        transform: translateY(var(--hover-lift, -2px)) !important;
-        box-shadow: var(
-            --shadow-medium,
-            0 4px 12px rgba(0, 0, 0, 0.15)
-        ) !important;
-    }
-
-    :global(update-profile form) sl-button[variant="default"]::part(base) {
-        background: var(--background, #f2fffe) !important;
-        color: var(--text-primary, #1e3a3a) !important;
-        border: var(--border-width-thin, 1px) solid var(--border, #ccf2ee) !important;
-        border-radius: var(--btn-border-radius, 50px) !important;
-        box-shadow: var(
-            --shadow-subtle,
-            0 2px 8px rgba(0, 0, 0, 0.08)
-        ) !important;
-        transition: var(--btn-transition, all 0.25s ease) !important;
-    }
-
-    :global(update-profile form)
-        sl-button[variant="default"]::part(base):hover {
-        background: var(--surface, #ffffff) !important;
-        border-color: var(--primary, #00cfbb) !important;
-        transform: translateY(var(--hover-lift, -2px)) !important;
-        box-shadow: var(
-            --shadow-medium,
-            0 4px 12px rgba(0, 0, 0, 0.15)
-        ) !important;
-    }
-
-    /* Input field styling */
-    :global(update-profile) sl-input::part(base),
-    :global(update-profile) sl-textarea::part(base) {
-        border-radius: var(--btn-border-radius, 50px) !important;
-        border: var(--border-width-thin, 1px) solid var(--border, #ccf2ee) !important;
-        transition: var(--btn-transition, all 0.25s ease) !important;
-    }
-
-    :global(update-profile) sl-input::part(base):hover,
-    :global(update-profile) sl-textarea::part(base):hover {
-        border-color: var(--primary, #00cfbb) !important;
-    }
-
-    :global(update-profile) sl-input::part(base):focus-within,
-    :global(update-profile) sl-textarea::part(base):focus-within {
-        border-color: var(--primary, #00cfbb) !important;
-        box-shadow: var(
-            --shadow-subtle,
-            0 2px 8px rgba(0, 0, 0, 0.08)
-        ) !important;
     }
 
     /* Custom animations */

@@ -21,7 +21,6 @@
     export let selectedProductType: string = "All";
     export let searchMode: boolean = false;
     export let productDataService: ProductDataService;
-    export let store: any;
 
     // New props for home view
     export let isHomeView: boolean = false;
@@ -32,17 +31,17 @@
 
     const dispatch = createEventDispatcher();
 
-    // State variables
-    let categoryProducts = {};
-    let allCategoryProducts = [];
-    let gridContainer = {};
-    let currentRanges = {};
-    let totalProducts = {};
-    let containerCapacity = 0;
-    let rowCapacities = {};
-    let mainGridContainer;
-    let allProductsTotal = 0;
-    let hasMore = {};
+    // State variables with proper types
+    let categoryProducts: Record<string, any[]> = {};
+    let allCategoryProducts: any[] = [];
+    let gridContainer: Record<string, any> = {};
+    let currentRanges: Record<string, { start: number; end: number }> = {};
+    let totalProducts: Record<string, number> = {};
+    let containerCapacity: number = 0;
+    let rowCapacities: Record<string, number> = {};
+    let mainGridContainer: HTMLElement;
+    let allProductsTotal: number = 0;
+    let hasMore: Record<string, boolean> = {};
 
     let loadedSubcategoriesSet = new Set<string>();
     let visibleGroups = new Set();
@@ -167,6 +166,8 @@
         } else if (!isHomeView && !selectedSubcategory) {
             subcategory = identifier;
         }
+
+        if (!category || !subcategory) return;
 
         try {
             const isInSubcategoryView = selectedCategory && selectedSubcategory;
@@ -342,7 +343,9 @@
         }
     }
 
-    async function loadMainCategoryView(capacity) {
+    async function loadMainCategoryView(capacity: number) {
+        if (!selectedCategory) return;
+
         // FIXED: Get all subcategories for this category
         const subcategories = getAllSubcategories(selectedCategory);
         const initialSubcategories = subcategories.slice(0, 3);
@@ -350,7 +353,7 @@
         const initialResults = await Promise.all(
             initialSubcategories.map(async (sub) => {
                 return await productDataService.loadSubcategoryProducts(
-                    selectedCategory,
+                    selectedCategory!,
                     sub.name,
                     capacity,
                 );
@@ -367,9 +370,11 @@
     }
 
     async function loadRemainingSubcategories(
-        remainingSubcategories,
-        capacity,
+        remainingSubcategories: any[],
+        capacity: number,
     ) {
+        if (!selectedCategory) return;
+
         const BATCH_SIZE = 5;
         for (let i = 0; i < remainingSubcategories.length; i += BATCH_SIZE) {
             const currentBatch = remainingSubcategories.slice(
@@ -378,9 +383,9 @@
             );
 
             const batchResults = await Promise.all(
-                currentBatch.map(async (sub) => {
+                currentBatch.map(async (sub: any) => {
                     return await productDataService.loadSubcategoryProducts(
-                        selectedCategory,
+                        selectedCategory!,
                         sub.name,
                         capacity,
                     );
@@ -392,7 +397,9 @@
         }
     }
 
-    async function loadSubcategoryView(capacity) {
+    async function loadSubcategoryView(capacity: number) {
+        if (!selectedCategory || !selectedSubcategory) return;
+
         // UPDATED: Use centralized utility
         const subcategoryConfig = getSubcategoryConfig(
             selectedCategory,
@@ -423,6 +430,8 @@
             return;
         }
 
+        if (!selectedCategory || !selectedSubcategory) return;
+
         const result = await productDataService.loadProductTypeProducts(
             selectedCategory,
             selectedSubcategory,
@@ -438,7 +447,9 @@
         }
     }
 
-    async function loadProductTypesView(capacity) {
+    async function loadProductTypesView(capacity: number) {
+        if (!selectedCategory || !selectedSubcategory) return;
+
         // UPDATED: Use centralized utility
         const productTypes = getFilteredProductTypes(
             selectedCategory,
@@ -452,8 +463,8 @@
             const batchResults = await Promise.all(
                 currentBatch.map(async (type) => {
                     return await productDataService.loadProductTypeProducts(
-                        selectedCategory,
-                        selectedSubcategory,
+                        selectedCategory!,
+                        selectedSubcategory!,
                         type,
                         true,
                         capacity,
@@ -470,6 +481,8 @@
         if (currentNavigationState.subcategory !== null) {
             return;
         }
+
+        if (!selectedCategory) return;
 
         const gridData =
             await productDataService.loadAllCategoryProducts(selectedCategory);
@@ -495,7 +508,7 @@
         productRowNodes.forEach((node) => {
             const identifier = node.getAttribute("data-subcategory");
             if (identifier) {
-                gridContainer[identifier] = node;
+                gridContainer[identifier] = node as HTMLElement;
                 // UPDATED: Use composable instead of direct observer
                 resizeObserver.observe(node as HTMLElement);
                 loadedSubcategoriesSet.add(identifier);
@@ -503,8 +516,8 @@
         });
     }
 
-    function processSubcategoryResults(results, capacity) {
-        results.forEach((result) => {
+    function processSubcategoryResults(results: any[], capacity: number) {
+        results.forEach((result: any) => {
             if (!result?.products?.length || !result?.name) return;
             const identifier = result.name;
             const initialProducts = result.products.slice(0, capacity);
@@ -525,8 +538,8 @@
         rowCapacities = { ...rowCapacities };
     }
 
-    function processHomeViewResults(results, capacity) {
-        results.forEach((result) => {
+    function processHomeViewResults(results: any[], capacity: number) {
+        results.forEach((result: any) => {
             if (!result?.products?.length || !result?.identifier) return;
             const identifier = result.identifier;
             const initialProducts = result.products.slice(0, capacity);
@@ -547,8 +560,8 @@
         rowCapacities = { ...rowCapacities };
     }
 
-    function processProductTypeResults(results, capacity) {
-        results.forEach((result) => {
+    function processProductTypeResults(results: any[], capacity: number) {
+        results.forEach((result: any) => {
             if (!result?.products?.length || !result?.type) return;
             const identifier = result.type;
             const initialProducts = result.products.slice(0, capacity);
@@ -585,7 +598,7 @@
         gridContainer = {};
     }
 
-    function handleDataLoaded(event) {
+    function handleDataLoaded(event: CustomEvent) {
         const {
             newStart,
             products,
@@ -624,11 +637,11 @@
         hasMore = { ...hasMore };
     }
 
-    function handleReportCategory(event) {
+    function handleReportCategory(event: CustomEvent) {
         dispatch("reportCategory", event.detail);
     }
 
-    function handleBoundariesInitialized(event) {
+    function handleBoundariesInitialized(event: CustomEvent) {
         const { identifier: id, grandTotal } = event.detail;
         if (id && typeof grandTotal === "number") {
             if (totalProducts[id] !== grandTotal) {
@@ -638,13 +651,13 @@
         }
     }
 
-    function getSubcategoryFromIdentifier(identifier) {
+    function getSubcategoryFromIdentifier(identifier: string): string {
         if (!identifier.includes("_")) return identifier;
         const parts = identifier.split("_");
         return parts[1];
     }
 
-    function getCategoryFromIdentifier(identifier) {
+    function getCategoryFromIdentifier(identifier: string): string | null {
         if (!identifier.includes("_")) return selectedCategory;
         const parts = identifier.split("_");
         return parts[0];
@@ -665,9 +678,8 @@
                     {currentRanges}
                     {totalProducts}
                     {hasMore}
-                    {store}
                     {productDataService}
-                    selectedCategory={rowCategory}
+                    selectedCategory={rowCategory || ""}
                     selectedSubcategory={rowSubcategory}
                     {mainGridContainer}
                     containerCapacity={rowCapacities[identifier] ||
@@ -698,7 +710,6 @@
                     {currentRanges}
                     {totalProducts}
                     {hasMore}
-                    {store}
                     {productDataService}
                     {selectedCategory}
                     selectedSubcategory={identifier}
@@ -725,7 +736,6 @@
             selectedSubcategory={null}
             selectedProductType={"All"}
             products={allCategoryProducts}
-            {allProductsTotal}
             on:reportCategory={handleReportCategory}
             on:productTypeSelect
         />
@@ -737,7 +747,6 @@
                 {selectedSubcategory}
                 {selectedProductType}
                 products={allCategoryProducts}
-                {allProductsTotal}
                 on:reportCategory={handleReportCategory}
                 on:productTypeSelect
             />
@@ -752,7 +761,6 @@
                         {currentRanges}
                         {totalProducts}
                         {hasMore}
-                        {store}
                         {productDataService}
                         {selectedCategory}
                         {selectedSubcategory}

@@ -10,14 +10,14 @@
   import { PriceService } from "./PriceService";
   import type { CartBusinessService } from "./cart/CartBusinessService";
 
-  export let selectedCategory = "";
-  export let selectedSubcategory = "";
+  export let selectedCategory: string = "";
+  export let selectedSubcategory: string = "";
 
-  let showReportDialog = false;
-  let showProductModal = false;
-  let buttonHovered = false;
-  let buttonElevated = false;
-  let elevationTimeout;
+  let showReportDialog: boolean = false;
+  let showProductModal: boolean = false;
+  let buttonHovered: boolean = false;
+  let buttonElevated: boolean = false;
+  let elevationTimeout: number | undefined;
 
   function handleButtonMouseEnter() {
     buttonHovered = true;
@@ -47,15 +47,15 @@
   const cartService =
     getContext<Writable<CartBusinessService | null>>("cartService");
 
-  export let product;
-  export let actionHash = undefined;
+  export let product: any;
+  export let actionHash: any = undefined;
 
   // For tracking cart updates
-  let itemCount = 0;
-  let itemWeight = 1; // Default to 1 lb for weight items
-  let unsubscribeCartState;
-  let isServiceReady = false;
-  let unsubscribeReadyState;
+  let itemCount: number = 0;
+  let itemWeight: number = 1; // Default to 1 lb for weight items
+  let unsubscribeCartState: (() => void) | null = null;
+  let isServiceReady: boolean = false;
+  let unsubscribeReadyState: (() => void) | null = null;
 
   // Determine if product is sold by weight
   $: isSoldByWeight = product.sold_by === "WEIGHT";
@@ -67,9 +67,9 @@
   $: displayPrices = PriceService.getDisplayPrices(product);
 
   // Store both original and base64 formats of the group hash
-  let groupHashOriginal = ""; // Original format (comma-separated numbers)
-  let groupHashBase64 = ""; // Base64 format
-  let productIndex = 0;
+  let groupHashOriginal: string = ""; // Original format (comma-separated numbers)
+  let groupHashBase64: string = ""; // Base64 format
+  let productIndex: number = 0;
 
   $: {
     const effectiveHash =
@@ -138,7 +138,7 @@
   }
 
   // Update item count whenever it changes
-  function updateItemCount(items) {
+  function updateItemCount(items: any[]) {
     if (!items || !Array.isArray(items)) return;
 
     // Try to find the item by either the original hash format or the base64 format
@@ -167,7 +167,7 @@
   onMount(() => {
     if ($cartService) {
       // Subscribe to ready state
-      unsubscribeReadyState = $cartService.ready.subscribe((ready) => {
+      unsubscribeReadyState = $cartService.ready.subscribe((ready: boolean) => {
         isServiceReady = ready;
 
         // If ready, check cart items immediately
@@ -178,7 +178,7 @@
       });
 
       // Subscribe to cart items
-      unsubscribeCartState = $cartService.subscribe((items) => {
+      unsubscribeCartState = $cartService.subscribe((items: any[]) => {
         updateItemCount(items);
       });
 
@@ -202,13 +202,13 @@
   });
 
   // Function to handle report button click
-  function handleReportClick(e) {
+  function handleReportClick(e: MouseEvent) {
     e.stopPropagation();
     dispatch("reportCategory", product);
   }
 
   // Handle report submission
-  async function handleReportSubmit(event) {
+  async function handleReportSubmit(event: CustomEvent) {
     const reportData = event.detail;
 
     try {
@@ -237,7 +237,7 @@
   }
 
   // Handle the main "Add" button click
-  function handleButtonClick(e) {
+  function handleButtonClick(e: MouseEvent | CustomEvent) {
     e.stopPropagation();
     if (!$cartService) {
       console.warn("Cart service not available");
@@ -253,13 +253,13 @@
     addProductToCart();
   }
 
-  function handleCardClick(e) {
+  function handleCardClick(e: MouseEvent) {
     // Prevent modal from opening when clicking on specific interactive elements
     if (
-      e.target.closest(".add-btn") ||
-      e.target.closest(".report-btn") ||
-      e.target.closest(".minus") ||
-      e.target.closest(".plus")
+      (e.target as Element).closest(".add-btn") ||
+      (e.target as Element).closest(".report-btn") ||
+      (e.target as Element).closest(".minus") ||
+      (e.target as Element).closest(".plus")
     ) {
       return;
     }
@@ -267,22 +267,42 @@
     showProductModal = true;
   }
 
+  function handleCardKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      showProductModal = true;
+    }
+  }
+
+  function handleCounterKeydown(event: KeyboardEvent, action: string) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (action === "increment") {
+        incrementCount(event as any);
+      } else if (action === "decrement") {
+        decrementCount(event as any);
+      }
+    }
+  }
+
   // Add product to cart
   async function addProductToCart() {
     try {
       const quantity = isSoldByWeight ? 1 : 1; // Default to 1 lb or 1 ct
-      const result = await $cartService.addToCart(
-        groupHashBase64,
-        productIndex,
-        quantity,
-      );
+      if ($cartService) {
+        const result = await $cartService.addToCart(
+          groupHashBase64,
+          productIndex,
+          quantity,
+        );
+      }
     } catch (error) {
       console.error("Error adding to cart:", error);
     }
   }
 
   // Increment item quantity
-  async function incrementCount(e) {
+  async function incrementCount(e: MouseEvent | KeyboardEvent) {
     e.stopPropagation();
     if (!$cartService) return;
 
@@ -296,7 +316,7 @@
   }
 
   // Decrement item quantity
-  async function decrementCount(e) {
+  async function decrementCount(e: MouseEvent | KeyboardEvent) {
     e.stopPropagation();
     if (!$cartService) return;
 
@@ -315,7 +335,7 @@
   }
 
   // Add this function
-  function normalizeStockStatus(status) {
+  function normalizeStockStatus(status: any): string {
     if (!status) return "UNKNOWN";
     const normalized = String(status).toUpperCase();
     if (normalized === "HIGH" || normalized === "IN_STOCK") return "HIGH";
@@ -324,7 +344,7 @@
   }
 
   // More debugging in your getStockText function
-  function getStockText(status) {
+  function getStockText(status: any): string {
     // Additional defensive check
     if (!status) {
       console.warn("Empty stock status for product:", product.name);
@@ -337,7 +357,7 @@
   }
 
   // Update this function
-  function getStockColor(status) {
+  function getStockColor(status: any): string {
     const normalizedStatus = normalizeStockStatus(status);
     if (normalizedStatus === "HIGH") return "var(--success)";
     if (normalizedStatus === "LOW") return "var(--warning)";
@@ -347,7 +367,10 @@
 
 <div
   class="product-card fade-in {buttonElevated ? 'button-elevated' : ''}"
+  role="button"
+  tabindex="0"
   on:click={handleCardClick}
+  on:keydown={handleCardKeydown}
 >
   <button
     class="add-btn btn {displayAmount > 0
@@ -361,14 +384,35 @@
     on:mouseleave={handleButtonMouseLeave}
   >
     {#if displayAmount > 0}
-      <span class="minus counter-btn" on:click|stopPropagation={decrementCount}>
+      <span
+        class="minus counter-btn"
+        role="button"
+        tabindex="0"
+        aria-label="Decrease quantity"
+        on:click|stopPropagation={decrementCount}
+        on:keydown={(e) => handleCounterKeydown(e, "decrement")}
+      >
         <Minus size={16} color="white" />
       </span>
-      <span class="count counter-value" on:click|stopPropagation={() => {}}>
+      <span
+        class="count counter-value"
+        role="button"
+        tabindex="0"
+        aria-label="Current quantity"
+        on:click|stopPropagation={() => {}}
+        on:keydown={() => {}}
+      >
         {displayAmount}
         {displayUnit}
       </span>
-      <span class="plus counter-btn" on:click|stopPropagation={incrementCount}>
+      <span
+        class="plus counter-btn"
+        role="button"
+        tabindex="0"
+        aria-label="Increase quantity"
+        on:click|stopPropagation={incrementCount}
+        on:keydown={(e) => handleCounterKeydown(e, "increment")}
+      >
         <Plus size={16} color="white" />
       </span>
     {:else}

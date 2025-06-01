@@ -51,9 +51,7 @@
   const productDataService =
     getContext<ProductDataService>("productDataService");
 
-  export let standAlone = false;
-
-  export function selectCategory(category, subcategory) {
+  export function selectCategory(category: any, subcategory: any) {
     handleCategorySelect({ detail: { category, subcategory } });
   }
 
@@ -64,22 +62,26 @@
 
   $: {
     if (uiProps && $uiProps) {
-      if ($uiProps.searchMode !== undefined)
-        $searchModeStore = $uiProps.searchMode;
-      if ($uiProps.searchQuery !== undefined)
-        $searchQueryStore = $uiProps.searchQuery;
-      if ($uiProps.selectedProductHash !== undefined)
-        $selectedProductHashStore = $uiProps.selectedProductHash;
-      if ($uiProps.productName !== undefined)
-        $productNameStore = $uiProps.productName;
-      if ($uiProps.searchResults !== undefined)
-        $searchResultsStore = $uiProps.searchResults || [];
-      if ($uiProps.isViewAll !== undefined)
-        $isViewAllStore = $uiProps.isViewAll || false;
+      const props = $uiProps as any;
+      if (props.searchMode !== undefined) $searchModeStore = props.searchMode;
+      if (props.searchQuery !== undefined)
+        $searchQueryStore = props.searchQuery;
+      if (props.selectedProductHash !== undefined)
+        $selectedProductHashStore = props.selectedProductHash;
+      if (props.productName !== undefined)
+        $productNameStore = props.productName;
+      if (props.searchResults !== undefined)
+        $searchResultsStore = props.searchResults || [];
+      if (props.isViewAll !== undefined)
+        $isViewAllStore = props.isViewAll || false;
     }
   }
 
-  function handleCategorySelect({ detail: { category, subcategory } }) {
+  function handleCategorySelect({
+    detail: { category, subcategory },
+  }: {
+    detail: { category: any; subcategory: any };
+  }) {
     sortByStore.set("best");
     selectedBrandsStore.set(new Set());
     selectedOrganicStore.set("all");
@@ -93,7 +95,8 @@
       $isHomeViewStore = false;
       $searchModeStore = false;
       if (store && uiProps && $uiProps) {
-        store.setUIprops({ ...($uiProps || {}), searchMode: false });
+        const currentProps = $uiProps as any;
+        store.setUIprops({ ...(currentProps || {}), searchMode: false });
       }
       $selectedCategoryStore = category;
       $selectedSubcategoryStore = subcategory;
@@ -108,7 +111,7 @@
     }
   }
 
-  function handleProductTypeSelect({ detail }) {
+  function handleProductTypeSelect({ detail }: { detail: any }) {
     if (detail.category && detail.subcategory) {
       $selectedCategoryStore = detail.category;
       $selectedSubcategoryStore = detail.subcategory;
@@ -120,11 +123,15 @@
     }
   }
 
-  function handleViewMore({ detail: { category, subcategory } }) {
+  function handleViewMore({
+    detail: { category, subcategory },
+  }: {
+    detail: { category: any; subcategory: any };
+  }) {
     handleCategorySelect({ detail: { category, subcategory } });
   }
 
-  async function handleReportSubmit(event) {
+  async function handleReportSubmit(event: CustomEvent) {
     try {
       const response = await fetch(
         "http://localhost:3000/api/report-category",
@@ -151,14 +158,14 @@
 
   // UPDATED: Use centralized function for product type navigation visibility
   $: showProductTypeNavigation = shouldShowProductTypeNav(
-    $selectedCategoryStore,
-    $selectedSubcategoryStore,
+    $selectedCategoryStore || "",
+    $selectedSubcategoryStore || "",
   );
 
   // UPDATED: Use centralized function for filtered product types
   $: filteredProductTypes = getFilteredProductTypes(
-    $selectedCategoryStore,
-    $selectedSubcategoryStore,
+    $selectedCategoryStore || "",
+    $selectedSubcategoryStore || "",
   );
 </script>
 
@@ -199,8 +206,6 @@
               </div>
             {/if}
           {/if}
-
-          {#if $isHomeViewStore}{/if}
         {/if}
 
         <div class="product-sections">
@@ -226,7 +231,6 @@
               isHomeView={true}
               {featuredSubcategories}
               searchMode={$searchModeStore}
-              {store}
               {productDataService}
               on:viewMore={handleViewMore}
               on:productTypeSelect={handleProductTypeSelect}
@@ -243,7 +247,6 @@
               isHomeView={false}
               featuredSubcategories={[]}
               searchMode={$searchModeStore}
-              {store}
               {productDataService}
               on:viewMore={handleViewMore}
               on:productTypeSelect={handleProductTypeSelect}

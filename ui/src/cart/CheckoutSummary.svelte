@@ -9,20 +9,19 @@
     import { PriceService } from "../PriceService";
 
     // Props
-    export let cartItems = [];
-    export let cartTotal = 0;
+    export let cartItems: any[] = [];
     export let address: Address;
     export let deliveryInstructions: string = "";
     export let deliveryTime: { date: Date; display: string };
     export let isCheckingOut = false;
-    export let cartService: CartBusinessService = null;
+    export let cartService: CartBusinessService | null = null;
 
     // Calculate totals with tax using PriceService
     $: {
         let regularTotal = 0;
         let promoTotal = 0;
 
-        cartItems.forEach((item) => {
+        cartItems.forEach((item: any) => {
             const product = item.productDetails;
             if (product) {
                 const totals = PriceService.calculateItemTotal(
@@ -49,24 +48,24 @@
     let totalSavings = 0;
 
     // Track which items are being updated - using composite key for groupHash_productIndex
-    let updatingProducts = new Map(); // Change from Set to Map to store timestamps
+    let updatingProducts = new Map<string, number>(); // Change from Set to Map to store timestamps
 
     // State for note editing
-    let editingNoteForItem = null;
+    let editingNoteForItem: any = null;
     let currentNote = "";
     let showNoteButtons = false;
     let noteChanged = false;
 
     // New state for preference saving
     let savePreference = false;
-    let existingPreference = null;
+    let existingPreference: any = null;
     let loadingPreference = false;
 
     // To detect new cart items
-    let previousCartItems = [...cartItems];
+    let previousCartItems: any[] = [...cartItems];
 
     // Create a composite key for tracking updates
-    function getItemKey(item) {
+    function getItemKey(item: any): string {
         return `${item.groupHash}_${item.productIndex}`;
     }
 
@@ -81,12 +80,12 @@
                 const productIndex = parseInt(productIndexStr);
 
                 const oldItem = previousCartItems.find(
-                    (item) =>
+                    (item: any) =>
                         item.groupHash === groupHash &&
                         item.productIndex === productIndex,
                 );
                 const newItem = cartItems.find(
-                    (item) =>
+                    (item: any) =>
                         item.groupHash === groupHash &&
                         item.productIndex === productIndex,
                 );
@@ -124,7 +123,12 @@
         dispatch("editTime");
     }
 
-    async function updateQuantity(groupHash, productIndex, newQuantity, note) {
+    async function updateQuantity(
+        groupHash: any,
+        productIndex: any,
+        newQuantity: any,
+        note: any,
+    ) {
         if (!cartService || newQuantity < 1) return;
 
         // Add to updating products with timestamp using composite key
@@ -157,7 +161,7 @@
     }
 
     // New function to remove item completely
-    async function handleRemove(groupHash, productIndex) {
+    async function handleRemove(groupHash: any, productIndex: any) {
         if (!groupHash) return;
 
         const itemKey = `${groupHash}_${productIndex}`;
@@ -178,7 +182,7 @@
         }
     }
 
-    function handleDecrementItem(item) {
+    function handleDecrementItem(item: any) {
         const itemKey = getItemKey(item);
         const isSoldByWeight = item.productDetails?.sold_by === "WEIGHT";
         const incrementValue = isSoldByWeight ? 0.25 : 1;
@@ -193,7 +197,7 @@
         }
     }
 
-    function handleIncrementItem(item) {
+    function handleIncrementItem(item: any) {
         const itemKey = getItemKey(item);
         const isSoldByWeight = item.productDetails?.sold_by === "WEIGHT";
         const incrementValue = isSoldByWeight ? 0.25 : 1;
@@ -209,13 +213,13 @@
     }
 
     // Returns true if a product is currently updating
-    function isUpdating(groupHash, productIndex) {
+    function isUpdating(groupHash: any, productIndex: any): boolean {
         const itemKey = `${groupHash}_${productIndex}`;
         return updatingProducts.has(itemKey);
     }
 
     // Note editing functionality
-    async function startEditingNote(item) {
+    async function startEditingNote(item: any) {
         editingNoteForItem = item;
         currentNote = item.note || "";
         showNoteButtons = false;
@@ -266,7 +270,7 @@
         if (!editingNoteForItem) return;
 
         try {
-            await cartService.addToCart(
+            await cartService!.addToCart(
                 editingNoteForItem.groupHash,
                 editingNoteForItem.productIndex,
                 editingNoteForItem.quantity,
@@ -275,7 +279,7 @@
 
             // Update the note in the local item
             const index = cartItems.findIndex(
-                (item) =>
+                (item: any) =>
                     item.groupHash === editingNoteForItem.groupHash &&
                     item.productIndex === editingNoteForItem.productIndex,
             );
@@ -286,14 +290,14 @@
 
             // Save or delete preference based on toggle state using service
             if (savePreference && currentNote && currentNote.trim()) {
-                await cartService.saveProductPreference({
+                await cartService!.saveProductPreference({
                     groupHash: editingNoteForItem.groupHash,
                     productIndex: editingNoteForItem.productIndex,
                     note: currentNote.trim(),
                     is_default: true,
                 });
             } else if (!savePreference && existingPreference) {
-                await cartService.deleteProductPreference(
+                await cartService!.deleteProductPreference(
                     existingPreference.hash,
                 );
             }
@@ -309,8 +313,9 @@
     }
 
     // Toggle preference saving based on checkbox
-    function handleSavePreferenceToggle(e) {
-        savePreference = e.target.checked;
+    function handleSavePreferenceToggle(e: Event) {
+        const target = e.target as HTMLInputElement;
+        savePreference = target.checked;
 
         // If toggle turned off and there's an existing preference, show delete button
         showNoteButtons =
@@ -318,7 +323,7 @@
     }
 
     // Helper to determine display unit based on product type
-    function getDisplayUnit(item) {
+    function getDisplayUnit(item: any): string {
         return item.productDetails?.sold_by === "WEIGHT" ? "lb" : "ct";
     }
 </script>

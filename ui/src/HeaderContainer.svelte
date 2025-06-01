@@ -32,7 +32,6 @@
   const profilesStore = getContext("profiles-store");
 
   // These now come from the UiStateStore
-  export let standAlone = false;
   export let cartTotal = 0; // This prop is passed from Controller, but we'll use the cart service value
 
   // Get current agent pubkey and encode it
@@ -100,7 +99,7 @@
     };
   });
 
-  $: uiProps = store.uiProps;
+  $: uiProps = store ? store.uiProps : {};
 
   function toggleCart() {
     $isCartOpenStore = !$isCartOpenStore;
@@ -130,7 +129,6 @@
     <div class="search-container">
       <SearchBar
         {store}
-        productCache={store.productStore}
         on:select={({ detail }) =>
           setSearchState({
             searchMode: true,

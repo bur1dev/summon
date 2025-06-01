@@ -26,22 +26,22 @@
     getContext<ProductDataService>("productDataService");
 
   // State
-  let cartItems = [];
-  let productDetails = {};
+  let cartItems: any[] = [];
+  let productDetails: Record<string, any> = {};
   let isLoading = true;
   let isCheckingOut = false;
   let isShowingCheckoutFlow = false;
   let checkoutError = "";
   let isClosing = false;
-  let cartTotalUnsubscribe;
-  let cartPromoTotalUnsubscribe;
+  let cartTotalUnsubscribe: (() => void) | null = null;
+  let cartPromoTotalUnsubscribe: (() => void) | null = null;
   let cartTotal = 0;
   let cartPromoTotal = 0;
 
   // Subscribe to cart changes
-  let unsubscribe;
+  let unsubscribe: (() => void) | null = null;
 
-  onMount(async () => {
+  onMount(() => {
     if (
       $cartServiceStore &&
       typeof $cartServiceStore.subscribe === "function"
@@ -101,7 +101,10 @@
   });
 
   // Product fetching using ProductDataService
-  async function fetchProductDetails(groupHashB64, productIndex) {
+  async function fetchProductDetails(
+    groupHashB64: string,
+    productIndex: number,
+  ) {
     if (!groupHashB64) {
       throw new Error("Missing groupHash");
     }
@@ -152,7 +155,7 @@
   }
 
   // Handle checkout success
-  function handleCheckoutSuccess(event) {
+  function handleCheckoutSuccess(event: CustomEvent) {
     closeCart();
   }
 
@@ -165,7 +168,7 @@
   $: client = $cartServiceStore ? $cartServiceStore.client : null;
 
   // Safe compare function for sorting
-  function safeCompare(a, b) {
+  function safeCompare(a: any, b: any) {
     // Handle undefined values
     if (!a && !b) return 0;
     if (!a) return -1;
@@ -182,20 +185,29 @@
 <div
   class="overlay {isOpen ? (isClosing ? 'fade-out' : 'fade-in') : ''}"
   class:visible={isOpen}
+  role="button"
+  tabindex="0"
   on:click={closeCart}
+  on:keydown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      closeCart();
+    }
+  }}
 >
   <div
     class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"
     class:open={isOpen}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cart-title"
     on:click|stopPropagation
+    on:keydown|stopPropagation
   >
-    {#if isShowingCheckoutFlow}
+    {#if isShowingCheckoutFlow && $cartServiceStore}
       <CheckoutFlow
         {client}
         cartService={$cartServiceStore}
         {cartItems}
-        {productDetails}
-        {cartTotal}
         onClose={closeCheckoutFlow}
         on:checkout-success={handleCheckoutSuccess}
       />
@@ -205,7 +217,7 @@
       <div class="cart-content">
         <div class="cart-main">
           <div class="cart-main-header">
-            <div class="cart-title">
+            <div class="cart-title" id="cart-title">
               Cart ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})
             </div>
             <button

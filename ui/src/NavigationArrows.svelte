@@ -5,13 +5,12 @@
 
     export let direction: "left" | "right";
     export let disabled: boolean = false;
-    export let currentRanges;
-    export let totalProducts;
-    export let identifier;
-    export let store;
-    export let selectedCategory;
-    export let selectedSubcategory;
-    export let mainGridContainer;
+    export let currentRanges: Record<string, any>;
+    export let totalProducts: Record<string, any>;
+    export let identifier: string;
+    export let selectedCategory: string;
+    export let selectedSubcategory: string;
+    export let mainGridContainer: HTMLElement;
     export let isProductType = false;
     export let hasMore = true;
     export let containerCapacity: number;
@@ -54,7 +53,9 @@
             }
         } catch (error) {
             console.error(`Navigation error (${direction}):`, error);
-            dispatch("navigationError", { error: error.message, identifier });
+            const errorMessage =
+                error instanceof Error ? error.message : String(error);
+            dispatch("navigationError", { error: errorMessage, identifier });
         } finally {
             dispatch("loading", { identifier, loading: false });
             isNavigating = false;

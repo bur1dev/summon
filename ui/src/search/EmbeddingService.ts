@@ -104,7 +104,7 @@ export class EmbeddingService {
                 const tempId = nanoid(); // Use a temporary ID for this specific promise
                 this.pendingRequests.set(tempId, {
                     resolve: () => { clearTimeout(timeout); resolve(); },
-                    reject: (err) => { clearTimeout(timeout); reject(err); },
+                    reject: (err: any) => { clearTimeout(timeout); reject(err); },
                     operation: 'workerReady'
                 });
                 // The worker will post { type: 'workerReady', id: 'worker-ready-signal' (or similar) }

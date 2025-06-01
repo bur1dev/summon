@@ -18,35 +18,35 @@
 
     export let onClose = () => {};
 
-    let reports = [];
-    let loading = true;
-    let error = null;
-    let selectedReport = null;
-    let showApproveDialog = false;
+    let reports: any[] = [];
+    let loading: boolean = true;
+    let error: string | null = null;
+    let selectedReport: any = null;
+    let showApproveDialog: boolean = false;
 
-    let approvingAll = false;
-    let approvedCount = 0;
-    let totalToApprove = 0;
+    let approvingAll: boolean = false;
+    let approvedCount: number = 0;
+    let totalToApprove: number = 0;
 
     // Category selection variables (for system-detected failures)
-    let selectedCategory = null;
-    let selectedSubcategory = null;
-    let selectedProductType = null;
-    let subcategories = [];
-    let productTypes = [];
+    let selectedCategory: string | null = null;
+    let selectedSubcategory: string | null = null;
+    let selectedProductType: string | null = null;
+    let subcategories: any[] = [];
+    let productTypes: any[] = [];
 
     // Recategorization variables
-    let queueingForRecategorization = false;
-    let processingQueue = false;
+    let queueingForRecategorization: boolean = false;
+    let processingQueue: boolean = false;
 
     // Sync DHT variables
-    let syncStatusModalOpen = false;
+    let syncStatusModalOpen: boolean = false;
 
     onMount(async () => {
         await loadReports();
     });
 
-    async function loadReports(preserveScroll = false) {
+    async function loadReports(preserveScroll: boolean = false): Promise<void> {
         try {
             // Save scroll position if preserving
             const scrollPosition = preserveScroll
@@ -73,15 +73,17 @@
                     if (container) container.scrollTop = scrollPosition;
                 }, 10);
             }
-        } catch (err) {
-            error = err.message;
+        } catch (err: unknown) {
+            const errorMessage =
+                err instanceof Error ? err.message : "Unknown error occurred";
+            error = errorMessage;
             console.error("Error in loadReports:", err);
         } finally {
             loading = false;
         }
     }
 
-    function viewReport(report) {
+    function viewReport(report: any): void {
         // Make a full copy to ensure reactivity
         selectedReport = JSON.parse(JSON.stringify(report));
         error = null; // Clear error when opening new dialog
@@ -114,12 +116,12 @@
     $: {
         if (selectedCategory) {
             const categoryData = mainCategories.find(
-                (c) => c.name === selectedCategory,
+                (c: any) => c.name === selectedCategory,
             );
             subcategories = categoryData?.subcategories || [];
             if (
                 selectedSubcategory &&
-                !subcategories.find((s) => s.name === selectedSubcategory)
+                !subcategories.find((s: any) => s.name === selectedSubcategory)
             ) {
                 selectedSubcategory = null;
                 selectedProductType = null;
@@ -134,7 +136,7 @@
     $: {
         if (selectedSubcategory) {
             const subcategoryData = subcategories.find(
-                (s) => s.name === selectedSubcategory,
+                (s: any) => s.name === selectedSubcategory,
             );
             productTypes = subcategoryData?.productTypes || [];
             if (subcategoryData?.gridOnly) {
@@ -151,9 +153,9 @@
         }
     }
 
-    async function approveReport(reportId = null) {
+    async function approveReport(reportId: any = null): Promise<void> {
         const reportToApprove = reportId
-            ? reports.find((r) => r.id === reportId)
+            ? reports.find((r: any) => r.id === reportId)
             : selectedReport;
 
         if (!reportToApprove || reportToApprove.id === undefined) {
@@ -188,7 +190,7 @@
                     return;
                 }
                 const isGridOnly = subcategories.find(
-                    (s) => s.name === selectedSubcategory,
+                    (s: any) => s.name === selectedSubcategory,
                 )?.gridOnly;
                 categoryToUpdateWith = {
                     category: selectedCategory,
@@ -232,7 +234,7 @@
 
                 // Also update the reports array
                 const reportIndex = reports.findIndex(
-                    (r) => r.id === reportIdForProcessing,
+                    (r: any) => r.id === reportIdForProcessing,
                 );
                 if (reportIndex !== -1) {
                     reports[reportIndex].suggestedCategory =
@@ -271,7 +273,7 @@
 
                 // Also update the reports array
                 const reportIndex = reports.findIndex(
-                    (r) => r.id === reportIdForProcessing,
+                    (r: any) => r.id === reportIdForProcessing,
                 );
                 if (reportIndex !== -1) {
                     reports[reportIndex].suggestedCategory =
@@ -314,7 +316,7 @@
 
                 // Update local state
                 const reportIndex = reports.findIndex(
-                    (r) => r.id === reportIdForProcessing,
+                    (r: any) => r.id === reportIdForProcessing,
                 );
                 if (reportIndex !== -1) {
                     reports[reportIndex].status = "approved";
@@ -338,16 +340,18 @@
                     loadReports(true);
                 }, 100);
             }
-        } catch (err) {
-            error = err.message;
+        } catch (err: unknown) {
+            const errorMessage =
+                err instanceof Error ? err.message : "Unknown error occurred";
+            error = errorMessage;
             console.error("Error in approveReport:", err);
         }
     }
 
     async function queueForRecategorization(
-        reportIdToQueue, // Expecting the actual ID (e.g., array index or unique DB ID)
-        showMessages = true,
-    ) {
+        reportIdToQueue: any, // Expecting the actual ID (e.g., array index or unique DB ID)
+        showMessages: boolean = true,
+    ): Promise<boolean> {
         if (reportIdToQueue === null || reportIdToQueue === undefined) {
             const errMessage =
                 "Cannot queue report: Invalid report ID provided.";
@@ -383,7 +387,7 @@
             if (response.ok) {
                 // Update UI for the specific report to "queued_for_recategorization"
                 const index = reports.findIndex(
-                    (r) => r.id === reportIdToQueue,
+                    (r: any) => r.id === reportIdToQueue,
                 );
                 if (index !== -1) {
                     reports[index].status = "queued_for_recategorization";
@@ -416,8 +420,10 @@
                 if (showMessages) error = errMessage;
                 return false; // Indicate failure
             }
-        } catch (err) {
-            const errMessage = `Error in queueForRecategorization: ${err.message}`;
+        } catch (err: unknown) {
+            const errorMessage =
+                err instanceof Error ? err.message : "Unknown error occurred";
+            const errMessage = `Error in queueForRecategorization: ${errorMessage}`;
             console.error(errMessage, "(ID:", reportIdToQueue, ")", err);
             if (showMessages) error = errMessage;
             return false; // Indicate failure
@@ -427,7 +433,7 @@
     }
 
     // Process recategorization queue
-    async function processRecategorizationQueue() {
+    async function processRecategorizationQueue(): Promise<void> {
         try {
             processingQueue = true;
             error = "Processing recategorization queue...";
@@ -448,19 +454,21 @@
             } else {
                 error = `Failed to process recategorization queue: ${result.error || "Unknown error"}`;
             }
-        } catch (err) {
+        } catch (err: unknown) {
+            const errorMessage =
+                err instanceof Error ? err.message : "Unknown error occurred";
             console.error("Error processing recategorization queue:", err);
-            error = err.message;
+            error = errorMessage;
         } finally {
             processingQueue = false;
         }
     }
 
-    async function approveAllReports() {
+    async function approveAllReports(): Promise<void> {
         approvingAll = true;
         error = null;
         const pendingReports = reports.filter(
-            (r) =>
+            (r: any) =>
                 (!r.status || r.status === "pending") &&
                 r.suggestedCategory && // Only those with suggestions
                 r.source !== "system", // Exclude system reports for bulk approve
@@ -522,7 +530,7 @@
                     );
                     bulkErrorOccurred = true;
                 }
-            } catch (err) {
+            } catch (err: unknown) {
                 console.error(
                     `Bulk approve: Exception for report ${report.id}:`,
                     err,
@@ -543,9 +551,9 @@
         approvingAll = false;
     }
 
-    async function rejectReport(reportId = null) {
+    async function rejectReport(reportId: any = null): Promise<void> {
         const reportToReject = reportId
-            ? reports.find((r) => r.id === reportId)
+            ? reports.find((r: any) => r.id === reportId)
             : selectedReport;
 
         if (!reportToReject || reportToReject.id === undefined) {
@@ -575,7 +583,7 @@
             if (response.ok) {
                 // Update the local reports array immediately
                 const reportIndex = reports.findIndex(
-                    (r) => r.id === reportIdToReject,
+                    (r: any) => r.id === reportIdToReject,
                 );
                 if (reportIndex !== -1) {
                     reports[reportIndex].status = "rejected";
@@ -598,13 +606,15 @@
                     await response.text(),
                 );
             }
-        } catch (err) {
-            error = err.message;
+        } catch (err: unknown) {
+            const errorMessage =
+                err instanceof Error ? err.message : "Unknown error occurred";
+            error = errorMessage;
             console.error("Error in rejectReport:", err);
         }
     }
 
-    function getStatusBadgeClass(status) {
+    function getStatusBadgeClass(status: any): string {
         if (status === "approved") return "badge-success";
         if (status === "rejected") return "badge-danger";
         if (status === "queued_for_recategorization") return "badge-info";
@@ -612,17 +622,17 @@
         return "badge-pending";
     }
 
-    function getSourceBadgeClass(source) {
+    function getSourceBadgeClass(source: any): string {
         return source === "system" ? "badge-system" : "badge-user";
     }
 
-    function getReportTypeBadgeClass(type) {
+    function getReportTypeBadgeClass(type: any): string {
         if (type === "negative_example") return "badge-negative";
         if (type === "suggestion") return "badge-suggestion";
         return "badge-default";
     }
 
-    function portal(node) {
+    function portal(node: HTMLElement) {
         const target = document.body;
 
         // We need to ensure we only append once and track it properly
@@ -663,18 +673,20 @@
     });
 
     // Function to trigger DHT synchronization (MOVED FROM SIDEBAR)
-    async function syncDht() {
+    async function syncDht(): Promise<void> {
         syncStatusModalOpen = true;
 
         try {
-            await store.productStore.syncDht();
+            if (store?.productStore) {
+                await store.productStore.syncDht();
+            }
         } catch (error) {
             console.error("Error during DHT sync:", error);
         }
     }
 
     // Get sync status from the store (MOVED FROM SIDEBAR)
-    $: syncStatus = store.productStore?.getState()?.syncStatus || {
+    $: syncStatus = store?.productStore?.getState()?.syncStatus || {
         inProgress: false,
         message: "",
         progress: 0,
@@ -707,7 +719,7 @@
         <div class="data-admin-buttons">
             <button
                 class="data-admin-btn"
-                on:click={() => store.productStore?.loadFromSavedData()}
+                on:click={() => store?.productStore?.loadFromSavedData()}
             >
                 <span class="btn-icon">
                     <Database size={18} />
@@ -898,14 +910,29 @@
     <div
         class="overlay"
         style="background-color: rgba(0,0,0,0.7); z-index: 9999;"
+        role="button"
+        tabindex="0"
         on:click|self={() => {
             showApproveDialog = false;
             selectedReport = null;
         }}
+        on:keydown|self={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                showApproveDialog = false;
+                selectedReport = null;
+            }
+        }}
         use:portal
     >
-        <div class="dialog">
-            <h2>Review Category Report ({selectedReport.id})</h2>
+        <div
+            class="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dialogTitle"
+        >
+            <h2 id="dialogTitle">
+                Review Category Report ({selectedReport.id})
+            </h2>
 
             <div class="report-details">
                 <div class="report-section">
@@ -1100,11 +1127,28 @@
 {#if syncStatusModalOpen}
     <div
         class="sync-modal-overlay"
+        role="button"
+        tabindex="0"
         on:click={() => !syncStatus.inProgress && (syncStatusModalOpen = false)}
+        on:keydown={(e) => {
+            if (
+                (e.key === "Enter" || e.key === " ") &&
+                !syncStatus.inProgress
+            ) {
+                syncStatusModalOpen = false;
+            }
+        }}
     >
-        <div class="sync-modal" on:click|stopPropagation>
+        <div
+            class="sync-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="syncDialogTitle"
+            on:click|stopPropagation
+            on:keydown|stopPropagation
+        >
             <div class="sync-modal-header">
-                <h3>DHT Synchronization Status</h3>
+                <h3 id="syncDialogTitle">DHT Synchronization Status</h3>
                 {#if !syncStatus.inProgress}
                     <button
                         class="close-button"

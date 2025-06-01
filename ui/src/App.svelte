@@ -104,8 +104,9 @@
 
   // Use Svelte's reactive statement to watch profilesStore
   $: prof = profilesStore ? profilesStore.myProfile : undefined;
+  $: profValue = $prof && ($prof as any).value;
 
-  function handleProfileCreated(event) {
+  function handleProfileCreated(event: CustomEvent) {
     console.log("Profile created event:", event);
     console.log("Event detail:", event.detail);
   }
@@ -120,7 +121,7 @@
 
 {#if connected}
   <profiles-context store={profilesStore}>
-    {#if !prof || $prof.status === "pending"}
+    {#if !prof || ($prof && $prof.status === "pending")}
       <div class="loading-container">
         <div class="loading-wrapper">
           <div class="pulse-ring"></div>
@@ -128,7 +129,7 @@
           <p class="loading-text">Connecting to the network...</p>
         </div>
       </div>
-    {:else if $prof.status === "complete" && !$prof.value}
+    {:else if $prof && $prof.status === "complete" && !profValue}
       <div class="welcome-container">
         <div class="welcome-card">
           <div class="welcome-header">

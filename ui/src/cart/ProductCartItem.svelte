@@ -8,11 +8,11 @@
     import { PriceService } from "../PriceService";
 
     // Props - UPDATED FOR NEW STRUCTURE
-    export let product;
-    export let quantity;
-    export let groupHash; // Changed from productHash
-    export let productIndex; // Added
-    export let note = null; // Added for note support
+    export let product: any;
+    export let quantity: number;
+    export let groupHash: string; // Changed from productHash
+    export let productIndex: number; // Added
+    export let note: string | null = null; // Added for note support
     export let isUpdating = false;
 
     // Get cart service directly from the context
@@ -43,7 +43,7 @@
                     groupHash,
                     productIndex,
                     newQuantity,
-                    note,
+                    note || undefined,
                 );
             } else {
                 // Setting to 0 to remove item
@@ -65,7 +65,7 @@
                 groupHash,
                 productIndex,
                 quantity + incrementValue,
-                note,
+                note || undefined,
             );
         } catch (error) {
             console.error("Error increasing quantity:", error);

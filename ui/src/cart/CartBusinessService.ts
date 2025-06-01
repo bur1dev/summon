@@ -13,7 +13,7 @@ export interface DeliveryTimeSlot {
 // Type for checkout details
 export interface CheckoutDetails {
     addressHash?: string;
-    deliveryInstructions?: string;
+    deliveryInstructions?: string | null;
     deliveryTime?: DeliveryTimeSlot;
 }
 
@@ -35,6 +35,13 @@ interface DecodedProductGroup {
     subcategory?: string;
     product_type?: string;
     additional_categorizations?: any[];
+}
+
+interface TimeSlot {
+    id: string;
+    display: string;
+    timestamp: number;
+    slot: string;
 }
 
 export class CartBusinessService {
@@ -368,8 +375,9 @@ export class CartBusinessService {
                 return { success: false, message: "No Holochain client available" };
             }
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error checking out cart:', error);
-            return { success: false, message: error.toString() };
+            return { success: false, message: errorMessage };
         }
     }
 
@@ -389,12 +397,7 @@ export class CartBusinessService {
         date: Date,
         dateFormatted: string,
         dayOfWeek: string,
-        timeSlots: {
-            id: string,
-            display: string,
-            timestamp: number,
-            slot: string
-        }[]
+        timeSlots: TimeSlot[]
     }[] {
         const days = [];
         const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -417,7 +420,7 @@ export class CartBusinessService {
             const dayOfWeek = daysOfWeek[date.getDay()];
 
             // Time slots for this day
-            const timeSlots = [];
+            const timeSlots: TimeSlot[] = [];
 
             // Add time slots
             const slotTimes = [
@@ -514,8 +517,9 @@ export class CartBusinessService {
                 return { success: false, message: "No Holochain client available" };
             }
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error loading checked out carts:', error);
-            return { success: false, message: error.toString() };
+            return { success: false, message: errorMessage };
         }
     }
 
@@ -652,7 +656,7 @@ export class CartBusinessService {
                     if (cart) {
                         // Save delivery details before returning to shopping
                         this.savedDeliveryDetails.set({
-                            addressHash: cart.addressHash,
+                            addressHash: cart.addressHash ?? undefined,
                             deliveryInstructions: cart.deliveryInstructions,
                             deliveryTime: cart.deliveryTime?.raw
                         });
@@ -713,8 +717,9 @@ export class CartBusinessService {
                 return { success: false, message: "No Holochain client available" };
             }
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error returning cart to shopping:', error);
-            return { success: false, message: error.toString() };
+            return { success: false, message: errorMessage };
         }
     }
 
@@ -754,8 +759,9 @@ export class CartBusinessService {
 
             return { success: false, message: "No preference found" };
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error getting product preference:', error);
-            return { success: false, message: error.toString() };
+            return { success: false, message: errorMessage };
         }
     }
 
@@ -788,8 +794,9 @@ export class CartBusinessService {
 
             return { success: true, data: { hash: encodeHashToBase64(hash), preference: holochainPreference } };
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error saving preference:', error);
-            return { success: false, message: error.toString() };
+            return { success: false, message: errorMessage };
         }
     }
 
@@ -814,8 +821,9 @@ export class CartBusinessService {
 
             return { success: true };
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error deleting product preference:', error);
-            return { success: false, message: error.toString() };
+            return { success: false, message: errorMessage };
         }
     }
 }

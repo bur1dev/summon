@@ -28,10 +28,14 @@
     // Props
     export let client: any;
     export let cartService: CartBusinessService;
-    export let cartItems = [];
-    export let productDetails = {};
-    export let cartTotal = 0;
+    export let cartItems: any[] = [];
     export let onClose: () => void;
+
+    let cartTotal = 0; // This was an export, now a local variable if needed internally, or remove if not.
+    // Based on the previous error, it's not used by CheckoutSummary.
+    // If it's used elsewhere in THIS component, it can remain as `let cartTotal = 0;`
+    // If not used at all, it can be removed entirely.
+    // For now, I'll keep it as a local variable declaration.
 
     // Get the store for the client
     const storeContext = getContext<import("../store").StoreContext>("store");
@@ -46,20 +50,20 @@
     // State
     let currentStep = 1;
     let checkoutDetails: CheckoutDetails = {};
-    let deliveryTimeSlots = [];
-    let formattedDeliveryTime = null;
-    let address = null;
+    let deliveryTimeSlots: any[] = [];
+    let formattedDeliveryTime: { date: Date; display: string } | null = null;
+    let address: Address | null = null;
     let isCheckingOut = false;
     let checkoutError = "";
-    let addressService = null;
-    let localCartItems = [];
-    let unsubscribe: any;
-    let enrichedCartItems = []; // New state for cart items with product details
+    let addressService: AddressService | null = null;
+    let localCartItems: any[] = [];
+    let unsubscribe: (() => void) | null = null;
+    let enrichedCartItems: any[] = []; // New state for cart items with product details
 
     // Subscribe to cart service for real-time updates
     onMount(() => {
         if (cartService && typeof cartService.subscribe === "function") {
-            unsubscribe = cartService.subscribe(async (items) => {
+            unsubscribe = cartService.subscribe(async (items: any[]) => {
                 localCartItems = items || [];
                 console.log(
                     "Cart items updated in CheckoutFlow:",
@@ -72,7 +76,7 @@
         } else {
             localCartItems = cartItems;
             // Enrich initial cart items
-            enrichCartItems(localCartItems).then((items) => {
+            enrichCartItems(localCartItems).then((items: any[]) => {
                 enrichedCartItems = items;
             });
         }
@@ -83,13 +87,13 @@
     });
 
     // Helper function to enrich cart items with product details
-    async function enrichCartItems(items) {
+    async function enrichCartItems(items: any[]): Promise<any[]> {
         console.log("Enriching cart items with product details:", items.length);
 
         if (!items || !items.length) return [];
 
         const enrichedItems = await Promise.all(
-            items.map(async (item) => {
+            items.map(async (item: any) => {
                 try {
                     if (!item.groupHash) {
                         console.error("Item missing groupHash:", item);
@@ -113,7 +117,7 @@
 
                     // Fetch product group
                     const groupHash = decodeHashFromBase64(groupHashBase64);
-                    const result = await store.client.callZome({
+                    const result = await store!.client.callZome({
                         role_name: "grocery",
                         zome_name: "products",
                         fn_name: "get_product_group",
@@ -172,7 +176,7 @@
               : cartItems;
 
     // Load address from hash
-    async function loadAddress(addressHash) {
+    async function loadAddress(addressHash: any): Promise<Address | null> {
         if (!addressService || !addressHash) return null;
 
         console.log("Loading address from hash:", addressHash);
@@ -181,12 +185,14 @@
             const addresses = addressService.getAddresses();
             // Subscribe to the store to get the latest value
             return new Promise((resolve) => {
-                const unsubscribe = addresses.subscribe((addressMap) => {
-                    if (addressMap.has(addressHash)) {
-                        unsubscribe();
-                        resolve(addressMap.get(addressHash));
-                    }
-                });
+                const unsubscribe = addresses.subscribe(
+                    (addressMap: Map<string, Address>) => {
+                        if (addressMap.has(addressHash)) {
+                            unsubscribe();
+                            resolve(addressMap.get(addressHash) || null);
+                        }
+                    },
+                );
 
                 // Add a timeout to prevent hanging
                 setTimeout(() => {
@@ -242,18 +248,18 @@
     });
 
     // Handle address selection
-    function handleAddressSelect({ detail }) {
+    function handleAddressSelect({ detail }: { detail: any }) {
         checkoutDetails.addressHash = detail.addressHash;
         address = detail.address;
     }
 
     // Handle delivery instructions change
-    function handleInstructionsChange({ detail }) {
+    function handleInstructionsChange({ detail }: { detail: any }) {
         checkoutDetails.deliveryInstructions = detail.instructions;
     }
 
     // Handle delivery time selection
-    function handleTimeSelect({ detail }) {
+    function handleTimeSelect({ detail }: { detail: any }) {
         checkoutDetails.deliveryTime = detail.deliveryTime;
 
         // Format for display
@@ -265,7 +271,7 @@
     }
 
     // Validate the current state before proceeding to the next step
-    function validateStep(currentStep) {
+    function validateStep(currentStep: number): boolean {
         if (currentStep === 1) {
             return !!checkoutDetails.addressHash && !!address;
         }
@@ -329,9 +335,9 @@
                 checkoutError =
                     result.message || "Checkout failed. Please try again.";
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error during checkout:", error);
-            checkoutError = error.toString();
+            checkoutError = (error as Error).toString();
         } finally {
             isCheckingOut = false;
         }
@@ -366,7 +372,7 @@
                 <div class="avatar-container">
                     <agent-avatar
                         size="40"
-                        agent-pub-key={store.myAgentPubKeyB64}
+                        agent-pub-key={store?.myAgentPubKeyB64}
                         disable-tooltip={true}
                         disable-copy={true}
                     ></agent-avatar>
@@ -396,7 +402,7 @@
                 <div class="avatar-container">
                     <agent-avatar
                         size="40"
-                        agent-pub-key={store.myAgentPubKeyB64}
+                        agent-pub-key={store?.myAgentPubKeyB64}
                         disable-tooltip={true}
                         disable-copy={true}
                     ></agent-avatar>
@@ -405,10 +411,11 @@
 
             <DeliveryTimeSelector
                 timeSlots={deliveryTimeSlots}
-                selectedTimeSlot={checkoutDetails.deliveryTime?.time_slot}
-                selectedDate={checkoutDetails.deliveryTime
+                selectedDate={checkoutDetails.deliveryTime?.date
                     ? new Date(checkoutDetails.deliveryTime.date)
                     : null}
+                selectedTimeSlot={checkoutDetails.deliveryTime?.time_slot ||
+                    null}
                 on:select={handleTimeSelect}
             />
 
@@ -427,7 +434,7 @@
                     <div class="avatar-container">
                         <agent-avatar
                             size="40"
-                            agent-pub-key={store.myAgentPubKeyB64}
+                            agent-pub-key={store?.myAgentPubKeyB64}
                             disable-tooltip={true}
                             disable-copy={true}
                         ></agent-avatar>
@@ -436,7 +443,6 @@
 
                 <CheckoutSummary
                     cartItems={effectiveCartItems}
-                    {cartTotal}
                     {address}
                     deliveryInstructions={checkoutDetails.deliveryInstructions ||
                         ""}

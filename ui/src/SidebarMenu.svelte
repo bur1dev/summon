@@ -5,13 +5,12 @@
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
     import { X, Tag, AlertTriangle } from "lucide-svelte";
 
-    export let store: any;
     export let myAgentPubKeyB64: string | undefined;
     export let avatarLoaded: boolean;
 
     let showCategoryAdmin = false;
     let showProfileEditor = false;
-    let profileEditorComponent;
+    let profileEditorComponent: ProfileEditor | undefined;
     let isClosing = false;
 
     function closeMenu() {
@@ -22,8 +21,14 @@
         }, 300); // Match animation duration
     }
 
-    function handleProfileUpdated(event) {
+    function handleProfileUpdated(event: CustomEvent) {
         console.log("Profile updated event:", event);
+    }
+
+    function handleAvatarClick() {
+        showProfileEditor = true;
+        if (!profileEditorComponent) return;
+        profileEditorComponent.open();
     }
 </script>
 
@@ -31,7 +36,12 @@
     <!-- Overlay -->
     <div
         class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
+        role="button"
+        tabindex="0"
         on:click={closeMenu}
+        on:keydown={(e) => {
+            if (e.key === "Enter" || e.key === " ") closeMenu();
+        }}
     />
 
     <!-- Sidebar Panel -->
@@ -51,10 +61,12 @@
                 <div class="profile-section">
                     <div
                         class="avatar-container"
-                        on:click={() => {
-                            showProfileEditor = true;
-                            if (!profileEditorComponent) return;
-                            profileEditorComponent.open();
+                        role="button"
+                        tabindex="0"
+                        on:click={handleAvatarClick}
+                        on:keydown={(e) => {
+                            if (e.key === "Enter" || e.key === " ")
+                                handleAvatarClick();
                         }}
                         title="Edit Your Profile"
                     >

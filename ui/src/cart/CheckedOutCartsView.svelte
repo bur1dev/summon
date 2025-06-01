@@ -24,11 +24,11 @@
   const profilesStore = getContext("profiles-store");
 
   // Services
-  let addressService;
+  let addressService: AddressService;
 
   // State
   let isLoading = true;
-  let checkedOutCarts = [];
+  let checkedOutCarts: any[] = [];
   let errorMessage = "";
   let addressCache = new Map();
   let isClosing = false;
@@ -50,7 +50,8 @@
       await loadCheckedOutCarts();
     } catch (error) {
       console.error("Error in onMount:", error);
-      errorMessage = "Failed to load checked out carts: " + error.toString();
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      errorMessage = "Failed to load checked out carts: " + errorMsg;
       isLoading = false;
     }
   });
@@ -75,14 +76,15 @@
       isLoading = false;
     } catch (error) {
       console.error("Error loading checked out carts:", error);
-      errorMessage = "Error loading checked out carts: " + error.toString();
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      errorMessage = "Error loading checked out carts: " + errorMsg;
       isLoading = false;
       checkedOutCarts = [];
     }
   }
 
   // Function to return a cart to shopping
-  async function returnToShopping(item) {
+  async function returnToShopping(item: any) {
     try {
       console.log("Returning cart to shopping:", item.id);
 
@@ -99,12 +101,13 @@
       }
     } catch (error) {
       console.error("Error returning cart to shopping:", error);
-      errorMessage = "Error returning cart to shopping: " + error.toString();
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      errorMessage = "Error returning cart to shopping: " + errorMsg;
     }
   }
 
   // Format status for display
-  function formatStatus(status) {
+  function formatStatus(status: any): string {
     switch (status) {
       case "processing":
         return "Processing";
@@ -118,7 +121,7 @@
   }
 
   // Get address from cache
-  function getAddressFromCache(addressHash) {
+  function getAddressFromCache(addressHash: any) {
     if (!addressHash) return null;
     return addressCache.get(addressHash);
   }

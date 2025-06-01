@@ -39,7 +39,7 @@ interface StoreState {
 }
 
 // Add this function near the top with other utility functions
-function normalizeStockStatus(status) {
+function normalizeStockStatus(status: any): string {
   if (!status) return "UNKNOWN"; // Changed from "HIGH" to "UNKNOWN"
   const normalized = String(status).toUpperCase();
   if (normalized === "HIGH" || normalized === "IN_STOCK") return "HIGH";
@@ -214,7 +214,8 @@ export class ProductStore {
               error: `Uploaded ${successfullyUploadedProducts}/${totalProductsFromFile} products (${Math.round((successfullyUploadedProducts / totalProductsFromFile) * 100)}%) - ${totalGroupsCreated} groups created`
             }));
 
-          } catch (batchError) {
+          } catch (batchError: unknown) {
+            const errorMessage = batchError instanceof Error ? batchError.message : String(batchError);
             console.error(`[LOG] Load Saved Data: ❌ Attempt ${attempts}/3 failed for "${productTypeFromFile || 'None'}":`, batchError);
 
             if (attempts >= 3) {
@@ -259,7 +260,8 @@ export class ProductStore {
       // Delete the DHT upload flag after a successful full load
       await this.deleteDhtUploadFlag();
 
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("[LOG] Load Saved Data: ❌ Critical error:", error);
 
       console.log("[LOG] Load Saved Data: --------------------------------------------------");
@@ -287,7 +289,8 @@ export class ProductStore {
       }
       const data = await response.json();
       return data.flagExists;
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error checking DHT upload flag:", error);
       return false;
     }
@@ -303,7 +306,8 @@ export class ProductStore {
         throw new Error(`Failed to delete DHT upload flag: ${response.status} ${response.statusText}`);
       }
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error deleting DHT upload flag:", error);
       return false;
     }
@@ -348,7 +352,8 @@ export class ProductStore {
         console.log("Product not found by hash or record structure was unexpected.");
         return null;
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error getting product by hash:", error);
       return null;
     }
@@ -437,16 +442,17 @@ export class ProductStore {
       }));
       await this.performSelectiveSync(changedTypes);
 
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("[LOG] Sync: ❌ Error during DHT synchronization:", error);
       this.state.update(state => ({
         ...state,
-        error: `Sync error: ${error.message}`,
+        error: `Sync error: ${errorMessage}`,
         loading: false,
         syncStatus: {
           ...this.getState().syncStatus,
           inProgress: false,
-          message: `Error: ${error.message}`
+          message: `Error: ${errorMessage}`
         }
       }));
     }
@@ -581,7 +587,8 @@ export class ProductStore {
                   payload: group.signed_action.hashed.hash // Send the ProductGroup's ActionHash
                 });
                 deletedLinksCount++; // This counts deleted groups/link-sets, not individual links.
-              } catch (deleteError) {
+              } catch (deleteError: unknown) {
+                const errorMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
                 const groupActionHashForLog = group.signed_action?.hashed?.hash || "COULD_NOT_GET_HASH_FOR_LOG";
                 console.error(`[LOG] Sync (Selective): Error deleting links to group ${groupActionHashForLog} for active path ${typeKey} during refresh:`, deleteError);
               }
@@ -613,7 +620,8 @@ export class ProductStore {
                     payload: group.signed_action.hashed.hash
                   });
                   deletedLinksCount++;
-                } catch (deleteError) {
+                } catch (deleteError: unknown) {
+                  const errorMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
                   const groupActionHashForLog = group.signed_action?.hashed?.hash || "COULD_NOT_GET_HASH_FOR_LOG";
                   console.error(`[LOG] Sync (Selective): Error deleting links to group ${groupActionHashForLog} from old primary path ${typeKey}:`, deleteError);
                 }
@@ -685,7 +693,8 @@ export class ProductStore {
             });
             createdGroupsInLoop += createResult.length; // Assuming result is an array of created group records/hashes
             console.log(`[LOG] Sync (Selective): Zome call for path ${typeKey} created/updated ${createResult.length} group(s) with ${productBatchForZomeCall.length} products.`);
-          } catch (createError) {
+          } catch (createError: unknown) {
+            const errorMessage = createError instanceof Error ? createError.message : String(createError);
             console.error(`[LOG] Sync (Selective): Error in Zome call create_product_batch for path ${typeKey}:`, createError);
           }
         } else {
@@ -697,11 +706,12 @@ export class ProductStore {
         }
         console.log(`[LOG] Sync (Selective): Path ${typeKey} processing complete. Deleted old links/groups: ${deletedLinksCount}. Created new groups: ${createdGroupsInLoop}.`);
 
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`[LOG] Sync (Selective): Error processing product type ${typeKey}:`, error);
         this.state.update(state => ({
           ...state,
-          error: `Error updating ${typeKey}: ${error.message}. Continuing with other types...`
+          error: `Error updating ${typeKey}: ${errorMessage}. Continuing with other types...`
         }));
       }
 
@@ -735,7 +745,8 @@ export class ProductStore {
           const errorText = await resetResponse.text();
           console.warn(`[LOG] Sync (Selective): Failed to reset _categoryChanged flags: ${resetResponse.status} ${errorText}`);
         }
-      } catch (resetError) {
+      } catch (resetError: unknown) {
+        const errorMessage = resetError instanceof Error ? resetError.message : String(resetError);
         console.error(`[LOG] Sync (Selective): Error calling API to reset _categoryChanged flags:`, resetError);
       }
     } else {

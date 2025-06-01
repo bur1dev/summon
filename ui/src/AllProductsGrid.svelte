@@ -16,15 +16,14 @@
     export let selectedCategory: string;
     export let selectedSubcategory: string | null = null;
     export let selectedProductType: string | null = null;
-    export let products = [];
-    export let allProductsTotal: number = 0;
+    export let products: any[] = [];
 
     const { getStore } = getContext<StoreContext>("store");
     const store = getStore();
     const dispatch = createEventDispatcher();
 
-    let productsGridRef;
-    let parentScrollContainer;
+    let productsGridRef: HTMLElement;
+    let parentScrollContainer: HTMLElement | null = null;
 
     // Sort and filter state
     let sortDropdownOpen = false;
@@ -51,17 +50,17 @@
         `Rendering ${$visibleIndices.length} of ${sortedFilteredProducts.length} products`,
     );
 
-    // Use centralized category utility
+    // Use centralized category utility - fix null handling
     $: shouldShowControls = shouldShowSortControls(
         selectedCategory,
-        selectedSubcategory,
-        selectedProductType,
+        selectedSubcategory || "",
+        selectedProductType || "",
     );
 
     // Extract unique brands from products
     $: availableBrands = (() => {
         const brands = new Set<string>();
-        products.forEach((product) => {
+        products.forEach((product: any) => {
             if (product.brand && product.brand.trim()) {
                 brands.add(product.brand.trim());
             }
@@ -76,7 +75,7 @@
         // Apply brand filter
         if ($selectedBrandsStore.size > 0) {
             result = result.filter(
-                (product) =>
+                (product: any) =>
                     product.brand &&
                     $selectedBrandsStore.has(product.brand.trim()),
             );
@@ -84,10 +83,12 @@
 
         // Apply organic filter
         if ($selectedOrganicStore === "organic") {
-            result = result.filter((product) => product.is_organic === true);
+            result = result.filter(
+                (product: any) => product.is_organic === true,
+            );
         } else if ($selectedOrganicStore === "non-organic") {
             result = result.filter(
-                (product) =>
+                (product: any) =>
                     product.is_organic === false ||
                     product.is_organic === undefined,
             );
@@ -95,9 +96,9 @@
 
         // Apply sorting
         if ($sortByStore === "price-asc") {
-            result.sort((a, b) => (a.price || 0) - (b.price || 0));
+            result.sort((a: any, b: any) => (a.price || 0) - (b.price || 0));
         } else if ($sortByStore === "price-desc") {
-            result.sort((a, b) => (b.price || 0) - (a.price || 0));
+            result.sort((a: any, b: any) => (b.price || 0) - (a.price || 0));
         }
 
         return result;
@@ -123,17 +124,17 @@
     }
 
     // Event handlers for dropdowns
-    function handleSortChange(event) {
+    function handleSortChange(event: CustomEvent<any>) {
         sortByStore.set(event.detail);
         sortDropdownOpen = false;
     }
 
-    function handleBrandsChange(event) {
+    function handleBrandsChange(event: CustomEvent<any>) {
         selectedBrandsStore.set(event.detail);
         brandsDropdownOpen = false;
     }
 
-    function handleOrganicChange(event) {
+    function handleOrganicChange(event: CustomEvent<any>) {
         selectedOrganicStore.set(event.detail);
         organicDropdownOpen = false;
     }
@@ -164,9 +165,11 @@
 
     onMount(() => {
         // Find the global scroll container for resize observation
-        parentScrollContainer = document.querySelector(
+        const scrollContainer = document.querySelector(
             ".global-scroll-container",
-        );
+        ) as HTMLElement | null;
+
+        parentScrollContainer = scrollContainer;
 
         if (parentScrollContainer) {
             scrollContainerResizeObserver.observe(parentScrollContainer);

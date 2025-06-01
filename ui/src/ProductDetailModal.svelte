@@ -14,34 +14,34 @@
     const cartServiceStore =
         getContext<Writable<CartBusinessService | null>>("cartService");
 
-    export let isOpen = false;
-    export let product;
+    export let isOpen: boolean = false;
+    export let product: any;
     export let groupHashBase64: string;
     export let productIndex: number;
-    export let forceShowPreferences = false;
+    export let forceShowPreferences: boolean = false;
 
-    export let selectedCategory = "";
-    export let selectedSubcategory = "";
+    export let selectedCategory: string = "";
+    export let selectedSubcategory: string = "";
 
-    let quantity = 1;
-    let isInCart = false;
-    let unsubscribeCartState;
-    let note = "";
-    let existingNote = "";
-    let showPreferences = false;
-    let showButtons = false;
-    let noteChanged = false;
-    let isClosing = false;
-    let savePreference = false; // For the "remember preferences" toggle
-    let existingPreference = null; // To store existing preference if found
-    let loadingPreference = false; // Loading state while fetching preferences
-    let isTransitioning = false; // Flag to track button state transitions
+    let quantity: number = 1;
+    let isInCart: boolean = false;
+    let unsubscribeCartState: (() => void) | null = null;
+    let note: string = "";
+    let existingNote: string = "";
+    let showPreferences: boolean = false;
+    let showButtons: boolean = false;
+    let noteChanged: boolean = false;
+    let isClosing: boolean = false;
+    let savePreference: boolean = false; // For the "remember preferences" toggle
+    let existingPreference: any = null; // To store existing preference if found
+    let loadingPreference: boolean = false; // Loading state while fetching preferences
+    let isTransitioning: boolean = false; // Flag to track button state transitions
 
     $: isSoldByWeight = product?.sold_by === "WEIGHT";
     $: incrementValue = isSoldByWeight ? 0.25 : 1;
 
-    function formatQuantity(qty) {
-        return isSoldByWeight ? `${qty} lb` : qty;
+    function formatQuantity(qty: number): string {
+        return isSoldByWeight ? `${qty} lb` : qty.toString();
     }
 
     function closeModal() {
@@ -55,9 +55,50 @@
         }, 300); // Match the CSS animation duration
     }
 
-    function handleOverlayClick(e) {
+    function handleOverlayClick(e: MouseEvent) {
         if (e.target === e.currentTarget) {
             closeModal();
+        }
+    }
+
+    function handleOverlayKeydown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeModal();
+        }
+    }
+
+    function handleShopAllKeydown(event: KeyboardEvent) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            const productType = product.product_type || product.category;
+
+            const categoryToUse = selectedCategory || product.category;
+            const subcategoryToUse = selectedSubcategory || product.subcategory;
+
+            if (categoryToUse && subcategoryToUse) {
+                dispatch("productTypeSelect", {
+                    category: categoryToUse,
+                    subcategory: subcategoryToUse,
+                    productType,
+                });
+            } else {
+                dispatch("productTypeSelect", {
+                    productType,
+                });
+            }
+            closeModal();
+        }
+    }
+
+    function handleCounterKeydown(event: KeyboardEvent, action: string) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (action === "increment") {
+                incrementQuantity();
+            } else if (action === "decrement") {
+                decrementQuantity();
+            }
         }
     }
 
@@ -154,7 +195,7 @@
         // So, direct method calls should be safe if serviceInstance is not null.
         const items = serviceInstance.getCartItems();
         const item = items.find(
-            (item) =>
+            (item: any) =>
                 item &&
                 item.groupHash === groupHashBase64 &&
                 item.productIndex === productIndex,
@@ -259,7 +300,7 @@
         }
     }
 
-    function portal(node) {
+    function portal(node: HTMLElement) {
         let target = document.body;
 
         function update() {
@@ -394,8 +435,9 @@
     }
 
     // Toggle preference saving based on checkbox
-    function handleSavePreferenceToggle(e) {
-        savePreference = e.target.checked;
+    function handleSavePreferenceToggle(e: Event) {
+        const target = e.target as HTMLInputElement;
+        savePreference = target.checked;
 
         // If toggle turned off and there's an existing preference, show delete button
         showButtons =
@@ -404,9 +446,14 @@
 </script>
 
 {#if isOpen}
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div
         class="modal-overlay {isClosing ? 'fade-out' : 'fade-in'}"
         on:click={handleOverlayClick}
+        on:keydown={handleOverlayKeydown}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-title"
         use:portal
     >
         <div class="product-modal {isClosing ? 'scale-out' : 'scale-in'}">
@@ -445,9 +492,13 @@
                             {/if}
                         </div>
 
-                        <h1 class="product-title">{product.name}</h1>
+                        <h1 id="product-title" class="product-title">
+                            {product.name}
+                        </h1>
                         <div
                             class="shop-all btn btn-text"
+                            role="button"
+                            tabindex="0"
                             on:click|stopPropagation={() => {
                                 const productType =
                                     product.product_type || product.category;
@@ -474,6 +525,7 @@
                                 }
                                 closeModal();
                             }}
+                            on:keydown={handleShopAllKeydown}
                         >
                             Shop all {selectedSubcategory || product.subcategory
                                 ? (selectedSubcategory || product.subcategory) +
@@ -575,7 +627,15 @@
                                 <div class="counter-btn-group">
                                     <span
                                         class="counter-btn minus"
+                                        role="button"
+                                        tabindex="0"
+                                        aria-label="Decrease quantity"
                                         on:click|stopPropagation={decrementQuantity}
+                                        on:keydown={(e) =>
+                                            handleCounterKeydown(
+                                                e,
+                                                "decrement",
+                                            )}
                                     >
                                         <Minus size={20} />
                                     </span>
@@ -584,7 +644,15 @@
                                     >
                                     <span
                                         class="counter-btn plus"
+                                        role="button"
+                                        tabindex="0"
+                                        aria-label="Increase quantity"
                                         on:click|stopPropagation={incrementQuantity}
+                                        on:keydown={(e) =>
+                                            handleCounterKeydown(
+                                                e,
+                                                "increment",
+                                            )}
                                     >
                                         <Plus size={20} />
                                     </span>

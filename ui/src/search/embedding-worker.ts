@@ -478,7 +478,7 @@ async function handleSearchHnsw(message: WorkerMessage) {
         // Filter out any undefined mappings (if internalLabelMap was somehow incomplete)
         const validNeighbors: number[] = [];
         const validDistances: number[] = [];
-        finalResults.neighbors.forEach((origIdx, i) => {
+        finalResults.neighbors.forEach((origIdx: any, i: number) => {
             if (typeof origIdx === 'number') {
                 validNeighbors.push(origIdx);
                 validDistances.push(finalResults.distances[i]);

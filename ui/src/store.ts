@@ -10,7 +10,7 @@ import { ProductStore } from "./ProductStore";
 import type { Product } from "./search/search-types"; // Added import for Product
 
 export class ShopService {
-  constructor(public client: AppClient, public roleName, public zomeName = 'products') { }
+  constructor(public client: AppClient, public roleName: RoleName, public zomeName = 'products') { }
   private callZome(fnName: string, payload: any) {
     return this.client.callZome({
       role_name: this.roleName,
@@ -46,7 +46,7 @@ export class ShopStore {
     bgUrl: "",
     // Optional properties will be undefined initially
   });
-  dnaHash: DnaHash;
+  dnaHash: DnaHash | null;
   cartService: any; // Will hold the SimpleCartService instance
 
   setUIprops(propsToUpdate: Partial<UIProps>) {

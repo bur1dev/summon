@@ -11,6 +11,12 @@
         SearchMethod,
         SearchResult,
     } from "./search-types";
+
+    // Type for products coming from cache, which might have category as null and embedding in a raw format
+    type ProductFromCache = Omit<Product, "category" | "embedding"> & {
+        category: string | null;
+        embedding?: unknown; // Will be processed into Float32Array, made optional
+    };
     import { parseQuery, deduplicateProducts } from "./search-utils";
     import { SearchApiClient } from "./search-api";
     import {
@@ -25,7 +31,6 @@
     } from "./query-utils";
 
     export let store;
-    export let productCache;
 
     const dispatch = createEventDispatcher();
 
@@ -49,6 +54,7 @@
     let currentEmbeddingPromise: Promise<Float32Array | null> | null = null; // Track current embedding calculation
 
     let latestPreFilteredCandidates: Product[] = [];
+    let currentResults: Product[] = [];
 
     // Constants for search behavior
     const DROPDOWN_RESULTS_LIMIT = 15;
@@ -57,7 +63,7 @@
     const MINIMUM_KEYSTROKE_INTERVAL = 400; // ms to wait before calculating embeddings
     const MIN_QUERY_LENGTH = 3;
 
-    function portal(node) {
+    function portal(node: HTMLElement) {
         let target = document.body;
         function update() {
             target.appendChild(node);
@@ -89,69 +95,58 @@
         ignoreLocation: true,
     };
 
-    onMount(async () => {
-        try {
-            console.log("[SearchBar] Initializing...");
-            isLoading = true;
+    onMount(() => {
+        const initialize = async () => {
+            try {
+                console.log("[SearchBar] Initializing...");
+                isLoading = true;
 
-            apiClient = new SearchApiClient(store);
+                apiClient = new SearchApiClient(store);
 
-            // Step 1: Initialize EmbeddingService and ensure it's fully ready.
-            // The initializeEmbeddingService function awaits embeddingService.initialize().
-            await initializeEmbeddingService();
-            // At this point, if no error was thrown, embeddingService.isInitialized
-            // and embeddingService.isHnswLibInitializedInWorker *should* be true.
+                await initializeEmbeddingService();
 
-            // Step 2: Fetch product index
-            console.log(
-                "[SearchBar] Fetching product index from SearchCacheService...",
-            );
-            const productsFromCache = await SearchCacheService.getSearchIndex(
-                store,
-                false,
-            );
-            initializeProductIndex(productsFromCache); // This sets `productIndex` globally in the script
-
-            // Step 3: Eagerly prepare global HNSW index IF products exist.
-            // The error "EmbeddingService or HNSW Lib in worker not initialized"
-            // comes from within prepareHnswIndex if its internal checks fail.
-            // This means that even if SearchBar.svelte awaited initializeEmbeddingService(),
-            // some internal async part of embeddingService.initialize() might not have
-            // fully completed setting all necessary flags before prepareHnswIndex runs its checks.
-            // The most robust way is to ensure initialize() itself handles all its async steps
-            // and only resolves when truly ready.
-
-            if (productIndex && productIndex.length > 0) {
                 console.log(
-                    "[SearchBar] Eagerly preparing GLOBAL HNSW index for ALL products (after awaiting service init)...",
+                    "[SearchBar] Fetching product index from SearchCacheService...",
                 );
-                // The `prepareHnswIndex` method in EmbeddingService already calls `await this.initialize()`
-                // at its beginning, which is idempotent. So an explicit check for `isServiceInitialized()`
-                // here is redundant if `prepareHnswIndex` handles it.
-                // The key is that `prepareHnswIndex`'s own internal checks for readiness must pass.
-                await embeddingService.prepareHnswIndex(
-                    productIndex, // Use the globally set productIndex
-                    false, // don't forceRebuild if it exists from previous session
-                    true, // persist this global index
+                const productsFromCache =
+                    await SearchCacheService.getSearchIndex(store, false);
+                initializeProductIndex(productsFromCache);
+
+                if (productIndex && productIndex.length > 0) {
+                    console.log(
+                        "[SearchBar] Eagerly preparing GLOBAL HNSW index for ALL products (after awaiting service init)...",
+                    );
+                    await embeddingService.prepareHnswIndex(
+                        productIndex,
+                        false,
+                        true,
+                    );
+                    console.log(
+                        "[SearchBar] Global HNSW index preparation request sent/completed.",
+                    );
+                } else {
+                    console.log(
+                        "[SearchBar] No products found in cache, skipping global HNSW index preparation.",
+                    );
+                }
+            } catch (e) {
+                let message = "Unknown error during initialization";
+                if (e instanceof Error) {
+                    message = e.message;
+                } else if (typeof e === "string") {
+                    message = e;
+                }
+                console.error(
+                    "[SearchBar] Error during onMount initialization sequence:",
+                    e,
                 );
-                console.log(
-                    "[SearchBar] Global HNSW index preparation request sent/completed.",
-                );
-            } else {
-                console.log(
-                    "[SearchBar] No products found in cache, skipping global HNSW index preparation.",
-                );
+                embeddingStatus = `Error during initialization: ${message}`;
+            } finally {
+                isLoading = false;
             }
-        } catch (error: any) {
-            // Added :any to error for broader catch
-            console.error(
-                "[SearchBar] Error during onMount initialization sequence:",
-                error,
-            );
-            embeddingStatus = `Error during initialization: ${error.message || "Unknown error"}`;
-        } finally {
-            isLoading = false;
-        }
+        };
+
+        initialize();
 
         window.addEventListener("resize", updateDropdownPosition);
         return () => {
@@ -170,16 +165,22 @@
             await embeddingService.initialize();
             embeddingStatus = "Embedding service ready";
             console.log("[SearchBar] Embedding service initialized");
-        } catch (error) {
+        } catch (e) {
+            let message = "Unknown error";
+            if (e instanceof Error) {
+                message = e.message;
+            } else if (typeof e === "string") {
+                message = e;
+            }
             console.error(
                 "[SearchBar] Error initializing embedding service:",
-                error,
+                e,
             );
-            embeddingStatus = `Error initializing embedding service: ${error.message}`;
+            embeddingStatus = `Error initializing embedding service: ${message}`;
         }
     }
 
-    function initializeProductIndex(products: Product[]) {
+    function initializeProductIndex(products: ProductFromCache[]) {
         if (!products || products.length === 0) {
             console.error(
                 "[SearchBar] No products available for search index.",
@@ -188,9 +189,7 @@
             return;
         }
 
-        // Ensure products have embeddings and other necessary fields
         productIndex = products.map((p) => {
-            // Correctly handle embedding which should be a Float32Array from SearchCacheService
             let finalEmbedding: Float32Array | number[] = new Float32Array(0);
             if (
                 p.embedding instanceof Float32Array &&
@@ -223,7 +222,7 @@
                 hash: p.hash,
                 image_url: p.image_url,
                 price: p.price,
-                category: p.category,
+                category: p.category === null ? undefined : p.category,
                 subcategory: p.subcategory,
                 product_type: p.product_type,
                 size: p.size,
@@ -240,7 +239,6 @@
             `[SearchBar] Product index initialized with ${productIndex.length} products.`,
         );
 
-        // Initialize Fuse.js for the dropdown
         initFuse(productIndex.filter((p) => p.name));
     }
 
@@ -255,7 +253,6 @@
         }
     }
 
-    // Function to get query embedding with caching
     const getQueryEmbedding = async (
         query: string,
     ): Promise<Float32Array | null> => {
@@ -263,13 +260,11 @@
             return null;
         }
 
-        // Check cache first
         if (queryEmbeddingCache.has(query)) {
             return queryEmbeddingCache.get(query)!;
         }
 
         try {
-            // Get embedding using the service
             const embedding = await embeddingService.getQueryEmbedding(query);
 
             if (!embedding) {
@@ -279,9 +274,7 @@
                 return null;
             }
 
-            // Cache the result (limit cache size to ~100 entries)
             if (queryEmbeddingCache.size > 100) {
-                // Remove oldest entries
                 const keysToDelete = Array.from(
                     queryEmbeddingCache.keys(),
                 ).slice(0, 20);
@@ -299,7 +292,6 @@
         }
     };
 
-    // Throttled function to calculate embeddings for dropdown
     const calculateQueryEmbedding = throttle(async () => {
         if (
             searchQuery === lastQueryForEmbedding ||
@@ -312,11 +304,9 @@
         semanticResultsLoading = true;
 
         try {
-            // Cancel any in-progress embedding calculation
             currentEmbeddingPromise = getQueryEmbedding(searchQuery);
             currentQueryEmbedding = await currentEmbeddingPromise;
 
-            // Only enhance dropdown if it's still visible
             if (
                 showDropdown &&
                 searchQuery.trim() &&
@@ -332,7 +322,6 @@
         }
     }, MINIMUM_KEYSTROKE_INTERVAL);
 
-    // New: Separate function to enhance dropdown with semantic results
     async function enhanceDropdownResults() {
         if (
             !currentQueryEmbedding ||
@@ -342,7 +331,6 @@
             return;
 
         try {
-            // Extract products (not type groups) from initial results
             const preFilteredProducts =
                 latestPreFilteredCandidates.length > 0
                     ? latestPreFilteredCandidates
@@ -350,9 +338,8 @@
                           .filter((item) => !item.isType)
                           .map((item) => item as Product);
 
-            if (preFilteredProducts.length < 3) return; // Not enough for meaningful ranking
+            if (preFilteredProducts.length < 3) return;
 
-            // Create hybrid dropdown strategy with pre-filtered candidates
             const strategy = new HybridDropdownStrategy(
                 searchQuery,
                 preFilteredProducts,
@@ -362,7 +349,6 @@
 
             const result = await strategy.execute();
 
-            // Only update if we still have the same query and dropdown is visible
             if (showDropdown && searchQuery === lastQueryForEmbedding) {
                 searchResultsForDropdown =
                     result.groupedResults || initialResultsForDropdown;
@@ -375,7 +361,6 @@
         }
     }
 
-    // Fast initial search for dropdown suggestions
     const debouncedSearchForDropdown = debounce(async () => {
         if (!searchQuery.trim() || searchQuery.length < MIN_QUERY_LENGTH) {
             searchResultsForDropdown = [];
@@ -394,35 +379,27 @@
         isLoading = true;
 
         try {
-            // 1. PHASE ONE - Fast text-based results
             const { mainTerms, qualifiers } = parseQuery(searchQuery);
             const mainQuery = mainTerms.join(" ");
 
-            // Get initial text-based results immediately
             const fuseResultsRaw = fuse.search(mainQuery || searchQuery);
 
-            // Extract products from Fuse results and limit to PRE_FILTER_LIMIT
             const preFilteredCandidates = fuseResultsRaw
                 .slice(0, PRE_FILTER_LIMIT)
                 .map((r) => r.item);
 
-            // Store the candidates for later semantic enhancement
             latestPreFilteredCandidates = preFilteredCandidates;
 
-            // Process for simple grouped display (exact same logic as before)
             initialResultsForDropdown = processSearchResultsForDropdown(
                 fuseResultsRaw,
                 qualifiers,
             );
 
-            // Set the dropdown results to initial text-based results
             searchResultsForDropdown = initialResultsForDropdown;
             showDropdown = searchResultsForDropdown.length > 0;
 
             if (showDropdown) updateDropdownPosition();
 
-            // 2. PHASE TWO - Trigger semantic enhancement in background
-            // Only start semantic calculations for longer queries
             if (searchQuery.length >= MINIMUM_QUERY_LENGTH_FOR_EMBEDDING) {
                 calculateQueryEmbedding();
             }
@@ -434,11 +411,10 @@
         } finally {
             isLoading = false;
         }
-    }, 100); // Faster debounce for initial results
+    }, 100);
 
-    // Legacy function maintained for initial dropdown display
     function processSearchResultsForDropdown(
-        fuseResults: FuseResult<Product>[], // Changed from Fuse.FuseResult
+        fuseResults: FuseResult<Product>[],
         qualifiers: string[],
     ): Array<Product | ProductTypeGroup> {
         const searchLower = searchQuery.toLowerCase();
@@ -494,10 +470,9 @@
         }
     }
 
-    // Legacy function maintained for backward compatibility
     function sortResultsByRelevanceForDropdown(
-        a: FuseResult<Product>, // Changed from Fuse.FuseResult
-        b: FuseResult<Product>, // Changed from Fuse.FuseResult
+        a: FuseResult<Product>,
+        b: FuseResult<Product>,
         searchTerms: string[],
         qualifiers: string[],
     ): number {
@@ -546,27 +521,20 @@
     }
 
     function handleInput() {
-        // Clear previous search state
         if (currentEmbeddingPromise) {
             calculateQueryEmbedding.cancel();
         }
-
-        // Start search immediately
         debouncedSearchForDropdown();
     }
 
     function selectProduct(product: Product) {
         showDropdown = false;
+        currentResults = []; // Initialize here
 
-        // Ensure we have valid searchResults
-        let currentResults = [];
-
-        // If we have Fuse initialized, get results
         if (fuse) {
             currentResults = fuse.search(searchQuery).map((r) => r.item);
         }
 
-        // Add the selected product to results if not already included
         if (
             !currentResults.some(
                 (p) => p.hash.toString() === product.hash.toString(),
@@ -591,7 +559,6 @@
         });
     }
 
-    // Extract the actual search logic (not debounced)
     const executeSemanticSearch = async () => {
         if (!searchQuery.trim()) {
             return;
@@ -632,7 +599,6 @@
                     console.warn(
                         `[SearchBar PSS] Failed to generate averaged embedding for "${normalizedSearchQuery}". Falling back to single query embedding.`,
                     );
-                    // Fallback to single query embedding if averaging fails for some reason
                     queryEmbedding = await embeddingService.getQueryEmbedding(
                         normalizedSearchQuery,
                     );
@@ -667,8 +633,8 @@
                     isViewAll: true,
                     searchMethod: "text",
                 });
-                console.timeEnd(`[SearchBar PSS] Total for "${searchQuery}"`); // Early exit
-                isLoading = false; // Ensure isLoading is reset
+                console.timeEnd(`[SearchBar PSS] Total for "${searchQuery}"`);
+                isLoading = false;
                 return;
             }
 
@@ -685,7 +651,6 @@
                 `[SearchBar PSS] Fuse.js found ${textResults.length} text candidates for "${searchQuery}".`,
             );
 
-            // Always use SemanticSearchStrategy, even if textResults is empty
             console.log(
                 `[SearchBar PSS] Creating SemanticSearchStrategy for "${searchQuery}" with ${productIndex.length} total products and ${textResults.length} text candidates.`,
             );
@@ -727,7 +692,7 @@
                 query: searchQuery,
                 fuseResults: [],
                 isViewAll: true,
-                searchMethod: "semantic", // Or "error"
+                searchMethod: "semantic",
             });
         } finally {
             isLoading = false;
@@ -735,11 +700,9 @@
         }
     };
 
-    // Keep debounced version for typing
     const performSemanticSearch = debounce(executeSemanticSearch, 700);
 
     function handleViewAllResults() {
-        // Use semantic search when "View all results" is clicked
         console.log(
             "[SearchBar] 'View all results' clicked. Triggering semantic search.",
         );
@@ -753,7 +716,6 @@
         console.log("[SearchBar] Type selected:", typeItem.type);
 
         if (fuse && typeItem.type) {
-            // Use searchStrategyFactory to create a TextSearchStrategy
             const textResults = fuse
                 .search(typeItem.type)
                 .filter((r) => r.item.product_type === typeItem.type)
@@ -784,23 +746,19 @@
             );
             debouncedSearchForDropdown.cancel();
             performSemanticSearch.cancel();
-            executeSemanticSearch(); // Call the unwrapped version directly
+            executeSemanticSearch();
         }
         showDropdown = false;
     }
 
     function handleClickType(item: Product | ProductTypeGroup) {
-        // Check for properties unique to ProductTypeGroup
         if ("type" in item && "sample" in item) {
-            // Now TypeScript should be more confident that 'item' can be treated as ProductTypeGroup
             handleTypeSelection(item as ProductTypeGroup);
         }
     }
 
     function handleClickProduct(item: Product | ProductTypeGroup) {
-        // Check for properties unique to Product
         if ("name" in item && "hash" in item) {
-            // Now TypeScript should be more confident that 'item' can be treated as Product
             selectProduct(item as Product);
         }
     }
@@ -836,7 +794,12 @@
     {#if showDropdown}
         <div
             class="search-overlay"
+            role="button"
+            tabindex="0"
             on:click={() => (showDropdown = false)}
+            on:keydown={(e) => {
+                if (e.key === "Enter" || e.key === " ") showDropdown = false;
+            }}
             use:portal
         ></div>
 
@@ -862,7 +825,13 @@
                         {#if result.isType && "type" in result && "sample" in result}
                             <div
                                 class="dropdown-item type-item"
+                                role="button"
+                                tabindex="0"
                                 on:click={() => handleClickType(result)}
+                                on:keydown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ")
+                                        handleClickType(result);
+                                }}
                             >
                                 <div class="product-image">
                                     {#if result.sample && "image_url" in result.sample && result.sample.image_url}
@@ -882,7 +851,13 @@
                         {:else if !result.isType && "name" in result && "price" in result}
                             <div
                                 class="dropdown-item"
+                                role="button"
+                                tabindex="0"
                                 on:click={() => handleClickProduct(result)}
+                                on:keydown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ")
+                                        handleClickProduct(result);
+                                }}
                             >
                                 <div class="product-image">
                                     {#if "image_url" in result && result.image_url}
@@ -903,7 +878,16 @@
                     {/each}
                 {/if}
             </div>
-            <div class="view-all" on:click={handleViewAllResults}>
+            <div
+                class="view-all"
+                role="button"
+                tabindex="0"
+                on:click={handleViewAllResults}
+                on:keydown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                        handleViewAllResults();
+                }}
+            >
                 View all results
             </div>
         </div>

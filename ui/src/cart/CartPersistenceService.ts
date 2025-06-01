@@ -67,7 +67,7 @@ export class CartPersistenceService {
 
             if (result && result.items) {
                 // Transform items to the expected format
-                const cartItems = result.items.map(item => {
+                const cartItems = result.items.map((item: any) => {
                     const hashBase64 = encodeHashToBase64(item.group_hash);
 
                     return {
@@ -80,7 +80,7 @@ export class CartPersistenceService {
                 });
 
                 // Filter out any invalid items
-                return cartItems.filter(item =>
+                return cartItems.filter((item: any) =>
                     item && item.groupHash && item.productIndex !== undefined);
             }
 

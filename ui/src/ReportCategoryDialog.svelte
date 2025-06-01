@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher, onMount, onDestroy } from "svelte";
     import { mainCategories } from "./categoryData";
     import { X } from "lucide-svelte";
@@ -6,29 +6,29 @@
 
     const dispatch = createEventDispatcher();
 
-    export let product;
-    export let isOpen = false;
+    export let product: any;
+    export let isOpen: boolean = false;
 
-    let selectedCategory = null;
-    let selectedSubcategory = null;
-    let selectedProductType = null;
-    let unsubscribeStore;
-    let notes = "";
-    let reportType = "suggestion"; // Default to suggestion type (can be "suggestion" or "incorrect")
-    let isClosing = false; // Animation state for smooth closing
+    let selectedCategory: string | null = null;
+    let selectedSubcategory: string | null = null;
+    let selectedProductType: string | null = null;
+    let unsubscribeStore: (() => void) | null = null;
+    let notes: string = "";
+    let reportType: string = "suggestion"; // Default to suggestion type (can be "suggestion" or "incorrect")
+    let isClosing: boolean = false; // Animation state for smooth closing
 
-    let subcategories = [];
-    let productTypes = [];
+    let subcategories: any[] = [];
+    let productTypes: string[] = [];
 
     // Reactive statements to update options
     $: {
         subcategories =
-            mainCategories.find((c) => c.name === selectedCategory)
+            mainCategories.find((c: any) => c.name === selectedCategory)
                 ?.subcategories || [];
         // Reset subcategory when category changes
         if (
             selectedSubcategory &&
-            !subcategories.find((s) => s.name === selectedSubcategory)
+            !subcategories.find((s: any) => s.name === selectedSubcategory)
         ) {
             selectedSubcategory = null;
         }
@@ -36,7 +36,7 @@
 
     $: {
         const subcategory = subcategories.find(
-            (s) => s.name === selectedSubcategory,
+            (s: any) => s.name === selectedSubcategory,
         );
         productTypes = subcategory?.productTypes || [];
 
@@ -75,7 +75,7 @@
         }
 
         // Get values from store when component mounts
-        unsubscribeStore = lastCategorySelection.subscribe((values) => {
+        unsubscribeStore = lastCategorySelection.subscribe((values: any) => {
             if (values.category) {
                 selectedCategory = values.category;
                 selectedSubcategory = values.subcategory;
@@ -221,12 +221,26 @@
         closeModal();
     }
 
-    function setReportType(type) {
+    function setReportType(type: string) {
         reportType = type;
     }
 
+    function handleKeydown(event: KeyboardEvent, type: string) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setReportType(type);
+        }
+    }
+
+    function handleOverlayKeydown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            handleClose();
+        }
+    }
+
     // Portal functionality to mount dialog to body
-    function portal(node) {
+    function portal(node: HTMLElement) {
         const target = document.body;
         let appended = false; // Track if node is appended
 
@@ -254,7 +268,7 @@
         return {
             destroy,
             // Svelte might call update if isOpen changes, ensure it doesn't re-append
-            update: (newIsOpen) => {
+            update: (newIsOpen: boolean) => {
                 if (newIsOpen && !appended) {
                     target.appendChild(node);
                     appended = true;
@@ -294,9 +308,11 @@
 </script>
 
 {#if isOpen}
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div
         class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
         on:click|self={handleClose}
+        on:keydown={handleOverlayKeydown}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
@@ -348,7 +364,11 @@
                             class="report-option {reportType === 'incorrect'
                                 ? 'selected'
                                 : ''}"
+                            role="button"
+                            tabindex="0"
                             on:click={() => setReportType("incorrect")}
+                            on:keydown={(event) =>
+                                handleKeydown(event, "incorrect")}
                         >
                             <div class="report-option-heading">
                                 Just flag as incorrect
@@ -363,7 +383,11 @@
                             class="report-option {reportType === 'suggestion'
                                 ? 'selected'
                                 : ''}"
+                            role="button"
+                            tabindex="0"
                             on:click={() => setReportType("suggestion")}
+                            on:keydown={(event) =>
+                                handleKeydown(event, "suggestion")}
                         >
                             <div class="report-option-heading">
                                 Suggest correct category

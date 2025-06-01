@@ -7,13 +7,13 @@
     const dispatch = createEventDispatcher();
 
     // Props
-    export let timeSlots;
-    export let selectedDate = null;
-    export let selectedTimeSlot = null;
+    export let timeSlots: any[];
+    export let selectedDate: Date | null = null;
+    export let selectedTimeSlot: any = null;
 
     // State
     let visibleStartIndex = 0;
-    let visibleDays = [];
+    let visibleDays: any[] = [];
     let canScrollLeft = false;
     let canScrollRight = true;
 
@@ -24,13 +24,13 @@
         if (selectedDate && timeSlots) {
             // Find the matching day by date
             const matchingDay = timeSlots.find(
-                (day) => day.date.getTime() === selectedDate.getTime(),
+                (day: any) => day.date.getTime() === selectedDate!.getTime(),
             );
 
             if (matchingDay && selectedTimeSlot) {
                 // Find the matching time slot by slot value
                 const matchingSlot = matchingDay.timeSlots.find(
-                    (slot) => slot.slot === selectedTimeSlot,
+                    (slot: any) => slot.slot === selectedTimeSlot,
                 );
 
                 if (matchingSlot) {
@@ -52,14 +52,14 @@
     }
 
     // Handle date selection (only selects, doesn't navigate)
-    function selectDate(date) {
+    function selectDate(date: Date) {
         selectedDate = date;
         selectedTimeSlot = null; // Reset time slot when date changes
         dispatchSelection();
     }
 
     // Handle time slot selection
-    function selectTimeSlot(timeSlot) {
+    function selectTimeSlot(timeSlot: any) {
         selectedTimeSlot = timeSlot;
         dispatchSelection();
     }
@@ -77,7 +77,7 @@
     }
 
     // Scroll date carousel - only changes which days are visible
-    function scrollDates(direction) {
+    function scrollDates(direction: string) {
         if (direction === "left" && canScrollLeft) {
             visibleStartIndex -= 1;
         } else if (direction === "right" && canScrollRight) {
@@ -90,7 +90,8 @@
     // Find currently visible time slots for the selected date
     $: currentDateTimeSlots =
         timeSlots.find(
-            (d) => selectedDate && d.date.getTime() === selectedDate.getTime(),
+            (d: any) =>
+                selectedDate && d.date.getTime() === selectedDate.getTime(),
         )?.timeSlots || [];
 
     // Update visible days when slots change
@@ -122,7 +123,13 @@
                     day.date.getTime() === selectedDate.getTime()
                         ? 'selected'
                         : ''}"
+                    role="button"
+                    tabindex="0"
                     on:click={() => selectDate(day.date)}
+                    on:keydown={(e) => {
+                        if (e.key === "Enter" || e.key === " ")
+                            selectDate(day.date);
+                    }}
                 >
                     <div class="date-card-day">{day.dayOfWeek}</div>
                     <div class="date-card-date">{day.dateFormatted}</div>
@@ -152,7 +159,13 @@
                             : selectedTimeSlot.id === timeSlot.id)
                             ? 'selected'
                             : ''}"
+                        role="button"
+                        tabindex="0"
                         on:click={() => selectTimeSlot(timeSlot)}
+                        on:keydown={(e) => {
+                            if (e.key === "Enter" || e.key === " ")
+                                selectTimeSlot(timeSlot);
+                        }}
                     >
                         <div class="time-slot-time">{timeSlot.display}</div>
                     </div>

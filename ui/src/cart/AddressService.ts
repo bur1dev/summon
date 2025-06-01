@@ -182,7 +182,9 @@ export class AddressService {
         // Return the first address if no default
         if (addressMap.size > 0) {
             const firstEntry = addressMap.entries().next().value;
-            return { hash: firstEntry[0], address: firstEntry[1] };
+            if (firstEntry) {
+                return { hash: firstEntry[0], address: firstEntry[1] };
+            }
         }
 
         return null;

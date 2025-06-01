@@ -8,23 +8,22 @@
     // Required props
     export let title: string;
     export let identifier: string;
-    export let products = [];
-    export let currentRanges;
-    export let totalProducts = {};
-    export let store;
+    export let products: any[] = [];
+    export let currentRanges: Record<string, any>;
+    export let totalProducts: Record<string, any> = {};
     export let productDataService: ProductDataService;
-    export let selectedCategory;
-    export let selectedSubcategory;
-    export let mainGridContainer;
+    export let selectedCategory: string;
+    export let selectedSubcategory: string;
+    export let mainGridContainer: HTMLElement;
     export let isProductType = false;
     export let onViewMore = () => {};
-    export let action;
-    export let hasMore = {};
+    export let action: any;
+    export let hasMore: Record<string, any> = {};
     export let containerCapacity = 4;
 
     const dispatch = createEventDispatcher();
 
-    function handleReportCategory(event) {
+    function handleReportCategory(event: CustomEvent) {
         dispatch("reportCategory", event.detail);
     }
 </script>
@@ -36,7 +35,12 @@
         </div>
         <span
             class="view-all-link btn btn-text"
+            role="button"
+            tabindex="0"
             on:click|stopPropagation={onViewMore}
+            on:keydown|stopPropagation={(e) => {
+                if (e.key === "Enter" || e.key === " ") onViewMore();
+            }}
         >
             View More
             <ChevronRight size={20} class="chevron-icon" />
@@ -51,7 +55,6 @@
             {currentRanges}
             {totalProducts}
             {identifier}
-            {store}
             {selectedCategory}
             {selectedSubcategory}
             {mainGridContainer}
@@ -81,7 +84,6 @@
             {currentRanges}
             {totalProducts}
             {identifier}
-            {store}
             {selectedCategory}
             {selectedSubcategory}
             {mainGridContainer}

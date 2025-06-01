@@ -20,8 +20,8 @@
 
   let selectedCategory = null; // This is shadowed by the store, consider removing local if not needed
   let selectedSubcategory = null; // This is shadowed by the store, consider removing local if not needed
-  let sidebarElement;
-  let headerElement;
+  let sidebarElement: HTMLElement;
+  let headerElement: HTMLElement;
 
   // Subscribe to the stores to keep local variables in sync
   // These lines are fine if you need local copies for some reason,
@@ -29,7 +29,7 @@
   $: selectedCategory = $selectedCategoryStore;
   $: selectedSubcategory = $selectedSubcategoryStore;
 
-  function selectCategory(category) {
+  function selectCategory(category: string) {
     currentPage = 0;
     $selectedCategoryStore = category;
     $selectedSubcategoryStore = null;
@@ -39,7 +39,7 @@
       if (sidebarElement && headerElement) {
         const selectedElement = sidebarElement.querySelector(
           ".category-item.active",
-        );
+        ) as HTMLElement;
 
         if (selectedElement) {
           const actualHeaderHeight = headerElement.offsetHeight;
@@ -82,7 +82,7 @@
     dispatch("categorySelect", { category, subcategory: null });
   }
 
-  function selectSubcategory(subcategory) {
+  function selectSubcategory(subcategory: string) {
     currentPage = 0;
     $selectedSubcategoryStore = subcategory; // This uses the store directly
     $isHomeViewStore = false;
@@ -109,7 +109,15 @@
 
 <div class="sidebar" bind:this={sidebarElement}>
   <div class="sidebar-header" bind:this={headerElement}>
-    <div class="store-logo-container btn btn-toggle active" on:click={goToHome}>
+    <div
+      class="store-logo-container btn btn-toggle active"
+      role="button"
+      tabindex="0"
+      on:click={goToHome}
+      on:keydown={(e) => {
+        if (e.key === "Enter" || e.key === " ") goToHome();
+      }}
+    >
       <div class="store-name">Ralphs Store</div>
     </div>
   </div>
@@ -120,7 +128,12 @@
         class="category-item btn btn-toggle {selectedCategory === category.name
           ? 'active'
           : ''}"
+        role="button"
+        tabindex="0"
         on:click={() => selectCategory(category.name)}
+        on:keydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") selectCategory(category.name);
+        }}
       >
         {category.name}
       </div>
@@ -132,7 +145,13 @@
             subcategory.name
               ? 'active'
               : ''}"
+            role="button"
+            tabindex="0"
             on:click|stopPropagation={() => selectSubcategory(subcategory.name)}
+            on:keydown|stopPropagation={(e) => {
+              if (e.key === "Enter" || e.key === " ")
+                selectSubcategory(subcategory.name);
+            }}
           >
             {subcategory.name}
           </div>

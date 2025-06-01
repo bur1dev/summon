@@ -6,13 +6,13 @@
         onDestroy,
     } from "svelte";
     import { get, type Writable } from "svelte/store"; // Import get
-    import type { SimpleCartService } from "./cart/SimpleCartService";
+    import type { CartBusinessService } from "./cart/CartBusinessService";
     import { X, Plus, Minus, ArrowLeft, Save } from "lucide-svelte";
 
     const dispatch = createEventDispatcher();
-    // cartServiceStore holds the store from context, which in turn holds the SimpleCartService instance (or null)
+    // cartServiceStore holds the store from context, which in turn holds the CartBusinessService instance (or null)
     const cartServiceStore =
-        getContext<Writable<SimpleCartService | null>>("cartService");
+        getContext<Writable<CartBusinessService | null>>("cartService");
 
     export let isOpen = false;
     export let product;

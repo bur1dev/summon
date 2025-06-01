@@ -4,11 +4,13 @@
         encodeHashToBase64,
         decodeHashFromBase64,
     } from "@holochain/client";
-    import { AddressService, type Address } from "./AddressService";
+    import { AddressService } from "./AddressService";
+    import type { Address } from "./AddressService";
+    import type { CartBusinessService } from "./CartBusinessService";
     import type {
         DeliveryTimeSlot,
         CheckoutDetails,
-    } from "./SimpleCartService";
+    } from "./CartBusinessService";
     import AddressSelector from "./AddressSelector.svelte";
     import DeliveryTimeSelector from "./DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";
@@ -17,8 +19,7 @@
 
     // Define an interface for the decoded product group
     interface ProductGroup {
-        products: any[]; // Ideally, replace 'any' with a more specific Product type if available
-        // Add other expected properties of a product group if known
+        products: any[];
     }
 
     // Import agent-avatar component
@@ -26,7 +27,7 @@
 
     // Props
     export let client: any;
-    export let cartService: any;
+    export let cartService: CartBusinessService;
     export let cartItems = [];
     export let productDetails = {};
     export let cartTotal = 0;

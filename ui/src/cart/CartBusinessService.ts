@@ -1,7 +1,8 @@
 import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
-import { writable, derived, get, type Writable, type Readable } from 'svelte/store'; // Added Writable, Readable
-import { decode } from "@msgpack/msgpack";
-import type { DecodedProductGroupEntry } from "../search/search-utils";
+import { writable, derived, get, type Writable, type Readable } from 'svelte/store';
+import type { ProductDataService } from "../ProductDataService";
+import { CartPersistenceService } from "./CartPersistenceService";
+import { CartCalculationService } from "./CartCalculationService";
 
 // Type for delivery time
 export interface DeliveryTimeSlot {
@@ -19,36 +20,36 @@ export interface CheckoutDetails {
 // Type alias for base64-encoded action hash
 type ActionHashB64 = string;
 
-// Interface for Svelte context
-export interface CartServiceContext {
-    cartTotal: Writable<number>;
-    uniqueItemCount: Readable<number>; // Derived stores are Readable
-    // If other methods/stores from SimpleCartService are accessed via context, add them here.
+interface CartItem {
+    groupHash: ActionHashB64;
+    productIndex: number;
+    quantity: number;
+    timestamp: number;
+    note?: string;
 }
 
-export class SimpleCartService {
-    // Stores
-    private cartItems = writable<Array<{
-        groupHash: ActionHashB64,
-        productIndex: number,
-        quantity: number,
-        timestamp: number,
-        note?: string
-    }>>([]);
+// Define the ProductGroup interface for decoded data
+interface DecodedProductGroup {
+    products: any[];
+    category: string;
+    subcategory?: string;
+    product_type?: string;
+    additional_categorizations?: any[];
+}
 
-    // Local cart management - NEW
-    private localCartItems: Array<{
-        groupHash: ActionHashB64,
-        productIndex: number,
-        quantity: number,
-        timestamp: number,
-        note?: string
-    }> = [];
-    private syncTimeoutId: ReturnType<typeof setTimeout> | null = null;
-    private syncInterval = 3000; // 3 seconds
+export class CartBusinessService {
+    // Services
+    private persistenceService: CartPersistenceService;
+    private calculationService: CartCalculationService;
+
+    // Stores
+    private cartItems = writable<CartItem[]>([]);
+
+    // Local cart management
+    private localCartItems: CartItem[] = [];
     private isInitialized = false;
 
-    // New store for saved delivery details
+    // Store for saved delivery details
     private savedDeliveryDetails = writable<CheckoutDetails>({});
 
     // Derived stores for UI
@@ -70,39 +71,39 @@ export class SimpleCartService {
     // Loading state to track data loading operations
     public loading = writable(true);
 
-    // Product store reference for price lookup
-    private productStore: any = null;
+    constructor(public client: any, productDataService?: ProductDataService) {
+        this.persistenceService = new CartPersistenceService(client);
+        this.calculationService = new CartCalculationService(productDataService);
 
-    constructor(public client: any) {
         this.cartItems.set([]);
         this.cartTotal.set(0);
         this.cartPromoTotal.set(0);
         this.loading.set(true);
 
-        // Add event listener for page unload to sync cart
-        window.addEventListener('beforeunload', () => {
-            this.forceSyncToHolochain();
-        });
-
         // Initialize asynchronously
         this.initialize();
     }
 
-    // Set product store reference (called from Controller)
-    public setProductStore(productStore: any) {
-        this.productStore = productStore;
+    // Set ProductDataService reference (called from Controller)
+    public setProductDataService(productDataService: ProductDataService): void {
+        this.calculationService.setProductDataService(productDataService);
 
         // Force immediate recalculation
         setTimeout(() => this.recalculateCartTotal(), 0);
     }
 
-    private async initialize() {
+    private async initialize(): Promise<void> {
         try {
             this.ready.set(false);
             this.loading.set(true);
 
             // First check localStorage
-            await this.loadFromLocalStorage();
+            const localItems = await this.persistenceService.loadFromLocalStorage();
+            if (localItems.length > 0) {
+                this.localCartItems = localItems;
+                this.cartItems.set(localItems);
+                await this.recalculateCartTotal();
+            }
 
             if (this.client) {
                 // Wait a bit to ensure Holochain connection is ready
@@ -125,220 +126,45 @@ export class SimpleCartService {
         }
     }
 
-    // NEW: Load cart from localStorage
-    private async loadFromLocalStorage() {
-        try {
-            const storedCart = localStorage.getItem('cart');
-            if (storedCart) {
-                const parsedCart = JSON.parse(storedCart);
-                console.log("Loaded cart from localStorage:", parsedCart);
-
-                if (Array.isArray(parsedCart)) {
-                    this.localCartItems = parsedCart;
-                    this.cartItems.set(parsedCart);
-
-                    // Calculate cart total based on local items
-                    await this.recalculateCartTotal();
-                }
-            }
-        } catch (error) {
-            console.error('Error loading cart from localStorage:', error);
-        }
-    }
-
-    // NEW: Save cart to localStorage
-    private saveToLocalStorage() {
-        try {
-            localStorage.setItem('cart', JSON.stringify(this.localCartItems));
-        } catch (error) {
-            console.error('Error saving cart to localStorage:', error);
-        }
-    }
-
-    // NEW: Schedule sync to Holochain with debounce
-    private scheduleSyncToHolochain() {
-        if (this.syncTimeoutId) {
-            clearTimeout(this.syncTimeoutId);
-        }
-
-        this.syncTimeoutId = setTimeout(() => {
-            this.syncToHolochain();
-        }, this.syncInterval);
-    }
-
-    // NEW: Force immediate sync to Holochain
-    private forceSyncToHolochain() {
-        if (this.syncTimeoutId) {
-            clearTimeout(this.syncTimeoutId);
-            this.syncTimeoutId = null;
-        }
-
-        // Only sync if there are items and we're initialized
-        if (this.isInitialized && this.localCartItems.length > 0) {
-            this.syncToHolochain();
-        }
-    }
-
-    // NEW: Sync cart to Holochain
-    private async syncToHolochain() {
-        if (!this.client || !this.isInitialized) return;
+    // Load cart from Holochain
+    public async loadCart(): Promise<void> {
+        this.loading.set(true);
 
         try {
-            console.log("Syncing cart to Holochain:", this.localCartItems);
+            const holochainItems = await this.persistenceService.loadFromPrivateEntry();
 
-            await this.client.callZome({
-                role_name: 'grocery',
-                zome_name: 'cart',
-                fn_name: 'replace_private_cart',
-                payload: {
-                    items: this.localCartItems,
-                    last_updated: Date.now()
-                }
-            });
-
-            console.log("Cart successfully synced to Holochain");
-
-            // Clear localStorage after successful sync to avoid stale data
-            // We'll keep the memory version but not persist old data
-            localStorage.removeItem('cart');
-        } catch (error) {
-            console.error('Error syncing cart to Holochain:', error);
-        } finally {
-            this.syncTimeoutId = null;
-        }
-    }
-
-    // Load cart from Holochain private entry - MODIFIED
-    private async loadFromPrivateEntry() {
-        try {
-            if (!this.client) {
-                console.warn("No client available for loadFromPrivateEntry");
-                return;
-            }
-
-            const result = await this.client.callZome({
-                role_name: 'grocery',
-                zome_name: 'cart',
-                fn_name: 'get_private_cart',
-                payload: null
-            });
-
-            if (result && result.items) {
-                // Transform items to the expected format
-                const cartItems = result.items.map(item => {
-                    const hashBase64 = encodeHashToBase64(item.group_hash);
-
-                    return {
-                        groupHash: hashBase64,
-                        productIndex: item.product_index,
-                        quantity: item.quantity,
-                        timestamp: item.timestamp,
-                        note: item.note
-                    };
-                });
-
-                // Filter out any invalid items
-                const validItems = cartItems.filter(item =>
-                    item && item.groupHash && item.productIndex !== undefined);
-
-
-                // Merge with local cart if needed
+            if (holochainItems.length > 0) {
                 if (this.localCartItems.length > 0) {
                     console.log("Merging Holochain cart with local cart");
-                    this.mergeLocalAndHolochainCarts(validItems);
+                    this.localCartItems = this.persistenceService.mergeLocalAndHolochainCarts(
+                        this.localCartItems,
+                        holochainItems
+                    );
                 } else {
                     // No local items, just use Holochain items
-                    this.localCartItems = validItems;
+                    this.localCartItems = holochainItems;
                 }
 
                 // Update the svelte store
                 this.cartItems.set([...this.localCartItems]);
 
                 // Save to localStorage
-                this.saveToLocalStorage();
+                this.persistenceService.saveToLocalStorage(this.localCartItems);
 
                 // Recalculate cart total after loading items
                 await this.recalculateCartTotal();
-            } else {
-                console.log("No items in private cart or invalid result");
-
+            } else if (this.localCartItems.length > 0) {
                 // If we have local items but nothing in Holochain, sync to Holochain
-                if (this.localCartItems.length > 0) {
-                    this.forceSyncToHolochain();
-                }
+                this.persistenceService.forceSyncToHolochain(this.localCartItems);
             }
         } catch (error) {
-            console.error('Error loading cart from private entry:', error);
-        }
-    }
-
-    // NEW: Merge local and Holochain carts
-    private mergeLocalAndHolochainCarts(holochainItems: Array<{
-        groupHash: ActionHashB64,
-        productIndex: number,
-        quantity: number,
-        timestamp: number,
-        note?: string
-    }>) {
-        // Create a map of Holochain items for quick lookup
-        const holochainItemsMap = new Map();
-        holochainItems.forEach(item => {
-            const key = `${item.groupHash}_${item.productIndex}`;
-            holochainItemsMap.set(key, item);
-        });
-
-        // Create a map of local items
-        const localItemsMap = new Map();
-        this.localCartItems.forEach(item => {
-            const key = `${item.groupHash}_${item.productIndex}`;
-            localItemsMap.set(key, item);
-        });
-
-        // Merge strategy: Use the item with the most recent timestamp
-        const mergedItems: Array<{
-            groupHash: ActionHashB64,
-            productIndex: number,
-            quantity: number,
-            timestamp: number,
-            note?: string
-        }> = [];
-
-        // Add all local items, updating with Holochain items if needed
-        for (const [key, localItem] of localItemsMap.entries()) {
-            const holochainItem = holochainItemsMap.get(key);
-
-            if (holochainItem && holochainItem.timestamp > localItem.timestamp) {
-                // Holochain item is newer
-                mergedItems.push(holochainItem);
-            } else {
-                // Local item is newer or no Holochain item
-                mergedItems.push(localItem);
-            }
-
-            // Remove from Holochain map to track what's been processed
-            holochainItemsMap.delete(key);
+            console.error('Error loading cart from Holochain:', error);
         }
 
-        // Add remaining Holochain items that aren't in local
-        for (const [key, holochainItem] of holochainItemsMap.entries()) {
-            mergedItems.push(holochainItem);
-        }
-
-        // Filter out zero quantity items
-        const filteredItems = mergedItems.filter(item => item.quantity > 0);
-
-        // Update local cart
-        this.localCartItems = filteredItems;
-    }
-
-    // Load cart from Holochain
-    public async loadCart() {
-        this.loading.set(true);
-        await this.loadFromPrivateEntry();
         this.loading.set(false);
     }
 
-    // Add product to cart (or update quantity) - MODIFIED for notes
+    // Add product to cart (or update quantity)
     public async addToCart(groupHash: ActionHashB64, productIndex: number, quantity: number = 1, note?: string) {
         try {
             if (!groupHash) {
@@ -370,7 +196,7 @@ export class SimpleCartService {
             await this.updateCartTotalDelta(standardizedHash, productIndex, quantityDelta);
 
             // Schedule sync to Holochain
-            this.scheduleSyncToHolochain();
+            this.persistenceService.scheduleSyncToHolochain(this.localCartItems);
 
             return { success: true, local: true };
         } catch (error) {
@@ -379,50 +205,29 @@ export class SimpleCartService {
         }
     }
 
-    // UPDATED: Add this new method to handle promo price delta
-    private async updateCartTotalDelta(groupHash: ActionHashB64, productIndex: number, quantityDelta: number) {
+    // Update cart total with delta calculation
+    private async updateCartTotalDelta(groupHash: ActionHashB64, productIndex: number, quantityDelta: number): Promise<void> {
         if (quantityDelta === 0) return;
 
         try {
-            // Get product details
-            const groupHashDecoded = decodeHashFromBase64(groupHash);
-            const result = await this.productStore.client.callZome({
-                role_name: 'grocery',
-                zome_name: 'products',
-                fn_name: 'get_product_group',
-                payload: groupHashDecoded
+            const delta = await this.calculationService.calculateItemDelta(groupHash, productIndex, quantityDelta);
+
+            this.cartTotal.update(current => {
+                const newTotal = current + delta.regular;
+                return newTotal < 0 ? 0 : newTotal;
             });
 
-            if (result) {
-                const group = decode(result.entry.Present.entry) as DecodedProductGroupEntry | null;
-                if (group?.products?.[productIndex]) {
-                    const product = group.products[productIndex];
-
-                    // Calculate both regular and promo price changes
-                    const regularPriceChange = product.price * quantityDelta;
-                    const promoPriceChange = (product.promo_price || product.price) * quantityDelta;
-
-                    // Log for debugging
-                    console.log(`Price change - Regular: ${regularPriceChange}, Promo: ${promoPriceChange}`);
-
-                    this.cartTotal.update(current => {
-                        const newTotal = current + regularPriceChange;
-                        return newTotal < 0 ? 0 : newTotal;
-                    });
-
-                    this.cartPromoTotal.update(current => {
-                        const newTotal = current + promoPriceChange;
-                        return newTotal < 0 ? 0 : newTotal;
-                    });
-                }
-            }
+            this.cartPromoTotal.update(current => {
+                const newTotal = current + delta.promo;
+                return newTotal < 0 ? 0 : newTotal;
+            });
         } catch (error) {
             console.error('Error updating cart total delta:', error);
             this.recalculateCartTotal();
         }
     }
 
-    // Add to SimpleCartService
+    // Clear cart
     public async clearCart() {
         try {
             // Clear local cart immediately
@@ -430,10 +235,10 @@ export class SimpleCartService {
             this.cartItems.set([]);
             this.cartTotal.set(0);
             this.cartPromoTotal.set(0);
-            this.saveToLocalStorage();
+            this.persistenceService.saveToLocalStorage([]);
 
             // Schedule sync to Holochain
-            this.scheduleSyncToHolochain();
+            this.persistenceService.scheduleSyncToHolochain([]);
 
             return { success: true };
         } catch (error) {
@@ -442,8 +247,7 @@ export class SimpleCartService {
         }
     }
 
-
-    private updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantity: number, note?: string) {
+    private updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantity: number, note?: string): void {
         const currentTime = Date.now();
         const itemIndex = this.localCartItems.findIndex(item =>
             item.groupHash === groupHash && item.productIndex === productIndex
@@ -475,28 +279,26 @@ export class SimpleCartService {
         this.cartItems.set([...this.localCartItems]);
 
         // Save to localStorage
-        this.saveToLocalStorage();
-
-        // NOTE: The explicit recalculateCartTotal() call was removed from here.
-        // addToCart and similar functions should rely on updateCartTotalDelta for incremental updates.
-        // Full recalculations are handled by loadCart, clearCart, etc.
+        this.persistenceService.saveToLocalStorage(this.localCartItems);
     }
 
-    // Force sync before checkout
-    public async syncBeforeCheckout() {
-        return this.forceSyncToHolochain();
+    // Recalculate cart total completely
+    private async recalculateCartTotal(): Promise<void> {
+        try {
+            const totals = await this.calculationService.calculateCartTotals(this.localCartItems);
+            this.cartTotal.set(totals.regular);
+            this.cartPromoTotal.set(totals.promo);
+        } catch (error) {
+            console.error('Error recalculating cart total:', error);
+        }
     }
 
     // Checkout the current cart with delivery details
     public async checkoutCart(details: CheckoutDetails) {
         try {
             if (this.client) {
-                // Skip force sync to avoid race condition
                 // Cancel any pending sync
-                if (this.syncTimeoutId) {
-                    clearTimeout(this.syncTimeoutId);
-                    this.syncTimeoutId = null;
-                }
+                this.persistenceService.forceSyncToHolochain([]);
 
                 // Use local cart items directly
                 let cartProducts = this.localCartItems.map(item => {
@@ -555,7 +357,7 @@ export class SimpleCartService {
                 this.cartItems.set([]);
                 this.cartTotal.set(0);
                 this.cartPromoTotal.set(0);
-                this.saveToLocalStorage();
+                this.persistenceService.saveToLocalStorage([]);
 
                 // Clear saved delivery details
                 this.savedDeliveryDetails.set({});
@@ -571,332 +373,15 @@ export class SimpleCartService {
         }
     }
 
-    // UPDATED: Recalculate both regular and promo cart totals
-    private async recalculateCartTotal() {
-        if (!this.productStore) {
-            console.log("Cannot calculate cart total - product store not set");
-            return;
-        }
-
-        if (this.localCartItems.length === 0) {
-            this.cartTotal.set(0);
-            this.cartPromoTotal.set(0);
-            return;
-        }
-
-        let regularTotal = 0;
-        let promoTotal = 0;
-
-        for (const item of this.localCartItems) {
-            try {
-                // Skip invalid items
-                if (!item || !item.groupHash) {
-                    console.warn("Skipping invalid cart item", item);
-                    continue;
-                }
-
-                // Check if the groupHash needs to be converted from comma-separated to base64
-                let groupHashBase64 = item.groupHash;
-                if (typeof item.groupHash === 'string' && item.groupHash.includes(',')) {
-                    // It's a comma-separated string, convert to proper base64
-                    const byteArray = new Uint8Array(item.groupHash.split(',').map(Number));
-                    groupHashBase64 = encodeHashToBase64(byteArray);
-                }
-
-                // Get the product group using the proper method
-                const groupHash = decodeHashFromBase64(groupHashBase64);
-                const result = await this.productStore.client.callZome({
-                    role_name: 'grocery',
-                    zome_name: 'products',
-                    fn_name: 'get_product_group',
-                    payload: groupHash
-                });
-
-                if (result) {
-                    const group = decode(result.entry.Present.entry) as DecodedProductGroupEntry | null;
-
-                    // Extract the specific product from the group by index
-                    if (group && group.products && group.products[item.productIndex]) {
-                        const product = group.products[item.productIndex];
-                        if (product && product.price) {
-                            // Add to regular total
-                            regularTotal += product.price * item.quantity;
-
-                            // Add to promo total (use promo_price if exists, otherwise regular price)
-                            const promoPrice = product.promo_price && product.promo_price < product.price
-                                ? product.promo_price
-                                : product.price;
-                            promoTotal += promoPrice * item.quantity;
-
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error calculating cart total:', error);
-            }
-        }
-
-        console.log(`Setting cart totals - Regular: ${regularTotal}, Promo: ${promoTotal}`);
-        this.cartTotal.set(regularTotal);
-        this.cartPromoTotal.set(promoTotal);
-    }
-
-    // Load checked out carts
-    public async loadCheckedOutCarts() {
-        try {
-            if (this.client) {
-                console.log("Loading checked out carts...");
-                const result = await this.client.callZome({
-                    role_name: 'grocery',
-                    zome_name: 'cart',
-                    fn_name: 'get_checked_out_carts',
-                    payload: null
-                });
-
-                console.log("Loaded checked out carts:", result);
-
-                // Process the results to make them easier to use in the UI
-                const processedCarts = await this.processCheckedOutCarts(result);
-
-                return { success: true, data: processedCarts };
-            } else {
-                console.warn("No Holochain client available for loading checked out carts");
-                return { success: false, message: "No Holochain client available" };
-            }
-        } catch (error) {
-            console.error('Error loading checked out carts:', error);
-            return { success: false, message: error.toString() };
-        }
-    }
-
-    // Process checked out carts to add product details and delivery info
-    private async processCheckedOutCarts(carts) {
-        console.log("Processing checked out carts from Holochain:", carts);
-
-        if (!this.productStore) {
-            return carts;
-        }
-
-        // For each cart, enrich products with details
-        return Promise.all(carts.map(async (cart) => {
-            const cartHash = encodeHashToBase64(cart.cart_hash);
-            const {
-                id,
-                products,
-                total,
-                created_at,
-                status,
-                address_hash,
-                delivery_instructions,
-                delivery_time
-            } = cart.cart;
-
-            // Get product details for each product
-            const productsWithDetails = await Promise.all(products.map(async (product) => {
-                if (!product || !product.group_hash) {
-                    return {
-                        groupHash: "",
-                        productIndex: 0,
-                        quantity: 0,
-                        details: null,
-                        note: null
-                    };
-                }
-
-                const groupHash = encodeHashToBase64(product.group_hash);
-                let details = null;
-
-                try {
-                    // Use zome call instead of store method to get proper group format
-                    const groupHashDecoded = decodeHashFromBase64(groupHash);
-                    const result = await this.client.callZome({
-                        role_name: 'grocery',
-                        zome_name: 'products',
-                        fn_name: 'get_product_group',
-                        payload: groupHashDecoded
-                    });
-
-                    if (result) {
-                        const group = decode(result.entry.Present.entry) as DecodedProductGroupEntry | null;
-
-                        if (group && group.products && group.products[product.product_index]) {
-                            details = group.products[product.product_index];
-                        }
-                    }
-                } catch (error) {
-                    console.error(`Failed to get product details for group ${groupHash} index ${product.product_index}:`, error);
-                }
-
-                return {
-                    groupHash: groupHash,
-                    productIndex: product.product_index,
-                    quantity: product.quantity,
-                    details,
-                    note: product.note
-                };
-            }));
-
-            // Calculate actual total based on current prices
-            let calculatedTotal = 0;
-            for (const product of productsWithDetails) {
-                if (product.details && product.details.price) {
-                    calculatedTotal += product.details.price * product.quantity;
-                }
-            }
-
-            // Format creation date
-            const creationDate = new Date(created_at / 1000);
-            const formattedDate = creationDate.toLocaleString();
-
-            // Add delivery info
-            let addressHashString = null;
-            if (address_hash) {
-                addressHashString = encodeHashToBase64(address_hash);
-            }
-
-            // Format delivery time if available
-            let formattedDeliveryTime = null;
-            if (delivery_time) {
-                const deliveryDate = new Date(delivery_time.date);
-                formattedDeliveryTime = {
-                    date: deliveryDate.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric'
-                    }),
-                    time: delivery_time.time_slot,
-                    raw: delivery_time
-                };
-            }
-
-            return {
-                id,
-                cartHash,
-                products: productsWithDetails,
-                total: calculatedTotal > 0 ? calculatedTotal : total,
-                createdAt: formattedDate,
-                status,
-                addressHash: addressHashString,
-                deliveryInstructions: delivery_instructions,
-                deliveryTime: formattedDeliveryTime
-            };
-        }));
-    }
-
-    // Return to shopping - FIXED RACE CONDITION
-    public async returnToShopping(cartHash: ActionHashB64) {
-        try {
-            if (this.client) {
-                console.log("START: returnToShopping for hash:", cartHash);
-                // Get the cart details before returning to shopping
-                const cartsResult = await this.loadCheckedOutCarts();
-                console.log("Cart lookup result:", cartsResult);
-
-                if (cartsResult.success && Array.isArray(cartsResult.data)) {
-                    const cart = cartsResult.data.find(c => c.cartHash === cartHash);
-                    console.log("Found cart to return:", cart);
-
-                    if (cart) {
-                        // Save delivery details before returning to shopping
-                        this.savedDeliveryDetails.set({
-                            addressHash: cart.addressHash,
-                            deliveryInstructions: cart.deliveryInstructions,
-                            deliveryTime: cart.deliveryTime?.raw
-                        });
-
-                        console.log("Saved delivery details:", get(this.savedDeliveryDetails));
-
-                        // Add products back to local cart first
-                        console.log("Adding products back to cart:", cart.products.length);
-
-                        // Clear existing cart
-                        this.localCartItems = [];
-
-                        // Add each product
-                        for (const product of cart.products) {
-                            if (product && product.groupHash) {
-                                this.localCartItems.push({
-                                    groupHash: product.groupHash,
-                                    productIndex: product.productIndex,
-                                    quantity: product.quantity,
-                                    timestamp: Date.now(),
-                                    note: product.note
-                                });
-                            }
-                        }
-
-                        // Update UI
-                        this.cartItems.set([...this.localCartItems]);
-
-                        // Save to localStorage
-                        this.saveToLocalStorage();
-
-                        // Recalculate total
-                        await this.recalculateCartTotal();
-
-                        // IMPORTANT: First call the zome function BEFORE syncing to avoid source chain errors
-                        console.log("CALLING zome: return_to_shopping with hash:", cartHash);
-                        try {
-                            const result = await this.client.callZome({
-                                role_name: 'grocery',
-                                zome_name: 'cart',
-                                fn_name: 'return_to_shopping',
-                                payload: decodeHashFromBase64(cartHash)
-                            });
-                            console.log("SUCCESS: Zome call result:", result);
-
-                            // Only force sync to Holochain AFTER zome call completes successfully
-                            await this.forceSyncToHolochain();
-                        } catch (e) {
-                            console.error("ERROR: Zome call failed:", e);
-                            throw e;
-                        }
-                    }
-                }
-
-                return { success: true };
-            } else {
-                console.warn("No Holochain client available for returning to shopping");
-                return { success: false, message: "No Holochain client available" };
-            }
-        } catch (error) {
-            console.error('Error returning cart to shopping:', error);
-            return { success: false, message: error.toString() };
-        }
-    }
-
     // Get current cart items
-    public getCartItems() {
-        // Return local cart items
+    public getCartItems(): CartItem[] {
         return this.localCartItems;
     }
 
     // Subscribe to cart changes
-    public subscribe(callback: (items: any[]) => void) {
-        // Initial callback with current state
+    public subscribe(callback: (items: CartItem[]) => void) {
         callback(this.localCartItems);
         return this.cartItems.subscribe(callback);
-    }
-
-    // Get saved delivery details
-    public getSavedDeliveryDetails() {
-        return get(this.savedDeliveryDetails);
-    }
-
-    // Subscribe to saved delivery details changes
-    public subscribeSavedDeliveryDetails(callback: (details: CheckoutDetails) => void) {
-        return this.savedDeliveryDetails.subscribe(callback);
-    }
-
-    // Set saved delivery details
-    public setSavedDeliveryDetails(details: CheckoutDetails) {
-        this.savedDeliveryDetails.set(details);
-    }
-
-    // Clear saved delivery details
-    public clearSavedDeliveryDetails() {
-        this.savedDeliveryDetails.set({});
     }
 
     // Generate available delivery time slots
@@ -989,7 +474,251 @@ export class SimpleCartService {
         return days;
     }
 
-    // Get product preference for a specific product
+    // Delivery details management
+    public getSavedDeliveryDetails(): CheckoutDetails {
+        return get(this.savedDeliveryDetails);
+    }
+
+    public subscribeSavedDeliveryDetails(callback: (details: CheckoutDetails) => void) {
+        return this.savedDeliveryDetails.subscribe(callback);
+    }
+
+    public setSavedDeliveryDetails(details: CheckoutDetails): void {
+        this.savedDeliveryDetails.set(details);
+    }
+
+    public clearSavedDeliveryDetails(): void {
+        this.savedDeliveryDetails.set({});
+    }
+
+    // Load checked out carts
+    public async loadCheckedOutCarts() {
+        try {
+            if (this.client) {
+                console.log("Loading checked out carts...");
+                const result = await this.client.callZome({
+                    role_name: 'grocery',
+                    zome_name: 'cart',
+                    fn_name: 'get_checked_out_carts',
+                    payload: null
+                });
+
+                console.log("Loaded checked out carts:", result);
+
+                // Process the results to make them easier to use in the UI
+                const processedCarts = await this.processCheckedOutCarts(result);
+
+                return { success: true, data: processedCarts };
+            } else {
+                console.warn("No Holochain client available for loading checked out carts");
+                return { success: false, message: "No Holochain client available" };
+            }
+        } catch (error) {
+            console.error('Error loading checked out carts:', error);
+            return { success: false, message: error.toString() };
+        }
+    }
+
+    // Process checked out carts to add product details and delivery info
+    private async processCheckedOutCarts(carts: any[]) {
+        console.log("Processing checked out carts from Holochain:", carts);
+
+        // For each cart, enrich products with details
+        return Promise.all(carts.map(async (cart) => {
+            const cartHash = encodeHashToBase64(cart.cart_hash);
+            const {
+                id,
+                products,
+                total,
+                created_at,
+                status,
+                address_hash,
+                delivery_instructions,
+                delivery_time
+            } = cart.cart;
+
+            // Get product details for each product
+            const productsWithDetails = await Promise.all(products.map(async (product: any) => {
+                if (!product || !product.group_hash) {
+                    return {
+                        groupHash: "",
+                        productIndex: 0,
+                        quantity: 0,
+                        details: null,
+                        note: null
+                    };
+                }
+
+                const groupHash = encodeHashToBase64(product.group_hash);
+                let details = null;
+
+                try {
+                    // Use ProductDataService if available
+                    if (this.calculationService && this.calculationService['productDataService']) {
+                        details = await this.calculationService['productDataService'].getProductByReference(groupHash, product.product_index);
+                    } else {
+                        // Fallback to direct zome call
+                        const groupHashDecoded = decodeHashFromBase64(groupHash);
+                        const result = await this.client.callZome({
+                            role_name: 'grocery',
+                            zome_name: 'products',
+                            fn_name: 'get_product_group',
+                            payload: groupHashDecoded
+                        });
+
+                        if (result) {
+                            const { decode } = await import("@msgpack/msgpack");
+                            const group = decode(result.entry.Present.entry) as DecodedProductGroup;
+
+                            if (group && group.products && group.products[product.product_index]) {
+                                details = group.products[product.product_index];
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Failed to get product details for group ${groupHash} index ${product.product_index}:`, error);
+                }
+
+                return {
+                    groupHash: groupHash,
+                    productIndex: product.product_index,
+                    quantity: product.quantity,
+                    details,
+                    note: product.note
+                };
+            }));
+
+            // Calculate actual total based on current prices
+            let calculatedTotal = 0;
+            for (const product of productsWithDetails) {
+                if (product.details && product.details.price) {
+                    calculatedTotal += product.details.price * product.quantity;
+                }
+            }
+
+            // Format creation date
+            const creationDate = new Date(created_at / 1000);
+            const formattedDate = creationDate.toLocaleString();
+
+            // Add delivery info
+            let addressHashString = null;
+            if (address_hash) {
+                addressHashString = encodeHashToBase64(address_hash);
+            }
+
+            // Format delivery time if available
+            let formattedDeliveryTime = null;
+            if (delivery_time) {
+                const deliveryDate = new Date(delivery_time.date);
+                formattedDeliveryTime = {
+                    date: deliveryDate.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }),
+                    time: delivery_time.time_slot,
+                    raw: delivery_time
+                };
+            }
+
+            return {
+                id,
+                cartHash,
+                products: productsWithDetails,
+                total: calculatedTotal > 0 ? calculatedTotal : total,
+                createdAt: formattedDate,
+                status,
+                addressHash: addressHashString,
+                deliveryInstructions: delivery_instructions,
+                deliveryTime: formattedDeliveryTime
+            };
+        }));
+    }
+
+    // Return to shopping
+    public async returnToShopping(cartHash: ActionHashB64) {
+        try {
+            if (this.client) {
+                console.log("START: returnToShopping for hash:", cartHash);
+                // Get the cart details before returning to shopping
+                const cartsResult = await this.loadCheckedOutCarts();
+                console.log("Cart lookup result:", cartsResult);
+
+                if (cartsResult.success && Array.isArray(cartsResult.data)) {
+                    const cart = cartsResult.data.find(c => c.cartHash === cartHash);
+                    console.log("Found cart to return:", cart);
+
+                    if (cart) {
+                        // Save delivery details before returning to shopping
+                        this.savedDeliveryDetails.set({
+                            addressHash: cart.addressHash,
+                            deliveryInstructions: cart.deliveryInstructions,
+                            deliveryTime: cart.deliveryTime?.raw
+                        });
+
+                        console.log("Saved delivery details:", get(this.savedDeliveryDetails));
+
+                        // Add products back to local cart first
+                        console.log("Adding products back to cart:", cart.products.length);
+
+                        // Clear existing cart
+                        this.localCartItems = [];
+
+                        // Add each product
+                        for (const product of cart.products) {
+                            if (product && product.groupHash) {
+                                this.localCartItems.push({
+                                    groupHash: product.groupHash,
+                                    productIndex: product.productIndex,
+                                    quantity: product.quantity,
+                                    timestamp: Date.now(),
+                                    note: product.note
+                                });
+                            }
+                        }
+
+                        // Update UI
+                        this.cartItems.set([...this.localCartItems]);
+
+                        // Save to localStorage
+                        this.persistenceService.saveToLocalStorage(this.localCartItems);
+
+                        // Recalculate total
+                        await this.recalculateCartTotal();
+
+                        // First call the zome function BEFORE syncing to avoid source chain errors
+                        console.log("CALLING zome: return_to_shopping with hash:", cartHash);
+                        try {
+                            const result = await this.client.callZome({
+                                role_name: 'grocery',
+                                zome_name: 'cart',
+                                fn_name: 'return_to_shopping',
+                                payload: decodeHashFromBase64(cartHash)
+                            });
+                            console.log("SUCCESS: Zome call result:", result);
+
+                            // Only force sync to Holochain AFTER zome call completes successfully
+                            this.persistenceService.forceSyncToHolochain(this.localCartItems);
+                        } catch (e) {
+                            console.error("ERROR: Zome call failed:", e);
+                            throw e;
+                        }
+                    }
+                }
+
+                return { success: true };
+            } else {
+                console.warn("No Holochain client available for returning to shopping");
+                return { success: false, message: "No Holochain client available" };
+            }
+        } catch (error) {
+            console.error('Error returning cart to shopping:', error);
+            return { success: false, message: error.toString() };
+        }
+    }
+
+    // Product preference management
     public async getProductPreference(groupHashB64: ActionHashB64, productIndex: number) {
         try {
             if (!this.client) {
@@ -1049,7 +778,7 @@ export class SimpleCartService {
                 is_default: preference.is_default
             };
 
-            // Call the zome function - exactly as declared in #[hdk_extern]
+            // Call the zome function
             const hash = await this.client.callZome({
                 role_name: 'grocery',
                 zome_name: 'cart',

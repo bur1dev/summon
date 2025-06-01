@@ -3,26 +3,27 @@
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import { ChevronRight } from "lucide-svelte";
+    import type { ProductDataService } from "./ProductDataService";
 
     // Required props
     export let title: string;
-    export let identifier: string; // subcategory or productType name
-    export let products = []; // This should be the exact slice of products to display
-    export let currentRanges; // Contains { start, end } for this identifier
-    export let totalProducts = {}; // Contains total estimate for this identifier's path
+    export let identifier: string;
+    export let products = [];
+    export let currentRanges;
+    export let totalProducts = {};
     export let store;
+    export let productDataService: ProductDataService;
     export let selectedCategory;
     export let selectedSubcategory;
-    export let mainGridContainer; // Passed down to NavigationArrows for capacity calculation
+    export let mainGridContainer;
     export let isProductType = false;
     export let onViewMore = () => {};
-    export let action; // For resize observer in ProductBrowser
-    export let hasMore = {}; // New prop to store hasMore values from backend
-    export let containerCapacity = 4; // New prop for dynamic capacity
+    export let action;
+    export let hasMore = {};
+    export let containerCapacity = 4;
 
     const dispatch = createEventDispatcher();
 
-    // Forward report events from ProductCard
     function handleReportCategory(event) {
         dispatch("reportCategory", event.detail);
     }
@@ -41,7 +42,7 @@
             <ChevronRight size={20} class="chevron-icon" />
         </span>
     </div>
-    <!-- Pass identifier to data-subcategory for resize observer -->
+
     <div class="product-row-items" data-subcategory={identifier} use:action>
         <NavigationArrows
             direction="left"
@@ -56,12 +57,11 @@
             {mainGridContainer}
             {containerCapacity}
             {isProductType}
+            {productDataService}
             on:dataLoaded
             on:boundariesInitialized
         />
 
-        <!-- This loop iterates over the 'products' prop directly -->
-        <!-- If 'products' becomes empty, this section will render nothing -->
         {#if products && products.length > 0}
             {#each products as product (product.hash)}
                 <ProductCard
@@ -87,6 +87,7 @@
             {mainGridContainer}
             {containerCapacity}
             {isProductType}
+            {productDataService}
             on:dataLoaded
             on:boundariesInitialized
         />
@@ -127,10 +128,10 @@
     .section-header {
         display: flex;
         justify-content: space-between;
-        align-items: baseline; /* Vertically align items along their text baseline */
+        align-items: baseline;
         width: 100%;
         margin-bottom: var(--spacing-lg);
-        position: relative; /* This is fine, can stay */
+        position: relative;
     }
 
     .view-all-link {
@@ -138,12 +139,8 @@
         font-weight: var(--font-weight-bold);
         text-decoration: none;
         cursor: pointer;
-        /* position: absolute; -- REMOVED */
-        /* right: var(--spacing-lg); -- REMOVED */
-        /* top: var(--content-padding); -- REMOVED */
-        display: flex; /* This is good for aligning the text and icon within the link */
-        align-items: center; /* Aligns "View More" text and the chevron icon vertically */
-        /* The .btn and .btn-text classes already provide padding and other styles */
+        display: flex;
+        align-items: center;
     }
 
     :global(.chevron-icon) {

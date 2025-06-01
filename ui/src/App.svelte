@@ -7,11 +7,11 @@
     encodeHashToBase64,
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
-  import { SimpleCartService } from "./cart/SimpleCartService";
+  import { CartBusinessService } from "./cart/CartBusinessService";
   import { AddressService } from "./cart/AddressService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
-  import { ShopStore, type StoreContext } from "./store"; // ADDED
+  import { ShopStore, type StoreContext } from "./store";
 
   // Import Profiles components
   import { ProfilesStore, ProfilesClient } from "@holochain-open-dev/profiles";
@@ -30,15 +30,14 @@
 
   let client: any;
   let profilesStore: ProfilesStore;
-  let shopStoreInstance: ShopStore | null = null; // MODIFIED: Initialize to null
+  let shopStoreInstance: ShopStore | null = null;
 
   // Create a single cart service that all components can access
   // Start with a writable that we'll set once connected
-  const cartService = writable<SimpleCartService | null>(null);
+  const cartService = writable<CartBusinessService | null>(null);
   setContext("cartService", cartService);
 
   // Create a writable for the address service
-  // We'll keep addressService as a writable store for now if other components consume it this way
   const addressServiceStore = writable<AddressService | null>(null);
   setContext("addressService", addressServiceStore);
 
@@ -81,21 +80,17 @@
     client = await AppWebsocket.connect(params);
 
     // Initialize ShopStore once client is available
-    // The setContext call has been moved to the top level.
-    // We just assign the instance here.
     shopStoreInstance = new ShopStore(client, roleName);
 
     // Now that we have a client, initialize the cart service and set it in the store
-    const simpleCartServiceInstance = new SimpleCartService(client);
-    console.log("SimpleCartService created with client:", !!client);
-    cartService.set(simpleCartServiceInstance); // Set the instance into the cartService store
+    const cartServiceInstance = new CartBusinessService(client);
+    console.log("CartBusinessService created with client:", !!client);
+    cartService.set(cartServiceInstance); // Set the instance into the cartService store
 
     // Initialize the address service
     const addressServiceInstance = new AddressService(client);
     console.log("AddressService created with client:", !!client);
     addressServiceStore.set(addressServiceInstance); // Update the address service store
-
-    // The console.log related to storeObj is removed as storeObj is no longer central to the "store" context.
 
     // Initialize ProfilesStore
     profilesStore = new ProfilesStore(new ProfilesClient(client, "grocery"), {

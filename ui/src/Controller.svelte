@@ -2,6 +2,8 @@
   import ShopView from "./ShopView.svelte";
   import HeaderContainer from "./HeaderContainer.svelte";
   import { ShopStore } from "./store";
+  import { ProductDataService } from "./ProductDataService";
+  import { ProductRowCacheService } from "./ProductRowCacheService";
   import {
     setContext,
     onMount,
@@ -15,7 +17,7 @@
   import { ProfilesStore } from "@holochain-open-dev/profiles";
   import CategorySidebar from "./CategorySidebar.svelte";
   import SlideOutCart from "./cart/SlideOutCart.svelte";
-  import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte"; // Added import
+  import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte";
   import {
     currentViewStore,
     isCartOpenStore,
@@ -28,12 +30,12 @@
     reportedProductStore,
     productNameStore,
     selectedProductHashStore,
-    searchResultsStore, // Changed from fuseResultsStore
+    searchResultsStore,
     isViewAllStore,
     isHomeViewStore,
   } from "./UiStateStore";
   import SidebarMenu from "./SidebarMenu.svelte";
-  import type { SimpleCartService } from "./cart/SimpleCartService";
+  import type { CartBusinessService } from "./cart/CartBusinessService";
 
   export let roleName = "";
   export let client: AppClient;
@@ -41,9 +43,21 @@
   let store: ShopStore = new ShopStore(client, roleName);
   let shopViewComponent; // Reference to the ShopView component
 
+  // Create ProductDataService during initialization
+  // Create global cache service instance if it doesn't exist
+  if (typeof window !== "undefined" && !window.productRowCache) {
+    window.productRowCache = new ProductRowCacheService();
+  }
+
+  const cacheService =
+    typeof window !== "undefined"
+      ? window.productRowCache
+      : new ProductRowCacheService();
+  const productDataService = new ProductDataService(store, cacheService);
+
   // Get cart service from context
   const cartService =
-    getContext<Writable<SimpleCartService | null>>("cartService");
+    getContext<Writable<CartBusinessService | null>>("cartService");
 
   // Get profiles store from context (passed down from profiles-context)
   const profilesStore = getContext("profiles-store");
@@ -54,6 +68,9 @@
   setContext("store", {
     getStore: () => store,
   });
+
+  // Set ProductDataService context during initialization
+  setContext("productDataService", productDataService);
 
   const DEFAULT_BG_IMG = "";
   $: uiProps = store.uiProps;
@@ -75,9 +92,9 @@
 
     store.setUIprops({ showMenu: false });
 
-    // Connect the product store to cart service for price calculations
-    if ($cartService && store.productStore) {
-      $cartService.setProductStore(store.productStore);
+    // Inject ProductDataService into cart service
+    if ($cartService && productDataService) {
+      $cartService.setProductDataService(productDataService);
     }
 
     // Subscribe to the cartTotal from the cart service

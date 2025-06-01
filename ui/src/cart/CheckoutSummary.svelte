@@ -2,7 +2,11 @@
     import { createEventDispatcher, onMount } from "svelte";
     import { PencilLine, Plus, Minus, X, Save } from "lucide-svelte";
     import type { Address } from "./AddressService";
-    import type { DeliveryTimeSlot } from "./SimpleCartService";
+    import type {
+        CartBusinessService,
+        DeliveryTimeSlot,
+    } from "./CartBusinessService";
+    import { PriceService } from "../PriceService";
 
     // Props
     export let cartItems = [];
@@ -11,25 +15,22 @@
     export let deliveryInstructions: string = "";
     export let deliveryTime: { date: Date; display: string };
     export let isCheckingOut = false;
-    export let cartService = null;
+    export let cartService: CartBusinessService = null;
 
-    // Calculate totals with tax - UPDATED with promo totals
+    // Calculate totals with tax using PriceService
     $: {
-        // Calculate regular price total
         let regularTotal = 0;
         let promoTotal = 0;
 
         cartItems.forEach((item) => {
             const product = item.productDetails;
             if (product) {
-                regularTotal += product.price * item.quantity;
-
-                // Use promo price if available, otherwise regular price
-                const priceToUse =
-                    product.promo_price && product.promo_price < product.price
-                        ? product.promo_price
-                        : product.price;
-                promoTotal += priceToUse * item.quantity;
+                const totals = PriceService.calculateItemTotal(
+                    product,
+                    item.quantity,
+                );
+                regularTotal += totals.regular;
+                promoTotal += totals.promo;
             }
         });
 
@@ -37,10 +38,10 @@
         itemsPromoTotal = promoTotal;
         estimatedTax = Math.round(itemsPromoTotal * 0.0775 * 100) / 100; // 7.75% CA sales tax on promo prices
         subtotal = itemsPromoTotal + estimatedTax;
-        totalSavings = regularTotal - promoTotal;
+        totalSavings = PriceService.calculateSavings(regularTotal, promoTotal);
     }
 
-    // UPDATED: Variables for price calculation
+    // Variables for price calculation
     let itemsTotal = 0;
     let itemsPromoTotal = 0;
     let estimatedTax = 0;
@@ -477,32 +478,29 @@
                                                 "Unknown Product"}
                                         </div>
 
-                                        <!-- UPDATED: Static price display -->
+                                        <!-- UPDATED: Price display using PriceService -->
                                         <div class="item-quantity-price">
                                             <span class="item-unit-price">
-                                                ${(
+                                                {PriceService.formatPriceWithUnit(
                                                     item.productDetails
-                                                        ?.price || 0
-                                                ).toFixed(2)}
-                                                {item.productDetails
-                                                    ?.sold_by === "WEIGHT"
-                                                    ? "/lb"
-                                                    : "each"}
+                                                        ?.price || 0,
+                                                    item.productDetails
+                                                        ?.sold_by,
+                                                )}
                                             </span>
-                                            {#if item.productDetails?.promo_price && item.productDetails.promo_price < item.productDetails.price}
+                                            {#if PriceService.hasPromoPrice(item.productDetails)}
                                                 <span class="price-separator"
                                                     >/</span
                                                 >
                                                 <span
                                                     class="item-unit-price promo-price"
                                                 >
-                                                    ${item.productDetails.promo_price.toFixed(
-                                                        2,
+                                                    {PriceService.formatPriceWithUnit(
+                                                        item.productDetails
+                                                            .promo_price,
+                                                        item.productDetails
+                                                            ?.sold_by,
                                                     )}
-                                                    {item.productDetails
-                                                        ?.sold_by === "WEIGHT"
-                                                        ? "/lb"
-                                                        : "each"}
                                                 </span>
                                             {/if}
                                         </div>
@@ -566,43 +564,35 @@
                                             </div>
                                         {/if}
 
-                                        <!-- UPDATED: Accumulated totals with savings -->
+                                        <!-- UPDATED: Item totals using PriceService -->
                                         <div class="item-price">
                                             {#if item.productDetails}
-                                                {@const regularTotal =
-                                                    item.productDetails.price *
-                                                    item.quantity}
+                                                {@const itemTotals =
+                                                    PriceService.calculateItemTotal(
+                                                        item.productDetails,
+                                                        item.quantity,
+                                                    )}
                                                 {@const hasPromo =
-                                                    item.productDetails
-                                                        .promo_price &&
-                                                    item.productDetails
-                                                        .promo_price <
-                                                        item.productDetails
-                                                            .price}
-                                                {@const promoTotal = hasPromo
-                                                    ? item.productDetails
-                                                          .promo_price *
-                                                      item.quantity
-                                                    : regularTotal}
-                                                {@const savings =
-                                                    regularTotal - promoTotal}
+                                                    PriceService.hasPromoPrice(
+                                                        item.productDetails,
+                                                    )}
 
                                                 <span class="price-amount"
-                                                    >${regularTotal.toFixed(
-                                                        2,
+                                                    >{PriceService.formatTotal(
+                                                        itemTotals.regular,
                                                     )}</span
                                                 >
                                                 {#if hasPromo}
                                                     <span class="promo-amount"
-                                                        >${promoTotal.toFixed(
-                                                            2,
+                                                        >{PriceService.formatTotal(
+                                                            itemTotals.promo,
                                                         )}</span
                                                     >
-                                                    {#if savings > 0}
+                                                    {#if itemTotals.savings > 0}
                                                         <span
                                                             class="item-savings"
-                                                            >You save ${savings.toFixed(
-                                                                2,
+                                                            >You save {PriceService.formatSavings(
+                                                                itemTotals.savings,
                                                             )}</span
                                                         >
                                                     {/if}
@@ -635,37 +625,43 @@
             </div>
         </div>
 
-        <!-- UPDATED: Price summary section -->
+        <!-- UPDATED: Price summary using PriceService -->
         <div class="price-summary">
             <div class="price-row">
                 <div class="price-label">Items Subtotal</div>
-                <div class="price-value">${itemsTotal.toFixed(2)}</div>
+                <div class="price-value">
+                    {PriceService.formatTotal(itemsTotal)}
+                </div>
             </div>
 
             {#if totalSavings > 0}
                 <div class="price-row savings-row">
                     <div class="price-label">Loyalty Card Savings</div>
                     <div class="price-value savings-value">
-                        -${totalSavings.toFixed(2)}
+                        -{PriceService.formatSavings(totalSavings)}
                     </div>
                 </div>
 
                 <div class="price-row promo-subtotal-row">
                     <div class="price-label">Subtotal with Savings</div>
                     <div class="price-value promo-value">
-                        ${itemsPromoTotal.toFixed(2)}
+                        {PriceService.formatTotal(itemsPromoTotal)}
                     </div>
                 </div>
             {/if}
 
             <div class="price-row">
                 <div class="price-label">Estimated Tax</div>
-                <div class="price-value">${estimatedTax.toFixed(2)}</div>
+                <div class="price-value">
+                    {PriceService.formatTotal(estimatedTax)}
+                </div>
             </div>
 
             <div class="price-row total-row">
                 <div class="price-label">Total</div>
-                <div class="price-value">${subtotal.toFixed(2)}</div>
+                <div class="price-value">
+                    {PriceService.formatTotal(subtotal)}
+                </div>
             </div>
         </div>
 
@@ -694,25 +690,21 @@
     }
 
     .checkout-summary-header {
-        height: var(--component-header-height); /* Explicit height */
-        box-sizing: border-box; /* Include padding and border in the element's total width and height */
-        padding: 0 var(--spacing-md); /* Adjust padding, left/right as needed */
-        background: var(
-            --background
-        ); /* Changed from gradient to standard background */
-        border-bottom: var(--border-width-thin) solid var(--border); /* Ensure bottom border is applied */
+        height: var(--component-header-height);
+        box-sizing: border-box;
+        padding: 0 var(--spacing-md);
+        background: var(--background);
+        border-bottom: var(--border-width-thin) solid var(--border);
         border-radius: var(--card-border-radius) var(--card-border-radius) 0 0;
-        display: flex; /* To allow vertical alignment */
-        align-items: center; /* Vertically center content */
+        display: flex;
+        align-items: center;
     }
 
     .checkout-summary-header h2 {
         margin: 0;
         font-size: var(--spacing-lg);
         font-weight: var(--font-weight-semibold);
-        color: var(
-            --text-primary
-        ); /* Changed to standard text color for light background */
+        color: var(--text-primary);
     }
 
     .summary-content {
@@ -846,7 +838,7 @@
         color: var(--text-primary);
     }
 
-    /* UPDATED: Static price display styling */
+    /* UPDATED: Price display styling */
     .item-quantity-price {
         display: flex;
         font-size: var(--font-size-sm);
@@ -896,7 +888,7 @@
         flex: 0 0 120px;
     }
 
-    /* UPDATED: Accumulated price styling */
+    /* UPDATED: Item price styling */
     .item-price {
         text-align: right;
     }
@@ -939,7 +931,7 @@
         text-decoration: underline;
     }
 
-    /* UPDATED: Price summary styling */
+    /* Price summary styling */
     .price-summary {
         background-color: var(--surface);
         border-radius: var(--card-border-radius);

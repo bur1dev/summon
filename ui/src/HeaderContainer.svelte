@@ -1,8 +1,8 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import type { StoreContext } from "./store"; // Added StoreContext
+  import type { StoreContext } from "./store";
   import type { Writable } from "svelte/store";
-  import type { SimpleCartService } from "./cart/SimpleCartService";
+  import type { CartBusinessService } from "./cart/CartBusinessService";
   import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart, Menu } from "lucide-svelte";
   import SearchBar from "./search/SearchBar.svelte";
@@ -14,19 +14,19 @@
     searchQueryStore,
     productNameStore,
     selectedProductHashStore,
-    searchResultsStore, // Changed from fuseResultsStore
+    searchResultsStore,
     isViewAllStore,
     setSearchState,
     showMenuStore,
   } from "./UiStateStore";
 
   // Get the store for UI props
-  const { getStore } = getContext<StoreContext>("store"); // Typed getContext
+  const { getStore } = getContext<StoreContext>("store");
   const store = getStore();
 
   // Get cart service store from the context
   const cartServiceStore =
-    getContext<Writable<SimpleCartService | null>>("cartService");
+    getContext<Writable<CartBusinessService | null>>("cartService");
 
   // Get profiles store from context
   const profilesStore = getContext("profiles-store");
@@ -47,7 +47,7 @@
 
   // Subscription to the cartServiceStore itself
   let unsubscribeCartServiceStore: (() => void) | null = null;
-  let currentCartServiceInstance: SimpleCartService | null = null;
+  let currentCartServiceInstance: CartBusinessService | null = null;
 
   onMount(() => {
     // Agent pubkey logic
@@ -137,19 +137,19 @@
             searchQuery: detail.originalQuery,
             productName: detail.productName,
             selectedProductHash: detail.hash,
-            searchResults: detail.fuseResults || [], // Changed from fuseResults but keep the event detail name
+            searchResults: detail.fuseResults || [],
             isViewAll: false,
-            searchMethod: "product_selection", // Add a method identifier
+            searchMethod: "product_selection",
           })}
         on:viewAll={({ detail }) =>
           setSearchState({
             searchMode: true,
             searchQuery: detail.query,
-            searchResults: detail.fuseResults || [], // Changed from fuseResults but keep the event detail name
+            searchResults: detail.fuseResults || [],
             isViewAll: detail.isViewAll || false,
             selectedProductHash: null,
             productName: "",
-            searchMethod: detail.searchMethod || "", // Pass searchMethod from event detail
+            searchMethod: detail.searchMethod || "",
           })}
       />
     </div>
@@ -183,20 +183,18 @@
 
 <style>
   .header-container {
-    position: sticky; /* Changed from fixed to sticky */
+    position: sticky;
     top: 0;
     left: 0;
     right: 0;
-    height: var(--component-header-height); /* Explicit height */
+    height: var(--component-header-height);
     background: var(--background);
     display: flex;
     align-items: center;
     justify-content: space-between;
     box-shadow: var(--shadow-subtle);
-    z-index: var(--z-index-modal); /* Restored original z-index */
-    padding-left: var(
-      --sidebar-width-category
-    ); /* Keeps left side aligned as it is now */
+    z-index: var(--z-index-modal);
+    padding-left: var(--sidebar-width-category);
   }
 
   .left-section {
@@ -211,12 +209,11 @@
   }
 
   .menu-button {
-    /* Positioning only - appearance from btn classes */
     display: flex;
     align-items: center;
     justify-content: center;
-    width: var(--btn-height-md); /* 45px */
-    height: var(--btn-height-md); /* 45px */
+    width: var(--btn-height-md);
+    height: var(--btn-height-md);
   }
 
   .app-logo {
@@ -228,7 +225,7 @@
 
   .view-toggle,
   .cart-button {
-    width: 235px; /* Made consistent */
+    width: 235px;
     height: var(--btn-height-md);
     display: inline-flex;
     align-items: center;
@@ -257,7 +254,6 @@
     gap: var(--spacing-md);
     flex: 1;
     justify-content: flex-start;
-    /* Remove the padding and let the items inside align */
     padding-left: var(--spacing-md);
     padding-right: var(--spacing-md);
   }
@@ -276,7 +272,6 @@
     max-width: 100%;
   }
 
-  /* Style the search input within the container */
   .search-container :global(input) {
     border-radius: var(--btn-border-radius) !important;
     height: var(--btn-height-md) !important;
@@ -301,10 +296,9 @@
     background-color: rgba(0, 0, 0, 0.15);
     color: var(--button-text);
     border-radius: 50%;
-    font-size: var(--font-size-md); /* Match .cart-total font size */
-    /* font-weight: normal; (This line was removed to inherit parent's font-weight) */
+    font-size: var(--font-size-md);
     position: absolute;
-    left: calc(50% - 100px); /* Position left of center */
+    left: calc(50% - 100px);
   }
 
   .cart-total {
@@ -312,6 +306,6 @@
     color: var(--button-text);
     white-space: nowrap;
     position: absolute;
-    right: calc(50% - 100px); /* Position right of center */
+    right: calc(50% - 100px);
   }
 </style>

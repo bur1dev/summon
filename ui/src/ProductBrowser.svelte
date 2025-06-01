@@ -2,9 +2,18 @@
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import AllProductsGrid from "./AllProductsGrid.svelte";
     import ProductRow from "./ProductRow.svelte";
-    import { mainCategories } from "./categoryData";
     import type { ProductDataService } from "./ProductDataService";
+    import { ProductRowCacheService } from "./ProductRowCacheService";
     import { tick } from "svelte";
+    import { useResizeObserver } from "./useResizeObserver";
+    // UPDATED: Import category utilities
+    import {
+        getSubcategoryConfig,
+        isGridOnlySubcategory,
+        getFilteredProductTypes,
+        hasProductTypes,
+        getAllSubcategories,
+    } from "./categoryUtils";
 
     // Required props
     export let selectedCategory: string | null = null;
@@ -24,22 +33,19 @@
     const dispatch = createEventDispatcher();
 
     // State variables
-    let categoryProducts = {}; // Holds the *currently displayed* products for each row identifier
-    let allCategoryProducts = []; // Holds all products for the grid view
-    let gridContainer = {}; // References to row container elements for resize observer
-    let currentRanges = {}; // Holds { start, end } virtual indices for each row identifier
-    let totalProducts = {}; // Holds estimated total products for each row identifier
-    let containerCapacity = 0; // Calculated capacity based on width
-    let rowCapacities = {}; // Store capacity for each row
-    let mainGridContainer; // Reference to the main browser container
-    let allProductsTotal = 0; // Total products for the grid view
-    let hasMore = {}; // Holds hasMore values for each row identifier
+    let categoryProducts = {};
+    let allCategoryProducts = [];
+    let gridContainer = {};
+    let currentRanges = {};
+    let totalProducts = {};
+    let containerCapacity = 0;
+    let rowCapacities = {};
+    let mainGridContainer;
+    let allProductsTotal = 0;
+    let hasMore = {};
 
-    let loadedSubcategoriesSet = new Set<string>(); // Tracks observed rows
-    let visibleGroups = new Set(); // Tracks initially visible rows
-
-    let resizeTimeouts: Record<string, number> = {}; // Store separate timeouts for each row
-    let isResizing = false;
+    let loadedSubcategoriesSet = new Set<string>();
+    let visibleGroups = new Set();
 
     // Add state tracking to prevent stale operations
     let currentNavigationState = {
@@ -48,26 +54,21 @@
         productType: "All",
     };
 
-    // Set up resize observer for responsive grid layout
-    let resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-            const identifier = entry.target.getAttribute("data-subcategory");
+    // UPDATED: Use the new resize observer composable
+    const resizeObserver = useResizeObserver(
+        ({ element, identifier }) => {
             if (identifier) {
-                handleResize(identifier, entry.target as HTMLElement);
+                handleResize(identifier, element);
             }
-        }
-    });
+        },
+        {
+            debounceMs: 250,
+            attributeName: "data-subcategory",
+        },
+    );
 
-    // Expose action for components to register with resize observer
-    export const action = (node) => {
-        if (!node) return;
-        resizeObserver.observe(node);
-        return {
-            destroy() {
-                resizeObserver.unobserve(node);
-            },
-        };
-    };
+    // UPDATED: Export the action from the composable
+    export const action = resizeObserver.action;
 
     onMount(() => {
         // Initial load handled by consolidated reactive statement
@@ -76,37 +77,28 @@
     onDestroy(() => {
         categoryProducts = {};
         allCategoryProducts = [];
-        resizeObserver?.disconnect();
-        // Clear all resize timeouts
-        Object.values(resizeTimeouts).forEach((timeout) =>
-            clearTimeout(timeout),
-        );
+        // UPDATED: Use composable cleanup
+        resizeObserver.disconnect();
     });
 
-    // CONSOLIDATED REACTIVE STATEMENT - REPLACES ALL THREE PREVIOUS ONES
+    // CONSOLIDATED REACTIVE STATEMENT
     $: {
-        // Skip if in search mode
         if (searchMode) {
             resetState();
         } else {
-            // Update navigation state
             currentNavigationState = {
                 category: selectedCategory,
                 subcategory: selectedSubcategory,
                 productType: selectedProductType,
             };
 
-            // Determine which loading function to call based on COMPLETE state
             if (isHomeView && featuredSubcategories.length > 0) {
                 loadHomeView();
             } else if (selectedCategory && selectedSubcategory) {
-                // We have both category AND subcategory - load specific view
                 loadProductsForCategory();
             } else if (selectedCategory && !selectedSubcategory) {
-                // We have category but NOT subcategory - load main category view
                 loadProductsForCategory();
             }
-            // If no category selected, do nothing (avoid incomplete state loads)
         }
     }
 
@@ -118,13 +110,7 @@
         const oldCapacity = rowCapacities[identifier] || containerCapacity;
 
         if (newCapacity !== oldCapacity) {
-            // Use separate timeout for each row
-            if (resizeTimeouts[identifier]) {
-                clearTimeout(resizeTimeouts[identifier]);
-            }
-            resizeTimeouts[identifier] = setTimeout(() => {
-                updateRowCapacity(identifier, newCapacity, oldCapacity);
-            }, 250);
+            updateRowCapacity(identifier, newCapacity, oldCapacity);
         }
     }
 
@@ -136,21 +122,12 @@
         rowCapacities[identifier] = newCapacity;
         rowCapacities = { ...rowCapacities };
 
-        // If capacity increased, we might need to fetch more products
         if (newCapacity > oldCapacity) {
             const currentEnd = currentRanges[identifier]?.end || 0;
             const currentStart = currentRanges[identifier]?.start || 0;
             const currentlyDisplayed = currentEnd - currentStart;
 
-            console.log(
-                `${identifier}: currentlyDisplayed=${currentlyDisplayed}, newCapacity=${newCapacity}, hasMore=${hasMore[identifier]}`,
-            );
-
-            // Try to fetch more products even if hasMore is undefined or false
-            // This handles cases where hasMore might not be set properly
             if (currentlyDisplayed < newCapacity) {
-                // Fetch more products to fill the expanded space
-                console.log(`Fetching additional products for ${identifier}`);
                 await fetchAdditionalProducts(
                     identifier,
                     currentStart,
@@ -158,7 +135,6 @@
                 );
             }
         } else if (newCapacity < oldCapacity) {
-            // Capacity decreased, just slice the existing products
             const currentProducts = categoryProducts[identifier] || [];
             if (currentProducts.length > newCapacity) {
                 const newProducts = currentProducts.slice(0, newCapacity);
@@ -181,7 +157,6 @@
         startIndex: number,
         capacity: number,
     ) {
-        // For home view, parse the identifier to get category and subcategory
         let category = selectedCategory;
         let subcategory = selectedSubcategory;
 
@@ -189,36 +164,20 @@
             const parts = identifier.split("_");
             category = parts[0];
             subcategory = parts[1];
-            console.log(
-                `Home view: Using category=${category}, subcategory=${subcategory}`,
-            );
         } else if (!isHomeView && !selectedSubcategory) {
-            // When in main category view, the identifier is the subcategory name
             subcategory = identifier;
-            console.log(
-                `Main category view: Using identifier "${identifier}" as subcategory`,
-            );
         }
 
         try {
-            // First check if we're in subcategory view with product type rows
             const isInSubcategoryView = selectedCategory && selectedSubcategory;
-
-            // Check if this identifier is a product type for the current subcategory
             const isProductTypeRow =
                 isInSubcategoryView &&
-                (mainCategories
-                    .find((c) => c.name === category)
-                    ?.subcategories.find((s) => s.name === subcategory)
-                    ?.productTypes?.includes(identifier) ??
-                    false);
+                getFilteredProductTypes(category, subcategory).includes(
+                    identifier,
+                );
 
             let result;
             if (isProductTypeRow) {
-                // This is a product type row - use the identifier as the product type
-                console.log(
-                    `Loading product type products for ${category}/${subcategory}/${identifier}`,
-                );
                 result = await productDataService.loadProductTypeProducts(
                     category,
                     subcategory,
@@ -227,8 +186,6 @@
                     capacity,
                 );
             } else {
-                // This is a subcategory row
-
                 result = await productDataService.loadSubcategoryProducts(
                     category,
                     subcategory,
@@ -262,7 +219,7 @@
     async function loadProductsForCategory() {
         if (!selectedCategory || searchMode) return;
 
-        resetState(); // Clear previous state
+        resetState();
 
         if (!mainGridContainer) {
             await tick();
@@ -291,7 +248,7 @@
     async function loadHomeView() {
         if (searchMode) return;
 
-        resetState(); // Clear previous state
+        resetState();
 
         if (!mainGridContainer) {
             await tick();
@@ -308,7 +265,7 @@
             Math.floor(mainGridContainer.offsetWidth / 245),
         );
 
-        const BATCH_SIZE = 3; // Process 3 subcategories at a time
+        const BATCH_SIZE = 3;
 
         for (let i = 0; i < featuredSubcategories.length; i += BATCH_SIZE) {
             const currentBatch = featuredSubcategories.slice(i, i + BATCH_SIZE);
@@ -324,7 +281,6 @@
                             );
 
                         if (result) {
-                            // Create unique identifier for home view rows by combining category_subcategory
                             return {
                                 ...result,
                                 identifier: `${featured.category}_${featured.subcategory || featured.category}`,
@@ -338,7 +294,6 @@
                     .filter(Boolean),
             );
 
-            // Process results
             processHomeViewResults(batchResults, containerCapacity);
             await tick();
             await registerResizeObservers();
@@ -348,26 +303,15 @@
     async function loadProductsForProductType() {
         if (!selectedCategory || !selectedSubcategory || searchMode) return;
 
-        // STATE GUARD: Check if we're still in the same navigation state
         if (
             currentNavigationState.category !== selectedCategory ||
             currentNavigationState.subcategory !== selectedSubcategory ||
             currentNavigationState.productType !== selectedProductType
         ) {
-            console.log(
-                "Navigation state changed, aborting loadProductsForProductType",
-            );
             return;
         }
 
         allCategoryProducts = [];
-
-        console.log(
-            "Loading products for:",
-            selectedCategory,
-            selectedSubcategory,
-            selectedProductType,
-        );
 
         try {
             if (selectedProductType !== "All") {
@@ -375,10 +319,8 @@
                     selectedCategory,
                     selectedSubcategory,
                     selectedProductType,
-                    false, // isPreview = false (fetch all for grid)
+                    false,
                 );
-
-                console.log("ProductDataService result:", result);
 
                 if (result?.products) {
                     allCategoryProducts = result.products;
@@ -401,9 +343,8 @@
     }
 
     async function loadMainCategoryView(capacity) {
-        const subcategories =
-            mainCategories.find((c) => c.name === selectedCategory)
-                ?.subcategories || [];
+        // FIXED: Get all subcategories for this category
+        const subcategories = getAllSubcategories(selectedCategory);
         const initialSubcategories = subcategories.slice(0, 3);
 
         const initialResults = await Promise.all(
@@ -419,11 +360,9 @@
         await tick();
 
         if (subcategories.length > 3) {
-            // REMOVED setTimeout - load remaining subcategories immediately
             await loadRemainingSubcategories(subcategories.slice(3), capacity);
         }
 
-        // REMOVED setTimeout - load all category products immediately
         await loadAllCategoryProducts();
     }
 
@@ -454,9 +393,11 @@
     }
 
     async function loadSubcategoryView(capacity) {
-        const subcategoryConfig = mainCategories
-            .find((c) => c.name === selectedCategory)
-            ?.subcategories.find((s) => s.name === selectedSubcategory);
+        // UPDATED: Use centralized utility
+        const subcategoryConfig = getSubcategoryConfig(
+            selectedCategory,
+            selectedSubcategory,
+        );
         if (!subcategoryConfig) {
             console.error(
                 `Configuration not found for subcategory: ${selectedSubcategory}`,
@@ -464,7 +405,8 @@
             return;
         }
 
-        if (subcategoryConfig.gridOnly) {
+        // UPDATED: Use centralized utility
+        if (isGridOnlySubcategory(selectedCategory, selectedSubcategory)) {
             await loadGridOnlySubcategory();
         } else if (selectedProductType === "All") {
             await loadProductTypesView(capacity);
@@ -474,14 +416,10 @@
     }
 
     async function loadGridOnlySubcategory() {
-        // STATE GUARD: Check if we're still in the same navigation state
         if (
             currentNavigationState.category !== selectedCategory ||
             currentNavigationState.subcategory !== selectedSubcategory
         ) {
-            console.log(
-                "Navigation state changed, aborting loadGridOnlySubcategory",
-            );
             return;
         }
 
@@ -501,12 +439,11 @@
     }
 
     async function loadProductTypesView(capacity) {
-        const subcategoryConfig = mainCategories
-            .find((c) => c.name === selectedCategory)
-            ?.subcategories.find((s) => s.name === selectedSubcategory);
-        if (!subcategoryConfig) return;
-        const productTypes =
-            subcategoryConfig.productTypes?.filter((t) => t !== "All") || [];
+        // UPDATED: Use centralized utility
+        const productTypes = getFilteredProductTypes(
+            selectedCategory,
+            selectedSubcategory,
+        );
 
         const BATCH_SIZE = 5;
         for (let i = 0; i < productTypes.length; i += BATCH_SIZE) {
@@ -518,8 +455,8 @@
                         selectedCategory,
                         selectedSubcategory,
                         type,
-                        true, // isPreview = true
-                        capacity, // Limit fetch
+                        true,
+                        capacity,
                     );
                 }),
             );
@@ -530,18 +467,13 @@
     }
 
     async function loadAllCategoryProducts() {
-        // STATE GUARD: Only load if we're still in main category view
         if (currentNavigationState.subcategory !== null) {
-            console.log(
-                "Not in main category view anymore, skipping loadAllCategoryProducts",
-            );
             return;
         }
 
         const gridData =
             await productDataService.loadAllCategoryProducts(selectedCategory);
 
-        // DOUBLE CHECK: Verify we're still in the right state before updating
         if (
             currentNavigationState.category === selectedCategory &&
             currentNavigationState.subcategory === null
@@ -553,10 +485,6 @@
                 allCategoryProducts = [];
                 allProductsTotal = 0;
             }
-        } else {
-            console.log(
-                "Navigation state changed during loadAllCategoryProducts, discarding results",
-            );
         }
     }
 
@@ -568,13 +496,9 @@
             const identifier = node.getAttribute("data-subcategory");
             if (identifier) {
                 gridContainer[identifier] = node;
-                // Always observe, even if already in set
-                resizeObserver.observe(node);
+                // UPDATED: Use composable instead of direct observer
+                resizeObserver.observe(node as HTMLElement);
                 loadedSubcategoriesSet.add(identifier);
-            } else {
-                console.warn(
-                    "Found .product-row-items without data-subcategory identifier.",
-                );
             }
         });
     }
@@ -656,26 +580,11 @@
         visibleGroups.clear();
         loadedSubcategoriesSet.clear();
 
-        // Clear all resize timeouts
-        Object.values(resizeTimeouts).forEach((timeout) =>
-            clearTimeout(timeout),
-        );
-        resizeTimeouts = {};
-
-        resizeObserver?.disconnect();
-        resizeObserver = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                const identifier =
-                    entry.target.getAttribute("data-subcategory");
-                if (identifier) {
-                    handleResize(identifier, entry.target as HTMLElement);
-                }
-            }
-        });
+        // UPDATED: Use composable cleanup
+        resizeObserver.disconnect();
         gridContainer = {};
     }
 
-    // This function handles the 'dataLoaded' event from NavigationArrows
     function handleDataLoaded(event) {
         const {
             newStart,
@@ -692,19 +601,13 @@
             return;
         }
 
-        // Use row-specific capacity if available, otherwise use container capacity
         const capacity = rowCapacities[identifier] || containerCapacity;
 
-        // Update the range based on the new virtual start and the number of products received
         currentRanges[identifier] = {
             start: newStart,
             end: newStart + products.length,
         };
 
-        // totalProducts[identifier] is primarily set by handleBoundariesInitialized.
-        // This ensures that if it wasn't set (e.g., for a very fast first load of a single product type
-        // where dataLoaded might arrive before boundariesInitialized fully processed in parent),
-        // it gets an initial value. 'total' from dataLoaded is NavigationArrows' current grand total prop.
         if (
             totalProducts[identifier] === undefined &&
             typeof total === "number"
@@ -712,13 +615,9 @@
             totalProducts[identifier] = total;
         }
 
-        // Update hasMore value
         hasMore[identifier] = newHasMore;
-
-        // Update the products to be displayed in this specific row
         categoryProducts[identifier] = products;
 
-        // Trigger reactivity for Svelte to update the UI
         currentRanges = { ...currentRanges };
         totalProducts = { ...totalProducts };
         categoryProducts = { ...categoryProducts };
@@ -733,23 +632,18 @@
         const { identifier: id, grandTotal } = event.detail;
         if (id && typeof grandTotal === "number") {
             if (totalProducts[id] !== grandTotal) {
-                console.log(
-                    `ProductBrowser: Grand total for ${id} initialized/updated to ${grandTotal} by boundariesInitialized event.`,
-                );
                 totalProducts[id] = grandTotal;
                 totalProducts = { ...totalProducts };
             }
         }
     }
 
-    // Get subcategory name for display from identifier
     function getSubcategoryFromIdentifier(identifier) {
         if (!identifier.includes("_")) return identifier;
         const parts = identifier.split("_");
         return parts[1];
     }
 
-    // Get category for a featured row
     function getCategoryFromIdentifier(identifier) {
         if (!identifier.includes("_")) return selectedCategory;
         const parts = identifier.split("_");
@@ -759,7 +653,6 @@
 
 <div class="product-browser" bind:this={mainGridContainer}>
     {#if isHomeView}
-        <!-- Home View: Featured Subcategory Rows -->
         {#each Object.keys(categoryProducts) as identifier}
             {#if categoryProducts[identifier]?.length > 0}
                 {@const rowCategory = getCategoryFromIdentifier(identifier)}
@@ -773,6 +666,7 @@
                     {totalProducts}
                     {hasMore}
                     {store}
+                    {productDataService}
                     selectedCategory={rowCategory}
                     selectedSubcategory={rowSubcategory}
                     {mainGridContainer}
@@ -793,10 +687,9 @@
             {/if}
         {/each}
     {:else if selectedCategory && !selectedSubcategory}
-        <!-- Main Category View: Rows for Subcategories -->
-        {#each mainCategories.find((c) => c.name === selectedCategory)?.subcategories || [] as subcategory}
+        <!-- FIXED: Use centralized utility to get ALL subcategories -->
+        {#each getAllSubcategories(selectedCategory) as subcategory}
             {@const identifier = subcategory.name}
-            <!-- Only render ProductRow if its data exists -->
             {#if categoryProducts[identifier]}
                 <ProductRow
                     title={identifier}
@@ -806,6 +699,7 @@
                     {totalProducts}
                     {hasMore}
                     {store}
+                    {productDataService}
                     {selectedCategory}
                     selectedSubcategory={identifier}
                     {mainGridContainer}
@@ -826,7 +720,6 @@
             {/if}
         {/each}
 
-        <!-- "All Products" Grid at the bottom of Main Category View -->
         <AllProductsGrid
             {selectedCategory}
             selectedSubcategory={null}
@@ -837,13 +730,8 @@
             on:productTypeSelect
         />
     {:else if selectedCategory && selectedSubcategory}
-        <!-- Subcategory View -->
-        {@const subcategoryConfig = mainCategories
-            .find((c) => c.name === selectedCategory)
-            ?.subcategories?.find((s) => s.name === selectedSubcategory)}
-
-        {#if subcategoryConfig?.gridOnly || selectedProductType !== "All"}
-            <!-- Grid View (for gridOnly subcats or specific product type selection) -->
+        <!-- UPDATED: Use centralized utility functions -->
+        {#if isGridOnlySubcategory(selectedCategory, selectedSubcategory) || selectedProductType !== "All"}
             <AllProductsGrid
                 {selectedCategory}
                 {selectedSubcategory}
@@ -854,10 +742,8 @@
                 on:productTypeSelect
             />
         {:else if selectedProductType === "All"}
-            <!-- Row View (when subcategory selected and type is "All") -->
-            {#each subcategoryConfig?.productTypes?.filter((pt) => pt !== "All") || [] as productType}
+            {#each getFilteredProductTypes(selectedCategory, selectedSubcategory) as productType}
                 {@const identifier = productType}
-                <!-- Only render ProductRow if its data exists -->
                 {#if categoryProducts[identifier]}
                     <ProductRow
                         title={identifier}
@@ -867,6 +753,7 @@
                         {totalProducts}
                         {hasMore}
                         {store}
+                        {productDataService}
                         {selectedCategory}
                         {selectedSubcategory}
                         {mainGridContainer}

@@ -7,6 +7,9 @@
   import ProductDetailModal from "./ProductDetailModal.svelte";
   import { createEventDispatcher } from "svelte";
 
+  import { PriceService } from "./PriceService";
+  import type { CartBusinessService } from "./cart/CartBusinessService";
+
   export let selectedCategory = "";
   export let selectedSubcategory = "";
 
@@ -37,23 +40,12 @@
     groupHash: string;
     productIndex: number;
     quantity: number;
-    // Add other properties if they exist, e.g., price, name, etc.
-  }
-
-  interface CartServiceAPI {
-    ready: Writable<boolean>; // 'ready' is a store
-    subscribe: (callback: (items: CartItem[]) => void) => () => void; // Method to subscribe to cart item changes
-    getCartItems: () => CartItem[];
-    addToCart: (
-      groupHash: string,
-      productIndex: number,
-      quantity: number,
-    ) => Promise<any>; // Or specific return type
-    // Add any other methods or properties the cart service might have
+    // Add other properties if they exist
   }
 
   // Get cart service directly from the context and type it as a Svelte store
-  const cartService = getContext<Writable<CartServiceAPI>>("cartService");
+  const cartService =
+    getContext<Writable<CartBusinessService | null>>("cartService");
 
   export let product;
   export let actionHash = undefined;
@@ -70,6 +62,9 @@
   $: displayAmount = isSoldByWeight ? itemWeight : itemCount;
   $: displayUnit = isSoldByWeight ? "lbs" : "ct";
   $: incrementValue = isSoldByWeight ? 0.25 : 1;
+
+  // Use PriceService for display prices
+  $: displayPrices = PriceService.getDisplayPrices(product);
 
   // Store both original and base64 formats of the group hash
   let groupHashOriginal = ""; // Original format (comma-separated numbers)
@@ -89,9 +84,10 @@
       typeof effectiveHash === "string" &&
       effectiveHash.includes("_")
     ) {
-      const parts = effectiveHash.split("_");
-      groupHashOriginal = parts[0];
-      productIndex = parseInt(parts[1]) || 0;
+      const lastUnderscoreIndex = effectiveHash.lastIndexOf("_");
+      groupHashOriginal = effectiveHash.substring(0, lastUnderscoreIndex);
+      productIndex =
+        parseInt(effectiveHash.substring(lastUnderscoreIndex + 1)) || 0;
 
       // Convert comma-separated to base64 if needed
       if (groupHashOriginal.includes(",")) {
@@ -248,6 +244,12 @@
       return;
     }
 
+    console.log("ProductCard hash info:", {
+      effectiveHash: actionHash || product?.hash,
+      groupHashBase64,
+      productIndex,
+    });
+
     addProductToCart();
   }
 
@@ -321,23 +323,6 @@
     return "UNKNOWN";
   }
 
-  // Add this function
-  function normalizePromoPrice(promoPrice, regularPrice) {
-    if (
-      promoPrice === null ||
-      promoPrice === undefined ||
-      promoPrice === 0 ||
-      typeof promoPrice !== "number" ||
-      isNaN(promoPrice) ||
-      typeof regularPrice !== "number" ||
-      promoPrice >= regularPrice
-    ) {
-      return null;
-    }
-    // Otherwise return the numeric value
-    return Number(promoPrice);
-  }
-
   // More debugging in your getStockText function
   function getStockText(status) {
     // Additional defensive check
@@ -408,23 +393,19 @@
       <div class="product-image placeholder-image">No Image</div>
     {/if}
     <div class="prices">
-      {#if product.promo_price && product.promo_price < product.price}
+      {#if displayPrices.hasPromo}
         <div class="price-row">
           <div class="promo-price">
-            ${Number(product.promo_price).toFixed(2)}{isSoldByWeight
-              ? " /lb"
-              : ""}
+            {displayPrices.promoPrice}
           </div>
           <div class="regular-price">
-            reg. ${Number(product.price).toFixed(2)}{isSoldByWeight
-              ? " /lb"
-              : ""}
+            {displayPrices.regularPrice}
           </div>
         </div>
-        <div class="promo-label">With loyalty card</div>
+        <div class="promo-label">{displayPrices.loyaltyLabel}</div>
       {:else}
         <div class="regular-price-solo">
-          ${Number(product.price).toFixed(2)}{isSoldByWeight ? " /lb" : ""}
+          {displayPrices.soloPrice}
         </div>
       {/if}
     </div>
@@ -488,19 +469,19 @@
   .product-card-content {
     display: flex;
     flex-direction: column;
-    width: 100%; /* Added */
-    height: 100%; /* Optional: if it should fill height too */
-    box-sizing: border-box; /* Added */
-    padding: 0; /* Changed: ensures no padding on any side */
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 0;
   }
 
   .product-image {
-    width: 100%; /* Changed from 245px */
+    width: 100%;
     height: 245px;
     object-fit: contain;
     padding: 0;
-    box-sizing: border-box; /* Added */
-    display: block; /* Added */
+    box-sizing: border-box;
+    display: block;
   }
 
   .placeholder-image {
@@ -509,8 +490,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #f0f0f0; /* Light grey background */
-    color: #ccc; /* Light grey text */
+    background-color: #f0f0f0;
+    color: #ccc;
     font-size: 16px;
     box-sizing: border-box;
   }
@@ -613,15 +594,13 @@
   .minus,
   .plus {
     cursor: pointer;
-    width: var(--btn-height-md); /* Changed to use standard variable */
-    height: var(--btn-height-md); /* Changed to use standard variable */
+    width: var(--btn-height-md);
+    height: var(--btn-height-md);
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    transition: var(
-      --btn-transition
-    ); /* Changed from btn-transition-fast for consistency */
+    transition: var(--btn-transition);
     background-color: rgba(0, 0, 0, 0.15);
   }
 
@@ -649,8 +628,8 @@
     justify-content: center;
     flex: 1;
     padding: 0 5px;
-    min-width: 60px; /* Fixed width for count to prevent shifting */
-    font-size: var(--font-size-md); /* Added to match cart-total */
+    min-width: 60px;
+    font-size: var(--font-size-md);
   }
   .report-btn {
     position: absolute;

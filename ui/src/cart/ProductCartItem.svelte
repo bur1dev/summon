@@ -4,7 +4,8 @@
     import { getContext } from "svelte";
     import { PencilLine, Plus, Minus } from "lucide-svelte";
     import type { Writable } from "svelte/store";
-    import type { SimpleCartService } from "./SimpleCartService"; // Assuming this is the correct type/interface
+    import type { CartBusinessService } from "./CartBusinessService";
+    import { PriceService } from "../PriceService";
 
     // Props - UPDATED FOR NEW STRUCTURE
     export let product;
@@ -16,7 +17,7 @@
 
     // Get cart service directly from the context
     const cartServiceStore =
-        getContext<Writable<SimpleCartService | null>>("cartService");
+        getContext<Writable<CartBusinessService | null>>("cartService");
 
     // State for modal
     let showModal = false;
@@ -26,10 +27,9 @@
     const displayUnit = isSoldByWeight ? "lbs" : "ct";
     const incrementValue = isSoldByWeight ? 0.25 : 1;
 
-    // NEW: Calculate totals
-    $: regularTotal = product.price * quantity;
-    $: promoTotal = (product.promo_price || product.price) * quantity;
-    $: hasPromo = product.promo_price && product.promo_price < product.price;
+    // Use PriceService for calculations
+    $: itemTotals = PriceService.calculateItemTotal(product, quantity);
+    $: hasPromo = PriceService.hasPromoPrice(product);
 
     // Methods - UPDATED FOR NEW STRUCTURE
     const handleDecrementItem = async () => {
@@ -102,20 +102,22 @@
                 {product.name}
             </div>
 
-            <!-- UPDATED: Price display section -->
+            <!-- UPDATED: Price display using PriceService -->
             <div class="cart-item-price">
                 <span
-                    >${product.price.toFixed(2)}{isSoldByWeight
-                        ? "/lb"
-                        : ""}</span
+                    >{PriceService.formatPriceWithUnit(
+                        product.price,
+                        product.sold_by,
+                    )}</span
                 >
                 {#if hasPromo}
                     <span class="price-separator">/</span>
-                    <span class="promo-price"
-                        >${product.promo_price.toFixed(2)}{isSoldByWeight
-                            ? "/lb"
-                            : ""}</span
-                    >
+                    <span class="promo-price">
+                        {PriceService.formatPriceWithUnit(
+                            product.promo_price,
+                            product.sold_by,
+                        )}
+                    </span>
                 {/if}
             </div>
 
@@ -156,11 +158,15 @@
                 </button>
             </div>
 
-            <!-- UPDATED: Total price with both regular and promo totals -->
+            <!-- UPDATED: Total price using PriceService -->
             <div class="cart-item-total">
-                <span class="total-regular">${regularTotal.toFixed(2)}</span>
+                <span class="total-regular"
+                    >{PriceService.formatTotal(itemTotals.regular)}</span
+                >
                 {#if hasPromo}
-                    <span class="total-promo">${promoTotal.toFixed(2)}</span>
+                    <span class="total-promo"
+                        >{PriceService.formatTotal(itemTotals.promo)}</span
+                    >
                 {/if}
             </div>
 

@@ -67,7 +67,11 @@ for (_i, additional) in input.additional_categorizations.iter().enumerate() {
     Ok(paths)
 }
 
-fn create_links_for_group(group_hash: &ActionHash, paths: Vec<Path>) -> ExternResult<()> {
+fn create_links_for_group(group_hash: &ActionHash, paths: Vec<Path>, product_count: usize) -> ExternResult<()> {
+    // Convert product count to bytes for LinkTag
+    let count_bytes = (product_count as u32).to_le_bytes();
+    let link_tag = LinkTag::new(count_bytes.to_vec());
+
     for path in paths.iter() {
         match path.path_entry_hash() {
             Ok(path_hash) => {
@@ -75,7 +79,7 @@ fn create_links_for_group(group_hash: &ActionHash, paths: Vec<Path>) -> ExternRe
                     path_hash.clone(),
                     group_hash.clone(),
                     LinkTypes::ProductTypeToGroup,
-                    LinkTag::new(""),
+                    link_tag.clone(),
                 )?;
             },
             Err(_e) => {}
@@ -110,7 +114,8 @@ pub fn create_product_group(input: CreateProductGroupInput) -> ExternResult<Acti
     };
 
     let paths = get_paths(&mock_input)?;
-    create_links_for_group(&group_hash, paths)?;
+    let product_count = product_group.products.len();
+    create_links_for_group(&group_hash, paths, product_count)?;
 
     Ok(group_hash)
 }
@@ -245,39 +250,18 @@ pub fn get_all_group_counts_for_path(params: GetProductsParams) -> ExternResult<
         }
     };
 
-    // Get count for each group
+    // Read counts directly from link tags instead of fetching groups
     let mut counts = Vec::new();
-    let mut _total_products = 0;
-    let mut _failed_fetches = 0;
-    let mut _failed_deserializations = 0;
     
     for link in all_links.iter() {
-        let target_hash_opt = link.target.clone().into_action_hash();
-        
-        if let Some(target_hash) = target_hash_opt {
-            match get(target_hash.clone(), GetOptions::network()) {
-                Ok(Some(record)) => {
-                    match record.entry().to_app_option::<ProductGroup>() {
-                        Ok(Some(group)) => {
-                            let product_count = group.products.len();
-                            counts.push(product_count);
-                            _total_products += product_count;
-                        },
-                        Ok(None) => {
-                            _failed_deserializations += 1;
-                        },
-                        Err(_e) => {
-                            _failed_deserializations += 1;
-                        }
-                    }
-                },
-                Ok(None) => {
-                    _failed_fetches += 1;
-                },
-                Err(_e) => {
-                    _failed_fetches += 1;
-                }
-            }
+        // Extract count from link tag
+        if link.tag.0.len() >= 4 {
+            let count_bytes: [u8; 4] = link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]);
+            let count = u32::from_le_bytes(count_bytes) as usize;
+            counts.push(count);
+        } else {
+            // Fallback to 0 if tag is malformed
+            counts.push(0);
         }
     }
     

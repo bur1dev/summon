@@ -1,19 +1,13 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import type { Writable } from "svelte/store"; // Import Writable
-  import type { SimpleCartService } from "./SimpleCartService"; // Import SimpleCartService type
+  import type { Writable } from "svelte/store";
+  import type { CartBusinessService } from "./CartBusinessService";
+  import type { ProductDataService } from "../ProductDataService";
   import CartHeader from "./CartHeader.svelte";
   import ProductCartItem from "./ProductCartItem.svelte";
   import CheckoutFlow from "./CheckoutFlow.svelte";
-  import { decodeHashFromBase64, encodeHashToBase64 } from "@holochain/client";
-  import { decode } from "@msgpack/msgpack";
   import { X } from "lucide-svelte";
-
-  // Define an interface for the decoded product group (similar to CheckoutFlow.svelte)
-  interface ProductGroup {
-    products: any[]; // Ideally, replace 'any' with a more specific Product type
-    // Add other expected properties of a product group if known
-  }
+  import { PriceService } from "../PriceService";
 
   // Props
   export let isOpen = false;
@@ -21,12 +15,15 @@
 
   // Get cart service directly from the context
   const cartServiceStore =
-    getContext<Writable<SimpleCartService | null>>("cartService");
+    getContext<Writable<CartBusinessService | null>>("cartService");
 
   // Get the store for product info
   const storeContext = getContext<import("../store").StoreContext>("store");
   const store = storeContext.getStore();
-  const productStore = store?.productStore;
+
+  // Get ProductDataService from context (must be at top level)
+  const productDataService =
+    getContext<ProductDataService>("productDataService");
 
   // State
   let cartItems = [];
@@ -35,7 +32,7 @@
   let isCheckingOut = false;
   let isShowingCheckoutFlow = false;
   let checkoutError = "";
-  let isClosing = false; // Added for animation control
+  let isClosing = false;
   let cartTotalUnsubscribe;
   let cartPromoTotalUnsubscribe;
   let cartTotal = 0;
@@ -103,76 +100,26 @@
     };
   });
 
-  // Product fetching - FIXED: Handle undefined hashB64
+  // Product fetching using ProductDataService
   async function fetchProductDetails(groupHashB64, productIndex) {
-    try {
-      if (!groupHashB64) {
-        console.error("Missing groupHash - cannot fetch product details");
-        return {
-          name: "Invalid Product",
-          price: 0,
-          size: "N/A",
-          image_url: "",
-        };
-      }
-
-      if (store && store.productStore && store.productStore.client) {
-        try {
-          let groupHashBase64 = groupHashB64;
-          if (typeof groupHashB64 === "string" && groupHashB64.includes(",")) {
-            // It's a comma-separated string, convert to proper base64
-            const byteArray = new Uint8Array(
-              groupHashB64.split(",").map(Number),
-            );
-            groupHashBase64 = encodeHashToBase64(byteArray);
-          }
-
-          const groupHash = decodeHashFromBase64(groupHashBase64);
-          const result = await store.productStore.client.callZome({
-            role_name: "grocery",
-            zome_name: "products",
-            fn_name: "get_product_group",
-            payload: groupHash,
-          });
-
-          if (
-            result &&
-            result.entry &&
-            result.entry.Present &&
-            result.entry.Present.entry
-          ) {
-            const group = decode(result.entry.Present.entry) as ProductGroup;
-
-            if (
-              group &&
-              group.products &&
-              productIndex < group.products.length &&
-              group.products[productIndex]
-            ) {
-              return group.products[productIndex];
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching product details:", error);
-        }
-      }
-
-      // If we got here, fallback to generic data
-      return {
-        name: "Product",
-        price: 0,
-        size: "N/A",
-        image_url: "",
-      };
-    } catch (e) {
-      console.error("Error fetching product:", e);
-      return {
-        name: "Unknown Product",
-        price: 0,
-        size: "N/A",
-        image_url: "",
-      };
+    if (!groupHashB64) {
+      throw new Error("Missing groupHash");
     }
+
+    if (!productDataService) {
+      throw new Error("ProductDataService not available");
+    }
+
+    const product = await productDataService.getProductByReference(
+      groupHashB64,
+      productIndex,
+    );
+
+    if (!product) {
+      throw new Error(`Product not found: ${groupHashB64}_${productIndex}`);
+    }
+
+    return product;
   }
 
   // Clear cart
@@ -228,8 +175,8 @@
     return String(a).localeCompare(String(b));
   }
 
-  // NEW: Calculate savings
-  $: totalSavings = cartTotal > cartPromoTotal ? cartTotal - cartPromoTotal : 0;
+  // Use PriceService for savings calculation
+  $: totalSavings = PriceService.calculateSavings(cartTotal, cartPromoTotal);
 </script>
 
 <div
@@ -269,15 +216,17 @@
             </button>
           </div>
 
-          <!-- NEW: Dual price display section -->
+          <!-- UPDATED: Price display using PriceService -->
           <div class="cart-totals-section">
-            <div class="cart-total-regular">Total: ${cartTotal.toFixed(2)}</div>
+            <div class="cart-total-regular">
+              Total: {PriceService.formatTotal(cartTotal)}
+            </div>
             <div class="cart-total-promo">
-              With loyalty card: ${cartPromoTotal.toFixed(2)}
+              With loyalty card: {PriceService.formatTotal(cartPromoTotal)}
             </div>
             {#if totalSavings > 0}
               <div class="savings-amount">
-                You save: ${totalSavings.toFixed(2)}
+                You save: {PriceService.formatSavings(totalSavings)}
               </div>
             {/if}
           </div>
@@ -288,7 +237,6 @@
             {:else if cartItems.length === 0}
               <div class="empty-cart">Your cart is empty</div>
             {:else}
-              <!-- FIXED: Safe sorting of cart items -->
               {#each [...cartItems]
                 .filter((item) => item && item.groupHash)
                 .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
@@ -338,9 +286,7 @@
     background: var(--overlay-dark);
     opacity: 0;
     pointer-events: none;
-    z-index: var(
-      --z-index-highest
-    ); /* Increased z-index to be above all other elements */
+    z-index: var(--z-index-highest);
   }
 
   .overlay.visible {
@@ -366,9 +312,7 @@
     box-shadow: var(--shadow-sidebar);
     display: flex;
     flex-direction: column;
-    z-index: var(
-      --z-index-highest
-    ); /* Same as overlay to ensure it's visible */
+    z-index: var(--z-index-highest);
   }
 
   .cart-container.slide-in-right {
@@ -398,10 +342,10 @@
   }
 
   .cart-main-header {
-    height: var(--component-header-height); /* Explicit height */
+    height: var(--component-header-height);
     min-height: var(--component-header-height);
-    box-sizing: border-box; /* Include padding and border in the element's total width and height */
-    padding: 0 var(--spacing-lg); /* Adjust padding if needed, top/bottom padding will be handled by align-items */
+    box-sizing: border-box;
+    padding: 0 var(--spacing-lg);
     position: sticky;
     top: 0;
     background: var(--background);
@@ -418,7 +362,6 @@
     color: var(--text-primary);
   }
 
-  /* NEW: Cart totals styling */
   .cart-totals-section {
     padding: var(--spacing-sm) var(--spacing-lg);
     background: linear-gradient(

@@ -1,14 +1,13 @@
 <script lang="ts">
   import { getContext } from "svelte";
-  import type { Writable } from "svelte/store"; // Added Writable
-  import type { ShopStore, StoreContext, UIProps } from "./store"; // Added StoreContext, ADDED UIProps
-  import type { SimpleCartService } from "./cart/SimpleCartService"; // Added SimpleCartService
+  import type { Writable } from "svelte/store";
+  import type { ShopStore, StoreContext, UIProps } from "./store";
+  import type { CartBusinessService } from "./cart/CartBusinessService";
+  import type { ProductDataService } from "./ProductDataService";
   import ProductCard from "./ProductCard.svelte";
   import { onMount, onDestroy } from "svelte";
-  import { mainCategories } from "./categoryData";
   import SearchResults from "./search/SearchResults.svelte";
   import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
-  import { ProductDataService } from "./ProductDataService";
   import ProductBrowser from "./ProductBrowser.svelte";
   import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte";
   import {
@@ -17,7 +16,6 @@
     selectedOrganicStore,
   } from "./UiStateStore";
 
-  // Import UI state stores
   import {
     currentViewStore,
     isCartOpenStore,
@@ -30,7 +28,7 @@
     reportedProductStore,
     productNameStore,
     selectedProductHashStore,
-    searchResultsStore, // Changed from fuseResultsStore
+    searchResultsStore,
     isViewAllStore,
     resetSearchState,
     isHomeViewStore,
@@ -38,39 +36,34 @@
     featuredSubcategories,
   } from "./UiStateStore";
 
-  // Store setup
+  // UPDATED: Import category utilities
+  import {
+    shouldShowProductTypeNav,
+    getFilteredProductTypes,
+  } from "./categoryUtils";
+
   const storeContext = getContext<StoreContext>("store");
   let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
 
-  // Get cart service directly from the context
-  const cartService = getContext<Writable<SimpleCartService>>("cartService");
+  const cartService = getContext<Writable<CartBusinessService>>("cartService");
 
-  // Create product data service - will be initialized once store is available
-  let productDataService: ProductDataService | null = null; // MODIFIED
-  $: if (store && !productDataService) {
-    // MODIFIED: Initialize when store is ready
-    productDataService = new ProductDataService(store);
-  }
+  // UPDATED: Get ProductDataService from context (created in Controller)
+  const productDataService =
+    getContext<ProductDataService>("productDataService");
 
-  // Only keep standAlone param
   export let standAlone = false;
 
-  // Export this function to be called from Controller
   export function selectCategory(category, subcategory) {
     handleCategorySelect({ detail: { category, subcategory } });
   }
 
-  // Sync with UI store when uiProps changes
-  let uiProps: Writable<UIProps> | null = null; // MODIFIED
+  let uiProps: Writable<UIProps> | null = null;
   $: if (store) {
-    // MODIFIED: Only access uiProps if store exists
     uiProps = store.uiProps;
   }
 
-  // Reactive updates based on uiProps
   $: {
     if (uiProps && $uiProps) {
-      // MODIFIED: Check if uiProps and $uiProps are available
       if ($uiProps.searchMode !== undefined)
         $searchModeStore = $uiProps.searchMode;
       if ($uiProps.searchQuery !== undefined)
@@ -87,19 +80,16 @@
   }
 
   function handleCategorySelect({ detail: { category, subcategory } }) {
-    // Reset sort/filter state when changing categories
     sortByStore.set("best");
     selectedBrandsStore.set(new Set());
     selectedOrganicStore.set("all");
 
     if (category === null && subcategory === null) {
-      // This is a navigation to the home view
       $isHomeViewStore = true;
       $searchModeStore = false;
       $selectedCategoryStore = null;
       $selectedSubcategoryStore = null;
     } else {
-      // This is navigation to a category or subcategory
       $isHomeViewStore = false;
       $searchModeStore = false;
       if (store && uiProps && $uiProps) {
@@ -110,7 +100,6 @@
       $selectedProductTypeStore = "All";
     }
 
-    // Scroll to top using global scroll container
     const scrollContainer = document.querySelector(".global-scroll-container");
     if (scrollContainer) {
       scrollContainer.scrollTop = 0;
@@ -120,17 +109,13 @@
   }
 
   function handleProductTypeSelect({ detail }) {
-    console.log("ShopView received productTypeSelect:", detail);
-
     if (detail.category && detail.subcategory) {
-      // Full navigation from "Shop all"
       $selectedCategoryStore = detail.category;
       $selectedSubcategoryStore = detail.subcategory;
       $selectedProductTypeStore = detail.productType;
       $isHomeViewStore = false;
-      $searchModeStore = false; // Exit search mode
+      $searchModeStore = false;
     } else {
-      // Just product type change
       $selectedProductTypeStore = detail.productType;
     }
   }
@@ -163,19 +148,27 @@
       );
     }
   }
+
+  // UPDATED: Use centralized function for product type navigation visibility
+  $: showProductTypeNavigation = shouldShowProductTypeNav(
+    $selectedCategoryStore,
+    $selectedSubcategoryStore,
+  );
+
+  // UPDATED: Use centralized function for filtered product types
+  $: filteredProductTypes = getFilteredProductTypes(
+    $selectedCategoryStore,
+    $selectedSubcategoryStore,
+  );
 </script>
 
 <div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
   <div class="main-content">
     {#if store && productDataService}
-      <!-- MODIFIED: Render content only if store and service are available -->
       <div class="content-wrapper">
         {#if !$searchModeStore}
           {#if !$isHomeViewStore && $selectedCategoryStore && $selectedSubcategoryStore}
-            {@const subcategory = mainCategories
-              .find((c) => c.name === $selectedCategoryStore)
-              ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)}
-            {#if subcategory?.productTypes && subcategory.productTypes.length > 1 && !subcategory.gridOnly}
+            {#if showProductTypeNavigation}
               <div class="product-type-nav">
                 <div class="product-type-container">
                   <button
@@ -190,10 +183,7 @@
                   >
                     All
                   </button>
-                  {#each mainCategories
-                    .find((c) => c.name === $selectedCategoryStore)
-                    ?.subcategories.find((s) => s.name === $selectedSubcategoryStore)
-                    ?.productTypes?.filter((pt) => pt !== "All") ?? [] as productType}
+                  {#each filteredProductTypes as productType}
                     <button
                       class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
                       productType
@@ -229,7 +219,6 @@
               on:productTypeSelect={handleProductTypeSelect}
             />
           {:else if $isHomeViewStore}
-            <!-- Home view with multiple featured subcategories -->
             <ProductBrowser
               selectedCategory={null}
               selectedSubcategory={null}
@@ -247,7 +236,6 @@
               }}
             />
           {:else}
-            <!-- Normal category browsing -->
             <ProductBrowser
               selectedCategory={$selectedCategoryStore}
               selectedSubcategory={$selectedSubcategoryStore}
@@ -269,7 +257,6 @@
       </div>
     {:else}
       <div>Loading store...</div>
-      <!-- MODIFIED: Show loading or placeholder -->
     {/if}
   </div>
 </div>
@@ -317,7 +304,7 @@
 
   .root-container {
     display: flex;
-    height: 100%; /* Changed from calc height */
+    height: 100%;
     width: calc(100% - var(--sidebar-width-category));
     margin: 0 0 0 var(--sidebar-width-category);
     position: relative;
@@ -335,8 +322,8 @@
   }
 
   .content-wrapper {
-    padding-left: var(--spacing-md); /* <<< THIS IS THE KEY CHANGE */
-    padding-right: var(--spacing-md); /* <<< THIS IS THE KEY CHANGE */
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
     box-sizing: border-box;
   }
 
@@ -351,12 +338,10 @@
     align-items: center;
     padding-top: var(--spacing-md);
     padding-bottom: var(--spacing-md);
-    /* The nav bar itself doesn't need side padding if its content container has it */
     padding-left: 0;
     padding-right: 0;
-    /* Adjust negative margins to match the NEW parent padding (var(--spacing-md)) */
-    margin-left: calc(-1 * var(--spacing-md)); /* <<< CHANGED */
-    margin-right: calc(-1 * var(--spacing-md)); /* <<< CHANGED */
+    margin-left: calc(-1 * var(--spacing-md));
+    margin-right: calc(-1 * var(--spacing-md));
     border-bottom: var(--border-width-thin) solid var(--border-lighter);
   }
 
@@ -364,12 +349,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--spacing-xs);
-    width: 100%; /* Make sure it takes the full width of the .product-type-nav */
-    box-sizing: border-box; /* Important for width calculation with padding */
+    width: 100%;
+    box-sizing: border-box;
     max-width: 100%;
-    /* This padding aligns the actual buttons inside the nav with the content below */
-    padding-left: var(--spacing-md); /* <<< CHANGED */
-    padding-right: var(--spacing-md); /* <<< CHANGED */
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
   }
 
   .product-type-btn {

@@ -230,7 +230,7 @@
     >
         {#if sortedFilteredProducts.length > 0}
             <div class="grid-container" style="height: {$totalHeight}px;">
-                {#each $visibleIndices as index (sortedFilteredProducts[index]?.hash || index)}
+                {#each $visibleIndices as index (index)}
                     {#if sortedFilteredProducts[index]}
                         <div
                             class="product-container"

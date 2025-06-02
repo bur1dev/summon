@@ -118,11 +118,11 @@ export function useVirtualGrid(config: VirtualGridConfig) {
 
         const viewportHeight = parentScrollContainer.clientHeight;
         const startRow = Math.floor(relativeScrollTop / config.itemHeight);
-        const visibleRows = Math.ceil(viewportHeight / config.itemHeight) + 4;
-        const startIndex = Math.max(0, (startRow - 3) * columnsPerRow);
+        const visibleRows = Math.ceil(viewportHeight / config.itemHeight) + 5;
+        const startIndex = Math.max(0, (startRow - 7) * columnsPerRow);
         const endIndex = Math.min(
             config.items.length,
-            (startRow + visibleRows + 3) * columnsPerRow,
+            (startRow + visibleRows + 7) * columnsPerRow,
         );
 
         if (!positionCache.has(startIndex)) {

@@ -496,9 +496,7 @@
     padding: 0;
     box-shadow: none;
     transition: var(--card-transition);
-    transform: scale(1) translate3d(0, 0, 0);
     overflow: visible;
-    will-change: transform;
     cursor: pointer;
     border: none;
     border-radius: var(--card-border-radius);

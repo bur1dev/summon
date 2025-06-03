@@ -47,7 +47,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
     // === STATIC DATA UPDATES (Business logic changes) ===
     function updateItems(newItems: any[]) {
         items = newItems;
-        console.log(`[VirtualGrid] updateItems called with ${newItems.length} items`);
 
         // Clear existing element references
         productElements.clear();
@@ -56,8 +55,30 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
         callbacks.onItemsChange(newItems);
 
         if (gridContainer) {
-            recalculateGrid();
+            // Force immediate element rescan after DOM updates
+            setTimeout(async () => {
+                await tick(); // Ensure DOM has updated
+                forceElementRescan();
+                recalculateGrid();
+            }, 0);
         }
+    }
+
+    // === CORE FIX: Robust element scanning and indexing ===
+    function forceElementRescan() {
+        if (!gridContainer) return;
+
+        productElements.clear();
+
+        // Get all product elements and rebuild mapping based on current DOM order
+        const elements = gridContainer.querySelectorAll('[data-virtual-index]');
+        const elementArray = Array.from(elements) as HTMLElement[];
+
+        // Update data-virtual-index attributes to match current array order
+        elementArray.forEach((element, domIndex) => {
+            element.setAttribute('data-virtual-index', domIndex.toString());
+            productElements.set(domIndex, element);
+        });
     }
 
     // === DIRECT DOM MANIPULATION (Performance-critical) ===
@@ -73,8 +94,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
 
             const rowCount = Math.ceil(items.length / columnsPerRow);
             totalHeight = rowCount * itemHeight;
-
-            console.log(`[VirtualGrid] Grid recalc: ${items.length} items, ${columnsPerRow} cols, ${rowCount} rows, ${totalHeight}px height`);
 
             // Notify component of height change for container sizing
             callbacks.onTotalHeightChange(totalHeight);
@@ -141,14 +160,12 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
         visibleIndices.forEach(index => {
             if (index >= items.length) return;
 
-            // Get or create element for this index
+            // Get element from cache - if not found, rescan
             let element = productElements.get(index);
             if (!element) {
-                // Look for the element in the DOM
-                element = gridContainer?.querySelector(`[data-virtual-index="${index}"]`) as HTMLElement;
-                if (element) {
-                    productElements.set(index, element);
-                }
+                // Element not in cache - force rescan
+                forceElementRescan();
+                element = productElements.get(index);
             }
 
             if (element) {
@@ -168,7 +185,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
         });
 
         currentVisibleIndices = visibleIndices;
-        console.log(`[VirtualGrid] Applied positions to ${visibleIndices.length} visible items`);
     }
 
     function handleScroll() {
@@ -186,7 +202,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
     function startRenderLoop() {
         if (renderLoopActive) return;
         renderLoopActive = true;
-        console.log('[VirtualGrid] Starting render loop');
 
         function renderFrame() {
             const now = performance.now();
@@ -227,16 +242,8 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
     }
 
     function scanForElements() {
-        // Scan for all product elements in the grid and cache them
-        if (!gridContainer) return;
-
-        const elements = gridContainer.querySelectorAll('[data-virtual-index]');
-        elements.forEach((element) => {
-            const index = parseInt(element.getAttribute('data-virtual-index') || '0');
-            productElements.set(index, element as HTMLElement);
-        });
-
-        console.log(`[VirtualGrid] Scanned and cached ${productElements.size} product elements`);
+        // Delegate to the more robust forceElementRescan
+        forceElementRescan();
     }
 
     function initialize(element: HTMLElement) {
@@ -254,7 +261,7 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
 
             setTimeout(() => {
                 recalculateGrid();
-                scanForElements();
+                forceElementRescan();
                 handleScroll();
             }, 100);
         } else {
@@ -269,7 +276,7 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
 
         setTimeout(() => {
             recalculateGrid();
-            scanForElements();
+            forceElementRescan();
             startRenderLoop();
         }, 50);
 

@@ -475,12 +475,15 @@
 
         if (!selectedCategory) return;
 
+        const categoryAtStart = selectedCategory; // Capture category at start
         const gridData =
             await dataManager.loadAllCategoryProducts(selectedCategory);
 
+        // Only update if still on same category
         if (
-            currentNavigationState.category === selectedCategory &&
-            currentNavigationState.subcategory === null
+            currentNavigationState.category === categoryAtStart &&
+            currentNavigationState.subcategory === null &&
+            selectedCategory === categoryAtStart
         ) {
             if (gridData?.products) {
                 allCategoryProducts = gridData.products;
@@ -521,23 +524,11 @@
             rowCapacities[identifier] = capacity;
             visibleGroups.add(identifier);
 
-            // NEW: Calculate and set total products for this identifier
-            if (selectedCategory) {
-                try {
-                    const total = await dataManager.getTotalProductsForPath(
-                        selectedCategory,
-                        identifier,
-                    );
-                    totalProducts[identifier] = total;
-                } catch (error) {
-                    console.error(
-                        `Error getting total for ${identifier}:`,
-                        error,
-                    );
-                    totalProducts[identifier] = result.products?.length || 0;
-                }
-            }
+            // Use total from backend result (calculated from link tags)
+            totalProducts[identifier] =
+                result.total || result.products?.length || 0;
         }
+
         categoryProducts = { ...categoryProducts };
         currentRanges = { ...currentRanges };
         totalProducts = { ...totalProducts };

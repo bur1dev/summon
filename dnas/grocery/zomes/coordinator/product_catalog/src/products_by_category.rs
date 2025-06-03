@@ -70,9 +70,19 @@ pub fn get_products_by_category(params: GetProductsParams) -> ExternResult<Categ
             return Err(e);
         }
     };
-
+    
     let total_groups = all_links.len();
-
+    
+    // Calculate total products count from link tags
+    let total_products_from_links: usize = all_links.iter()
+        .map(|link| {
+            if link.tag.0.len() >= 4 {
+                let count_bytes: [u8; 4] = link.tag.0[..4].try_into().unwrap_or([0, 0, 0, 0]);
+                u32::from_le_bytes(count_bytes) as usize
+            } else { 0 }
+        })
+        .sum();
+    
     // Apply pagination directly (no sorting needed)
     let paginated_links = all_links
         .into_iter()
@@ -111,7 +121,7 @@ pub fn get_products_by_category(params: GetProductsParams) -> ExternResult<Categ
         product_type: params.product_type,
         product_groups: product_groups_records,
         total_groups,
-        total_products: total_products_count,
+        total_products: total_products_from_links, // Use link tag totals instead of fetched groups
         has_more,
     })
 }

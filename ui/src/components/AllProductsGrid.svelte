@@ -98,14 +98,8 @@
     const virtualGridCallbacks = {
         onTotalHeightChange: (height: number) => {
             totalHeight = height;
-            console.log(
-                `[AllProductsGrid] Container height updated: ${height}px`,
-            );
         },
         onItemsChange: (items: any[]) => {
-            console.log(
-                `[AllProductsGrid] Virtual grid updated with ${items.length} items`,
-            );
             // Trigger element rescan after DOM updates
             setTimeout(() => {
                 if (virtualGrid) {
@@ -128,9 +122,6 @@
     // Use resize observer for scroll container changes
     const scrollContainerResizeObserver = useResizeObserver(
         async () => {
-            console.log(
-                "[AllProductsGrid] Global scroll container resized, updating virtual grid...",
-            );
             if (virtualGrid && sortedFilteredProducts.length > 0) {
                 virtualGrid.updateItems(sortedFilteredProducts);
             }
@@ -143,9 +134,6 @@
 
     // Update virtual grid when BUSINESS DATA changes (stay reactive)
     $: if (virtualGrid && sortedFilteredProducts) {
-        console.log(
-            `[AllProductsGrid] Updating virtual grid with ${sortedFilteredProducts.length} products`,
-        );
         virtualGrid.updateItems(sortedFilteredProducts);
     }
 

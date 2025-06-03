@@ -65,14 +65,6 @@
               visualGapWanted, // Subtract desired gap to position below header
           );
 
-          console.log({
-            offsetTop: selectedElement.offsetTop,
-            actualHeaderHeight,
-            visualGapWanted,
-            selectedElementMarginTop,
-            calculatedTargetPosition: targetPosition,
-          });
-
           sidebarElement.scrollTo({
             top: targetPosition,
             behavior: "smooth",

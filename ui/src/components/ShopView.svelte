@@ -7,7 +7,7 @@
   import ProductCard from "./ProductCard.svelte";
   import { onMount, onDestroy } from "svelte";
   import SearchResults from "../search/SearchResults.svelte";
-  import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
+  import ReportCategoryDialog from "./category reports/ReportCategoryDialog.svelte";
   import ProductBrowserData from "./ProductBrowserData.svelte";
   import CheckedOutCarts from "../cart/CheckedOutCartsView.svelte";
 

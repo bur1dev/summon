@@ -1,6 +1,6 @@
 <script lang="ts">
     import { showMenuStore } from "../stores/UiOnlyStore";
-    import CategoryReportsAdmin from "./CategoryReportsAdmin.svelte";
+    import CategoryReportsAdmin from "./category reports/CategoryReportsAdmin.svelte";
     import ProfileEditor from "./ProfileEditor.svelte";
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
     import { X, Tag, AlertTriangle } from "lucide-svelte";

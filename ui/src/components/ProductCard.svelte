@@ -3,7 +3,7 @@
   import type { Writable } from "svelte/store";
   import { BarChart, Plus, Minus, Flag } from "lucide-svelte";
   import { encodeHashToBase64 } from "@holochain/client";
-  import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
+  import ReportCategoryDialog from "./category reports/ReportCategoryDialog.svelte";
   import ProductDetailModal from "./ProductDetailModal.svelte";
   import { createEventDispatcher } from "svelte";
 

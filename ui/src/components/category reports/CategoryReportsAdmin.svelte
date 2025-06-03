@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { mainCategories } from "../utils/categoryData";
+    import { mainCategories } from "../../utils/categoryData";
     import { getContext } from "svelte";
     import {
         X,
@@ -10,7 +10,7 @@
         Database,
         RefreshCw,
     } from "lucide-svelte";
-    import type { StoreContext, ShopStore } from "../store"; // Adjust path if needed
+    import type { StoreContext, ShopStore } from "../../store"; // Adjust path if needed
 
     // This must be at the top level
     const storeContext = getContext<StoreContext>("store");

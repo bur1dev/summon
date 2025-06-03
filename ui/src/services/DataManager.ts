@@ -60,6 +60,15 @@ export class DataManager {
         return this.productDataService.loadAllCategoryProducts(category);
     }
 
+    // === NEW: TOTAL CALCULATION METHOD ===
+    async getTotalProductsForPath(
+        category: string,
+        subcategory?: string,
+        productType?: string
+    ): Promise<number> {
+        return this.productDataService.calculateTotalForPath(category, subcategory, productType);
+    }
+
     // === UTILITY METHODS ===
     extractProductsFromGroups(groupRecords: any[]) {
         return this.productDataService.extractProductsFromGroups(groupRecords);

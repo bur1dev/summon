@@ -96,6 +96,37 @@ export class ProductDataService {
         }
     }
 
+    // NEW: Simple method to calculate total products for a path
+    async calculateTotalForPath(
+        category: string,
+        subcategory?: string,
+        productType?: string
+    ): Promise<number> {
+        try {
+            const response = await this.store.service.client.callZome({
+                role_name: "grocery",
+                zome_name: "products",
+                fn_name: "get_all_group_counts_for_path",
+                payload: {
+                    category,
+                    subcategory,
+                    product_type: productType
+                }
+            });
+
+            // Sum all group counts to get total
+            let totalCount = 0;
+            for (const count of response) {
+                totalCount += Number(count) || 0;
+            }
+
+            return totalCount;
+        } catch (error) {
+            console.error('Error calculating total for path:', error);
+            return 0;
+        }
+    }
+
     // Centralized product extraction - eliminates duplication
     extractProductsFromGroups(groupRecords: HolochainRecord[]): ProductWithClientHash[] {
         if (!groupRecords || groupRecords.length === 0) return [];
@@ -222,6 +253,8 @@ export class ProductDataService {
         }
 
         // Cache the full group data
+        const correctTotal = boundaries.length > 0 ? boundaries[boundaries.length - 1].end : 0;
+
         this.cache.setCacheGroup(
             params.category,
             params.isProductType ? identifier : params.identifier,
@@ -235,7 +268,7 @@ export class ProductDataService {
                 rangeEnd: boundaries.length > 0 && boundaries[startGroupIndex]
                     ? boundaries[startGroupIndex].start + accumulatedProducts.length
                     : accumulatedProducts.length,
-                totalInPath,
+                totalInPath: correctTotal,  // <-- Use correct total from boundaries
                 hasMore: newHasMore || hasMoreProducts
             }
         );

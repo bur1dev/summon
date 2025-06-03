@@ -290,7 +290,7 @@
                     .filter(Boolean),
             );
 
-            processHomeViewResults(batchResults, containerCapacity);
+            await processHomeViewResults(batchResults, containerCapacity);
             await tick();
             await registerResizeObservers();
         }
@@ -353,7 +353,7 @@
                 );
             }),
         );
-        processSubcategoryResults(initialResults, capacity);
+        await processSubcategoryResults(initialResults, capacity);
         await tick();
 
         if (subcategories.length > 3) {
@@ -385,7 +385,7 @@
                     );
                 }),
             );
-            processSubcategoryResults(batchResults, capacity);
+            await processSubcategoryResults(batchResults, capacity);
             await tick();
             await registerResizeObservers();
         }
@@ -462,7 +462,7 @@
                     );
                 }),
             );
-            processProductTypeResults(batchResults, capacity);
+            await processProductTypeResults(batchResults, capacity);
             await tick();
             await registerResizeObservers();
         }
@@ -506,9 +506,9 @@
         });
     }
 
-    function processSubcategoryResults(results: any[], capacity: number) {
-        results.forEach((result: any) => {
-            if (!result?.products?.length || !result?.name) return;
+    async function processSubcategoryResults(results: any[], capacity: number) {
+        for (const result of results) {
+            if (!result?.products?.length || !result?.name) continue;
             const identifier = result.name;
             const initialProducts = result.products.slice(0, capacity);
             currentRanges[identifier] = {
@@ -520,7 +520,24 @@
                 result.hasMore || result.products.length > capacity;
             rowCapacities[identifier] = capacity;
             visibleGroups.add(identifier);
-        });
+
+            // NEW: Calculate and set total products for this identifier
+            if (selectedCategory) {
+                try {
+                    const total = await dataManager.getTotalProductsForPath(
+                        selectedCategory,
+                        identifier,
+                    );
+                    totalProducts[identifier] = total;
+                } catch (error) {
+                    console.error(
+                        `Error getting total for ${identifier}:`,
+                        error,
+                    );
+                    totalProducts[identifier] = result.products?.length || 0;
+                }
+            }
+        }
         categoryProducts = { ...categoryProducts };
         currentRanges = { ...currentRanges };
         totalProducts = { ...totalProducts };
@@ -528,9 +545,9 @@
         rowCapacities = { ...rowCapacities };
     }
 
-    function processHomeViewResults(results: any[], capacity: number) {
-        results.forEach((result: any) => {
-            if (!result?.products?.length || !result?.identifier) return;
+    async function processHomeViewResults(results: any[], capacity: number) {
+        for (const result of results) {
+            if (!result?.products?.length || !result?.identifier) continue;
             const identifier = result.identifier;
             const initialProducts = result.products.slice(0, capacity);
             currentRanges[identifier] = {
@@ -542,7 +559,19 @@
                 result.hasMore || result.products.length > capacity;
             rowCapacities[identifier] = capacity;
             visibleGroups.add(identifier);
-        });
+
+            // NEW: Calculate and set total products for this identifier
+            try {
+                const total = await dataManager.getTotalProductsForPath(
+                    result.category,
+                    result.subcategory,
+                );
+                totalProducts[identifier] = total;
+            } catch (error) {
+                console.error(`Error getting total for ${identifier}:`, error);
+                totalProducts[identifier] = result.products?.length || 0;
+            }
+        }
         categoryProducts = { ...categoryProducts };
         currentRanges = { ...currentRanges };
         totalProducts = { ...totalProducts };
@@ -550,9 +579,9 @@
         rowCapacities = { ...rowCapacities };
     }
 
-    function processProductTypeResults(results: any[], capacity: number) {
-        results.forEach((result: any) => {
-            if (!result?.products?.length || !result?.type) return;
+    async function processProductTypeResults(results: any[], capacity: number) {
+        for (const result of results) {
+            if (!result?.products?.length || !result?.type) continue;
             const identifier = result.type;
             const initialProducts = result.products.slice(0, capacity);
             currentRanges[identifier] = {
@@ -564,7 +593,25 @@
                 result.hasMore || result.products.length > capacity;
             rowCapacities[identifier] = capacity;
             visibleGroups.add(identifier);
-        });
+
+            // NEW: Calculate and set total products for this identifier
+            if (selectedCategory && selectedSubcategory) {
+                try {
+                    const total = await dataManager.getTotalProductsForPath(
+                        selectedCategory,
+                        selectedSubcategory,
+                        identifier,
+                    );
+                    totalProducts[identifier] = total;
+                } catch (error) {
+                    console.error(
+                        `Error getting total for ${identifier}:`,
+                        error,
+                    );
+                    totalProducts[identifier] = result.products?.length || 0;
+                }
+            }
+        }
         categoryProducts = { ...categoryProducts };
         currentRanges = { ...currentRanges };
         totalProducts = { ...totalProducts };

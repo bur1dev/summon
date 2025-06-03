@@ -66,9 +66,17 @@
     $: if (direction === "right") {
         const atEnd =
             currentRanges[identifier]?.end >= totalProducts[identifier];
+
+        // Add this logging for 1-product rows
+        console.log(`Arrow debug for ${identifier}:`, {
+            hasMore,
+            currentEnd: currentRanges[identifier]?.end,
+            totalProducts: totalProducts[identifier],
+            atEnd,
+            disabled: !hasMore && atEnd,
+        });
+
         disabled = !hasMore && atEnd;
-    } else if (direction === "left") {
-        disabled = currentRanges[identifier]?.start === 0;
     }
 </script>
 

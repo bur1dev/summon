@@ -1,9 +1,10 @@
 <script lang="ts">
-  import ShopView from "./ShopView.svelte";
-  import HeaderContainer from "./HeaderContainer.svelte";
+  import ShopView from "./components/ShopView.svelte";
+  import HeaderContainer from "./components/HeaderContainer.svelte";
   import { ShopStore } from "./store";
-  import { ProductDataService } from "./ProductDataService";
-  import { ProductRowCacheService } from "./ProductRowCacheService";
+  import { ProductDataService } from "./services/ProductDataService";
+  import { ProductRowCacheService } from "./services/ProductRowCacheService";
+  import { DataManager } from "./services/DataManager";
   import {
     setContext,
     onMount,
@@ -15,26 +16,35 @@
   import type { Writable } from "svelte/store";
 
   import { ProfilesStore } from "@holochain-open-dev/profiles";
-  import CategorySidebar from "./CategorySidebar.svelte";
+  import CategorySidebar from "./components/CategorySidebar.svelte";
   import SlideOutCart from "./cart/SlideOutCart.svelte";
   import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte";
+
+  // Import from UI-only store
   import {
     currentViewStore,
     isCartOpenStore,
-    searchModeStore,
-    searchQueryStore,
-    selectedCategoryStore,
-    selectedSubcategoryStore,
-    selectedProductTypeStore,
     showReportDialogStore,
     reportedProductStore,
     productNameStore,
     selectedProductHashStore,
     searchResultsStore,
     isViewAllStore,
+    searchMethodStore,
+    featuredSubcategories,
+  } from "./stores/UiOnlyStore";
+
+  // Import from data trigger store
+  import {
+    searchModeStore,
+    searchQueryStore,
+    selectedCategoryStore,
+    selectedSubcategoryStore,
+    selectedProductTypeStore,
     isHomeViewStore,
-  } from "./UiStateStore";
-  import SidebarMenu from "./SidebarMenu.svelte";
+  } from "./stores/DataTriggerStore";
+
+  import SidebarMenu from "./components/SidebarMenu.svelte";
   import type { CartBusinessService } from "./cart/CartBusinessService";
 
   export let roleName = "";
@@ -55,6 +65,9 @@
       : new ProductRowCacheService();
   const productDataService = new ProductDataService(store, cacheService);
 
+  // STEP 2: Create centralized DataManager
+  const dataManager = new DataManager(productDataService);
+
   // Get cart service from context
   const cartService =
     getContext<Writable<CartBusinessService | null>>("cartService");
@@ -69,7 +82,12 @@
     getStore: () => store,
   });
 
-  // Set ProductDataService context during initialization
+  // STEP 2: Set DataManager context instead of ProductDataService
+  // This becomes the single gateway for all data operations
+  setContext("dataManager", dataManager);
+
+  // LEGACY: Keep ProductDataService context for cart services temporarily
+  // TODO: Eventually update cart services to use DataManager
   setContext("productDataService", productDataService);
 
   const DEFAULT_BG_IMG = "";

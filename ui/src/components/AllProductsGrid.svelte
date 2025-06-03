@@ -1,17 +1,20 @@
 <script lang="ts">
     import { getContext, onMount, onDestroy, tick } from "svelte";
-    import type { StoreContext } from "./store";
+    import type { StoreContext } from "../store";
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import SortFilterDropdown from "./SortFilterDropdown.svelte";
+
+    // Import from data trigger store (these control filtering/sorting)
     import {
         sortByStore,
         selectedBrandsStore,
         selectedOrganicStore,
-    } from "./UiStateStore";
-    import { shouldShowSortControls } from "./categoryUtils";
-    import { useResizeObserver } from "./useResizeObserver";
-    import { useVirtualGrid } from "./useVirtualGrid";
+    } from "../stores/DataTriggerStore";
+
+    import { shouldShowSortControls } from "../utils/categoryUtils";
+    import { useResizeObserver } from "../utils/useResizeObserver";
+    import { useVirtualGrid } from "../utils/useVirtualGrid";
 
     export let selectedCategory: string;
     export let selectedSubcategory: string | null = null;
@@ -30,25 +33,7 @@
     let brandsDropdownOpen = false;
     let organicDropdownOpen = false;
 
-    // Use resize observer for scroll container changes
-    const scrollContainerResizeObserver = useResizeObserver(
-        async () => {
-            console.log(
-                "AllProductsGrid: Global scroll container resized, updating virtual grid...",
-            );
-            if (virtualGrid && sortedFilteredProducts.length > 0) {
-                virtualGrid.updateItems(sortedFilteredProducts);
-            }
-        },
-        {
-            debounceMs: 50,
-            requiresTick: true,
-        },
-    );
-
-    $: console.log(
-        `Rendering ${$visibleIndices.length} of ${sortedFilteredProducts.length} products`,
-    );
+    // === BUSINESS LOGIC (Keeps Svelte reactivity) ===
 
     // Use centralized category utility - fix null handling
     $: shouldShowControls = shouldShowSortControls(
@@ -68,7 +53,7 @@
         return Array.from(brands).sort();
     })();
 
-    // Apply sorting and filtering to products
+    // Apply sorting and filtering to products (BUSINESS LOGIC - stays reactive)
     $: sortedFilteredProducts = (() => {
         let result = [...products];
 
@@ -104,21 +89,62 @@
         return result;
     })();
 
-    // Initialize virtual grid with empty items first
-    const virtualGrid = useVirtualGrid({
-        items: [],
-        itemWidth: 245,
-        itemHeight: 450,
-    });
+    // === DIRECT CSS POSITIONING (Vanilla JS performance) ===
 
-    // Get reactive values from virtual grid
-    $: ({ visibleIndices, totalHeight } = virtualGrid);
-    $: positionCache = virtualGrid.getPositionCache();
+    // Local state for container sizing only
+    let totalHeight: number = 0;
 
-    // Update virtual grid when products change - FIXED
+    // Simplified callbacks - only for business data changes, not positioning
+    const virtualGridCallbacks = {
+        onTotalHeightChange: (height: number) => {
+            totalHeight = height;
+            console.log(
+                `[AllProductsGrid] Container height updated: ${height}px`,
+            );
+        },
+        onItemsChange: (items: any[]) => {
+            console.log(
+                `[AllProductsGrid] Virtual grid updated with ${items.length} items`,
+            );
+            // Trigger element rescan after DOM updates
+            setTimeout(() => {
+                if (virtualGrid) {
+                    virtualGrid.scanForElements();
+                }
+            }, 50);
+        },
+    };
+
+    // Initialize virtual grid with simplified callback approach
+    const virtualGrid = useVirtualGrid(
+        {
+            items: [],
+            itemWidth: 245,
+            itemHeight: 450,
+        },
+        virtualGridCallbacks,
+    );
+
+    // Use resize observer for scroll container changes
+    const scrollContainerResizeObserver = useResizeObserver(
+        async () => {
+            console.log(
+                "[AllProductsGrid] Global scroll container resized, updating virtual grid...",
+            );
+            if (virtualGrid && sortedFilteredProducts.length > 0) {
+                virtualGrid.updateItems(sortedFilteredProducts);
+            }
+        },
+        {
+            debounceMs: 50,
+            requiresTick: true,
+        },
+    );
+
+    // Update virtual grid when BUSINESS DATA changes (stay reactive)
     $: if (virtualGrid && sortedFilteredProducts) {
         console.log(
-            `Updating virtual grid with ${sortedFilteredProducts.length} products`,
+            `[AllProductsGrid] Updating virtual grid with ${sortedFilteredProducts.length} products`,
         );
         virtualGrid.updateItems(sortedFilteredProducts);
     }
@@ -229,26 +255,26 @@
         use:virtualGrid.action
     >
         {#if sortedFilteredProducts.length > 0}
-            <div class="grid-container" style="height: {$totalHeight}px;">
-                {#each $visibleIndices as index (index)}
-                    {#if sortedFilteredProducts[index]}
-                        <div
-                            class="product-container"
-                            style="position: absolute; top: {positionCache.get(
-                                index,
-                            )?.top ??
-                                Math.floor(index / 1) *
-                                    450}px; left: {positionCache.get(index)
-                                ?.left ?? 0}px; width: 245px;"
-                        >
-                            <ProductCard
-                                product={sortedFilteredProducts[index]}
-                                on:reportCategory={(event) =>
-                                    dispatch("reportCategory", event.detail)}
-                                on:productTypeSelect
-                            />
-                        </div>
-                    {/if}
+            <!-- Fixed height container for virtual scrolling -->
+            <div
+                class="grid-container"
+                style="height: {totalHeight}px; position: relative;"
+            >
+                <!-- Render ALL products with virtual index attributes -->
+                <!-- useVirtualGrid will handle show/hide and positioning via direct CSS transforms -->
+                {#each sortedFilteredProducts as product, index (product.hash || index)}
+                    <div
+                        class="product-container"
+                        data-virtual-index={index}
+                        style="display: none; position: absolute; width: 245px; height: 450px;"
+                    >
+                        <ProductCard
+                            {product}
+                            on:reportCategory={(event) =>
+                                dispatch("reportCategory", event.detail)}
+                            on:productTypeSelect
+                        />
+                    </div>
                 {/each}
             </div>
         {:else}
@@ -310,7 +336,10 @@
     }
 
     .product-container {
-        height: 100%;
+        /* Positioning will be handled by useVirtualGrid via direct CSS transforms */
+        /* Initial styles - will be overridden by virtual grid */
+        height: 450px;
+        width: 245px;
         padding: 0;
         transform: translateZ(0);
         will-change: transform;
@@ -327,5 +356,17 @@
 
     :global(*) {
         outline: none !important;
+    }
+
+    /* Disable card entrance animations for virtual grid performance */
+    :global(.products-grid .product-card) {
+        opacity: 1 !important;
+        animation: none !important;
+    }
+
+    /* Allow button animations to work */
+    :global(.products-grid .add-btn) {
+        animation: unset !important;
+        transition: var(--btn-transition) !important;
     }
 </style>

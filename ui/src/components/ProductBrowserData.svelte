@@ -1,26 +1,24 @@
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
-    import AllProductsGrid from "./AllProductsGrid.svelte";
-    import ProductRow from "./ProductRow.svelte";
-    import type { ProductDataService } from "./ProductDataService";
-    import { ProductRowCacheService } from "./ProductRowCacheService";
+    import type { DataManager } from "../services/DataManager";
+    import { ProductRowCacheService } from "../services/ProductRowCacheService";
     import { tick } from "svelte";
-    import { useResizeObserver } from "./useResizeObserver";
-    // UPDATED: Import category utilities
+    import { useResizeObserver } from "../utils/useResizeObserver";
+    import ProductBrowserView from "./ProductBrowserView.svelte";
     import {
         getSubcategoryConfig,
         isGridOnlySubcategory,
         getFilteredProductTypes,
         hasProductTypes,
         getAllSubcategories,
-    } from "./categoryUtils";
+    } from "../utils/categoryUtils";
 
     // Required props
     export let selectedCategory: string | null = null;
     export let selectedSubcategory: string | null = null;
     export let selectedProductType: string = "All";
     export let searchMode: boolean = false;
-    export let productDataService: ProductDataService;
+    export let dataManager: DataManager;
 
     // New props for home view
     export let isHomeView: boolean = false;
@@ -53,7 +51,6 @@
         productType: "All",
     };
 
-    // UPDATED: Use the new resize observer composable
     const resizeObserver = useResizeObserver(
         ({ element, identifier }) => {
             if (identifier) {
@@ -66,7 +63,6 @@
         },
     );
 
-    // UPDATED: Export the action from the composable
     export const action = resizeObserver.action;
 
     onMount(() => {
@@ -76,7 +72,6 @@
     onDestroy(() => {
         categoryProducts = {};
         allCategoryProducts = [];
-        // UPDATED: Use composable cleanup
         resizeObserver.disconnect();
     });
 
@@ -179,7 +174,7 @@
 
             let result;
             if (isProductTypeRow) {
-                result = await productDataService.loadProductTypeProducts(
+                result = await dataManager.loadProductTypeProducts(
                     category,
                     subcategory,
                     identifier,
@@ -187,7 +182,7 @@
                     capacity,
                 );
             } else {
-                result = await productDataService.loadSubcategoryProducts(
+                result = await dataManager.loadSubcategoryProducts(
                     category,
                     subcategory,
                     capacity,
@@ -275,7 +270,7 @@
                 currentBatch
                     .map(async (featured) => {
                         const result =
-                            await productDataService.loadSubcategoryProducts(
+                            await dataManager.loadSubcategoryProducts(
                                 featured.category,
                                 featured.subcategory || featured.category,
                                 containerCapacity,
@@ -316,7 +311,7 @@
 
         try {
             if (selectedProductType !== "All") {
-                const result = await productDataService.loadProductTypeProducts(
+                const result = await dataManager.loadProductTypeProducts(
                     selectedCategory,
                     selectedSubcategory,
                     selectedProductType,
@@ -346,13 +341,12 @@
     async function loadMainCategoryView(capacity: number) {
         if (!selectedCategory) return;
 
-        // FIXED: Get all subcategories for this category
         const subcategories = getAllSubcategories(selectedCategory);
         const initialSubcategories = subcategories.slice(0, 3);
 
         const initialResults = await Promise.all(
             initialSubcategories.map(async (sub) => {
-                return await productDataService.loadSubcategoryProducts(
+                return await dataManager.loadSubcategoryProducts(
                     selectedCategory!,
                     sub.name,
                     capacity,
@@ -384,7 +378,7 @@
 
             const batchResults = await Promise.all(
                 currentBatch.map(async (sub: any) => {
-                    return await productDataService.loadSubcategoryProducts(
+                    return await dataManager.loadSubcategoryProducts(
                         selectedCategory!,
                         sub.name,
                         capacity,
@@ -400,7 +394,6 @@
     async function loadSubcategoryView(capacity: number) {
         if (!selectedCategory || !selectedSubcategory) return;
 
-        // UPDATED: Use centralized utility
         const subcategoryConfig = getSubcategoryConfig(
             selectedCategory,
             selectedSubcategory,
@@ -412,7 +405,6 @@
             return;
         }
 
-        // UPDATED: Use centralized utility
         if (isGridOnlySubcategory(selectedCategory, selectedSubcategory)) {
             await loadGridOnlySubcategory();
         } else if (selectedProductType === "All") {
@@ -432,7 +424,7 @@
 
         if (!selectedCategory || !selectedSubcategory) return;
 
-        const result = await productDataService.loadProductTypeProducts(
+        const result = await dataManager.loadProductTypeProducts(
             selectedCategory,
             selectedSubcategory,
             null,
@@ -450,7 +442,6 @@
     async function loadProductTypesView(capacity: number) {
         if (!selectedCategory || !selectedSubcategory) return;
 
-        // UPDATED: Use centralized utility
         const productTypes = getFilteredProductTypes(
             selectedCategory,
             selectedSubcategory,
@@ -462,7 +453,7 @@
 
             const batchResults = await Promise.all(
                 currentBatch.map(async (type) => {
-                    return await productDataService.loadProductTypeProducts(
+                    return await dataManager.loadProductTypeProducts(
                         selectedCategory!,
                         selectedSubcategory!,
                         type,
@@ -485,7 +476,7 @@
         if (!selectedCategory) return;
 
         const gridData =
-            await productDataService.loadAllCategoryProducts(selectedCategory);
+            await dataManager.loadAllCategoryProducts(selectedCategory);
 
         if (
             currentNavigationState.category === selectedCategory &&
@@ -509,7 +500,6 @@
             const identifier = node.getAttribute("data-subcategory");
             if (identifier) {
                 gridContainer[identifier] = node as HTMLElement;
-                // UPDATED: Use composable instead of direct observer
                 resizeObserver.observe(node as HTMLElement);
                 loadedSubcategoriesSet.add(identifier);
             }
@@ -593,7 +583,6 @@
         visibleGroups.clear();
         loadedSubcategoriesSet.clear();
 
-        // UPDATED: Use composable cleanup
         resizeObserver.disconnect();
         gridContainer = {};
     }
@@ -609,7 +598,7 @@
 
         if (!identifier) {
             console.error(
-                "ProductBrowser: handleDataLoaded received event without an identifier!",
+                "ProductBrowserData: handleDataLoaded received event without an identifier!",
             );
             return;
         }
@@ -637,10 +626,6 @@
         hasMore = { ...hasMore };
     }
 
-    function handleReportCategory(event: CustomEvent) {
-        dispatch("reportCategory", event.detail);
-    }
-
     function handleBoundariesInitialized(event: CustomEvent) {
         const { identifier: id, grandTotal } = event.detail;
         if (id && typeof grandTotal === "number") {
@@ -650,6 +635,20 @@
             }
         }
     }
+
+    function handleReportCategory(event: CustomEvent) {
+        dispatch("reportCategory", event.detail);
+    }
+
+    function handleProductTypeSelect(event: CustomEvent) {
+        dispatch("productTypeSelect", event.detail);
+    }
+
+    function handleViewMore(event: CustomEvent) {
+        dispatch("viewMore", event.detail);
+    }
+
+    // mainGridContainer is now passed as a prop to the view component
 
     function getSubcategoryFromIdentifier(identifier: string): string {
         if (!identifier.includes("_")) return identifier;
@@ -664,133 +663,25 @@
     }
 </script>
 
-<div class="product-browser" bind:this={mainGridContainer}>
-    {#if isHomeView}
-        {#each Object.keys(categoryProducts) as identifier}
-            {#if categoryProducts[identifier]?.length > 0}
-                {@const rowCategory = getCategoryFromIdentifier(identifier)}
-                {@const rowSubcategory =
-                    getSubcategoryFromIdentifier(identifier)}
-                <ProductRow
-                    title={rowSubcategory}
-                    {identifier}
-                    products={categoryProducts[identifier]}
-                    {currentRanges}
-                    {totalProducts}
-                    {hasMore}
-                    {productDataService}
-                    selectedCategory={rowCategory || ""}
-                    selectedSubcategory={rowSubcategory}
-                    {mainGridContainer}
-                    containerCapacity={rowCapacities[identifier] ||
-                        containerCapacity}
-                    {action}
-                    bind:this={gridContainer[identifier]}
-                    onViewMore={() =>
-                        dispatch("viewMore", {
-                            category: rowCategory,
-                            subcategory: rowSubcategory,
-                        })}
-                    on:dataLoaded={handleDataLoaded}
-                    on:boundariesInitialized={handleBoundariesInitialized}
-                    on:reportCategory={handleReportCategory}
-                    on:productTypeSelect
-                />
-            {/if}
-        {/each}
-    {:else if selectedCategory && !selectedSubcategory}
-        <!-- FIXED: Use centralized utility to get ALL subcategories -->
-        {#each getAllSubcategories(selectedCategory) as subcategory}
-            {@const identifier = subcategory.name}
-            {#if categoryProducts[identifier]}
-                <ProductRow
-                    title={identifier}
-                    {identifier}
-                    products={categoryProducts[identifier]}
-                    {currentRanges}
-                    {totalProducts}
-                    {hasMore}
-                    {productDataService}
-                    {selectedCategory}
-                    selectedSubcategory={identifier}
-                    {mainGridContainer}
-                    containerCapacity={rowCapacities[identifier] ||
-                        containerCapacity}
-                    {action}
-                    bind:this={gridContainer[identifier]}
-                    onViewMore={() =>
-                        dispatch("viewMore", {
-                            category: selectedCategory,
-                            subcategory: identifier,
-                        })}
-                    on:dataLoaded={handleDataLoaded}
-                    on:boundariesInitialized={handleBoundariesInitialized}
-                    on:reportCategory={handleReportCategory}
-                    on:productTypeSelect
-                />
-            {/if}
-        {/each}
-
-        <AllProductsGrid
-            {selectedCategory}
-            selectedSubcategory={null}
-            selectedProductType={"All"}
-            products={allCategoryProducts}
-            on:reportCategory={handleReportCategory}
-            on:productTypeSelect
-        />
-    {:else if selectedCategory && selectedSubcategory}
-        <!-- UPDATED: Use centralized utility functions -->
-        {#if isGridOnlySubcategory(selectedCategory, selectedSubcategory) || selectedProductType !== "All"}
-            <AllProductsGrid
-                {selectedCategory}
-                {selectedSubcategory}
-                {selectedProductType}
-                products={allCategoryProducts}
-                on:reportCategory={handleReportCategory}
-                on:productTypeSelect
-            />
-        {:else if selectedProductType === "All"}
-            {#each getFilteredProductTypes(selectedCategory, selectedSubcategory) as productType}
-                {@const identifier = productType}
-                {#if categoryProducts[identifier]}
-                    <ProductRow
-                        title={identifier}
-                        {identifier}
-                        products={categoryProducts[identifier]}
-                        {currentRanges}
-                        {totalProducts}
-                        {hasMore}
-                        {productDataService}
-                        {selectedCategory}
-                        {selectedSubcategory}
-                        {mainGridContainer}
-                        containerCapacity={rowCapacities[identifier] ||
-                            containerCapacity}
-                        {action}
-                        bind:this={gridContainer[identifier]}
-                        isProductType={true}
-                        onViewMore={() =>
-                            dispatch("productTypeSelect", {
-                                productType: identifier,
-                            })}
-                        on:dataLoaded={handleDataLoaded}
-                        on:boundariesInitialized={handleBoundariesInitialized}
-                        on:reportCategory={handleReportCategory}
-                        on:productTypeSelect
-                    />
-                {/if}
-            {/each}
-        {/if}
-    {/if}
-</div>
-
-<style>
-    .product-browser {
-        display: flex;
-        flex-direction: column;
-        gap: var(--section-spacing);
-        overflow: visible;
-        background-color: white;
-    }
-</style>
+<ProductBrowserView
+    {isHomeView}
+    {selectedCategory}
+    {selectedSubcategory}
+    {selectedProductType}
+    {categoryProducts}
+    {allCategoryProducts}
+    {currentRanges}
+    {totalProducts}
+    {hasMore}
+    {dataManager}
+    {containerCapacity}
+    {rowCapacities}
+    {action}
+    {gridContainer}
+    bind:mainGridContainer
+    on:dataLoaded={handleDataLoaded}
+    on:boundariesInitialized={handleBoundariesInitialized}
+    on:reportCategory={handleReportCategory}
+    on:productTypeSelect={handleProductTypeSelect}
+    on:viewMore={handleViewMore}
+/>

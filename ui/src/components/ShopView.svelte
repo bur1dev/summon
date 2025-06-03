@@ -1,55 +1,59 @@
 <script lang="ts">
   import { getContext } from "svelte";
   import type { Writable } from "svelte/store";
-  import type { ShopStore, StoreContext, UIProps } from "./store";
-  import type { CartBusinessService } from "./cart/CartBusinessService";
-  import type { ProductDataService } from "./ProductDataService";
+  import type { ShopStore, StoreContext, UIProps } from "../store";
+  import type { CartBusinessService } from "../cart/CartBusinessService";
+  import type { DataManager } from "../services/DataManager";
   import ProductCard from "./ProductCard.svelte";
   import { onMount, onDestroy } from "svelte";
-  import SearchResults from "./search/SearchResults.svelte";
+  import SearchResults from "../search/SearchResults.svelte";
   import ReportCategoryDialog from "./ReportCategoryDialog.svelte";
-  import ProductBrowser from "./ProductBrowser.svelte";
-  import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte";
-  import {
-    sortByStore,
-    selectedBrandsStore,
-    selectedOrganicStore,
-  } from "./UiStateStore";
+  import ProductBrowserData from "./ProductBrowserData.svelte";
+  import CheckedOutCarts from "../cart/CheckedOutCartsView.svelte";
 
+  // Import from UI-only store
   import {
     currentViewStore,
     isCartOpenStore,
-    searchModeStore,
-    searchQueryStore,
-    selectedCategoryStore,
-    selectedSubcategoryStore,
-    selectedProductTypeStore,
     showReportDialogStore,
     reportedProductStore,
     productNameStore,
     selectedProductHashStore,
     searchResultsStore,
     isViewAllStore,
-    resetSearchState,
-    isHomeViewStore,
     searchMethodStore,
     featuredSubcategories,
-  } from "./UiStateStore";
+  } from "../stores/UiOnlyStore";
+
+  // Import from data trigger store
+  import {
+    searchModeStore,
+    searchQueryStore,
+    selectedCategoryStore,
+    selectedSubcategoryStore,
+    selectedProductTypeStore,
+    isHomeViewStore,
+    sortByStore,
+    selectedBrandsStore,
+    selectedOrganicStore,
+  } from "../stores/DataTriggerStore";
+
+  // Import helpers
+  import { resetSearchState } from "../utils/UiStateHelpers";
 
   // UPDATED: Import category utilities
   import {
     shouldShowProductTypeNav,
     getFilteredProductTypes,
-  } from "./categoryUtils";
+  } from "../utils/categoryUtils";
 
   const storeContext = getContext<StoreContext>("store");
   let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
 
   const cartService = getContext<Writable<CartBusinessService>>("cartService");
 
-  // UPDATED: Get ProductDataService from context (created in Controller)
-  const productDataService =
-    getContext<ProductDataService>("productDataService");
+  // STEP 2: Get DataManager from context instead of ProductDataService
+  const dataManager = getContext<DataManager>("dataManager");
 
   export function selectCategory(category: any, subcategory: any) {
     handleCategorySelect({ detail: { category, subcategory } });
@@ -171,7 +175,7 @@
 
 <div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
   <div class="main-content">
-    {#if store && productDataService}
+    {#if store && dataManager}
       <div class="content-wrapper">
         {#if !$searchModeStore}
           {#if !$isHomeViewStore && $selectedCategoryStore && $selectedSubcategoryStore}
@@ -224,14 +228,14 @@
               on:productTypeSelect={handleProductTypeSelect}
             />
           {:else if $isHomeViewStore}
-            <ProductBrowser
+            <ProductBrowserData
               selectedCategory={null}
               selectedSubcategory={null}
               selectedProductType={"All"}
               isHomeView={true}
               {featuredSubcategories}
               searchMode={$searchModeStore}
-              {productDataService}
+              {dataManager}
               on:viewMore={handleViewMore}
               on:productTypeSelect={handleProductTypeSelect}
               on:reportCategory={(event) => {
@@ -240,14 +244,14 @@
               }}
             />
           {:else}
-            <ProductBrowser
+            <ProductBrowserData
               selectedCategory={$selectedCategoryStore}
               selectedSubcategory={$selectedSubcategoryStore}
               selectedProductType={$selectedProductTypeStore}
               isHomeView={false}
               featuredSubcategories={[]}
               searchMode={$searchModeStore}
-              {productDataService}
+              {dataManager}
               on:viewMore={handleViewMore}
               on:productTypeSelect={handleProductTypeSelect}
               on:reportCategory={(event) => {

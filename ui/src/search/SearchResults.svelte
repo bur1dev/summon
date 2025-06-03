@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
-    import ProductCard from "../ProductCard.svelte";
+    import ProductCard from "../components/ProductCard.svelte";
     import {
         ProductSelectionStrategy,
         SemanticSearchStrategy,

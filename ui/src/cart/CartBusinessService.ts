@@ -1,6 +1,6 @@
 import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
 import { writable, derived, get, type Writable, type Readable } from 'svelte/store';
-import type { ProductDataService } from "../ProductDataService";
+import type { ProductDataService } from "../services/ProductDataService";
 import { CartPersistenceService } from "./CartPersistenceService";
 import { CartCalculationService } from "./CartCalculationService";
 

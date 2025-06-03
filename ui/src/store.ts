@@ -6,7 +6,7 @@ import {
   encodeHashToBase64,
 } from '@holochain/client';
 import { writable, type Writable } from "svelte/store";
-import { ProductStore } from "./ProductStore";
+import { ProductStore } from "./services/ProductStore";
 import type { Product } from "./search/search-types"; // Added import for Product
 
 export class ShopService {

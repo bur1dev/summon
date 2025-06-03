@@ -4,7 +4,7 @@ import { writable, get } from "svelte/store";
 import type { Writable } from "svelte/store";
 import type { AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
-import type { ShopStore } from "./store";
+import type { ShopStore } from "../store";
 
 interface DecodedSingleProductFields {
   name: string;

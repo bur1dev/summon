@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { showMenuStore } from "./UiStateStore";
+    import { showMenuStore } from "../stores/UiOnlyStore";
     import CategoryReportsAdmin from "./CategoryReportsAdmin.svelte";
     import ProfileEditor from "./ProfileEditor.svelte";
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";

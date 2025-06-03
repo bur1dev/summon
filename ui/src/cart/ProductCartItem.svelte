@@ -1,11 +1,11 @@
 <script lang="ts">
     import CartItem from "./CartItem.svelte";
-    import ProductDetailModal from "../ProductDetailModal.svelte";
+    import ProductDetailModal from "../components/ProductDetailModal.svelte";
     import { getContext } from "svelte";
     import { PencilLine, Plus, Minus } from "lucide-svelte";
     import type { Writable } from "svelte/store";
     import type { CartBusinessService } from "./CartBusinessService";
-    import { PriceService } from "../PriceService";
+    import { PriceService } from "../services/PriceService";
 
     // Props - UPDATED FOR NEW STRUCTURE
     export let product: any;

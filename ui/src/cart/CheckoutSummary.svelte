@@ -6,7 +6,7 @@
         CartBusinessService,
         DeliveryTimeSlot,
     } from "./CartBusinessService";
-    import { PriceService } from "../PriceService";
+    import { PriceService } from "../services/PriceService";
 
     // Props
     export let cartItems: any[] = [];

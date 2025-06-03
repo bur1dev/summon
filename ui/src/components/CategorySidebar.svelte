@@ -1,13 +1,15 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte"; // onMount isn't used, consider removing if not needed elsewhere
-  import type { ShopStore } from "./store";
+  import type { ShopStore } from "../store";
   import { createEventDispatcher } from "svelte";
-  import { mainCategories } from "./categoryData";
+  import { mainCategories } from "../utils/categoryData";
+
+  // Import from data trigger store - all these control data loading
   import {
     isHomeViewStore,
     selectedCategoryStore,
     selectedSubcategoryStore,
-  } from "./UiStateStore";
+  } from "../stores/DataTriggerStore";
 
   const dispatch = createEventDispatcher();
 

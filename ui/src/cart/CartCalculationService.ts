@@ -1,6 +1,6 @@
-import { PriceService } from "../PriceService";
+import { PriceService } from "../services/PriceService";
 import { encodeHashToBase64 } from "@holochain/client";
-import type { ProductDataService } from "../ProductDataService";
+import type { ProductDataService } from "../services/ProductDataService";
 
 interface CartItem {
     groupHash: string;

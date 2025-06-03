@@ -7,8 +7,8 @@
   import ProductDetailModal from "./ProductDetailModal.svelte";
   import { createEventDispatcher } from "svelte";
 
-  import { PriceService } from "./PriceService";
-  import type { CartBusinessService } from "./cart/CartBusinessService";
+  import { PriceService } from "../services/PriceService";
+  import type { CartBusinessService } from "../cart/CartBusinessService";
 
   export let selectedCategory: string = "";
   export let selectedSubcategory: string = "";

@@ -1,8 +1,8 @@
 <script lang="ts">
     import { createEventDispatcher, onMount, onDestroy } from "svelte";
-    import { mainCategories } from "./categoryData";
+    import { mainCategories } from "../utils/categoryData";
     import { X } from "lucide-svelte";
-    import { lastCategorySelection } from "./categorySelectionStore";
+    import { lastCategorySelection } from "../stores/categorySelectionStore";
 
     const dispatch = createEventDispatcher();
 

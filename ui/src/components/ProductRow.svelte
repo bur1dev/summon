@@ -3,7 +3,7 @@
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import { ChevronRight } from "lucide-svelte";
-    import type { ProductDataService } from "./ProductDataService";
+    import type { DataManager } from "../services/DataManager";
 
     // Required props
     export let title: string;
@@ -11,7 +11,8 @@
     export let products: any[] = [];
     export let currentRanges: Record<string, any>;
     export let totalProducts: Record<string, any> = {};
-    export let productDataService: ProductDataService;
+    // STEP 2: Use DataManager instead of ProductDataService
+    export let dataManager: DataManager;
     export let selectedCategory: string;
     export let selectedSubcategory: string;
     export let mainGridContainer: HTMLElement;
@@ -60,7 +61,7 @@
             {mainGridContainer}
             {containerCapacity}
             {isProductType}
-            {productDataService}
+            {dataManager}
             on:dataLoaded
             on:boundariesInitialized
         />
@@ -89,7 +90,7 @@
             {mainGridContainer}
             {containerCapacity}
             {isProductType}
-            {productDataService}
+            {dataManager}
             on:dataLoaded
             on:boundariesInitialized
         />

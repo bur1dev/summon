@@ -3,7 +3,7 @@
   import { ShoppingCart, ArrowLeft, MapPin, Clock, X } from "lucide-svelte";
   import type { Writable } from "svelte/store";
   import { AddressService } from "./AddressService";
-  import { currentViewStore } from "../UiStateStore";
+  import { currentViewStore } from "../stores/UiOnlyStore";
   import type { ShopStore } from "../store"; // Adjust path if store.ts is elsewhere
 
   interface ControllerStoreContext {

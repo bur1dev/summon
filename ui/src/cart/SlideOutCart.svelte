@@ -2,12 +2,12 @@
   import { getContext, onMount } from "svelte";
   import type { Writable } from "svelte/store";
   import type { CartBusinessService } from "./CartBusinessService";
-  import type { ProductDataService } from "../ProductDataService";
+  import type { ProductDataService } from "../services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
   import ProductCartItem from "./ProductCartItem.svelte";
   import CheckoutFlow from "./CheckoutFlow.svelte";
   import { X } from "lucide-svelte";
-  import { PriceService } from "../PriceService";
+  import { PriceService } from "../services/PriceService";
 
   // Props
   export let isOpen = false;

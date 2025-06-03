@@ -6,7 +6,7 @@
         onDestroy,
     } from "svelte";
     import { get, type Writable } from "svelte/store"; // Import get
-    import type { CartBusinessService } from "./cart/CartBusinessService";
+    import type { CartBusinessService } from "../cart/CartBusinessService";
     import { X, Plus, Minus, ArrowLeft, Save } from "lucide-svelte";
 
     const dispatch = createEventDispatcher();

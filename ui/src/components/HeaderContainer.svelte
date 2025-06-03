@@ -1,25 +1,32 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import type { StoreContext } from "./store";
+  import type { StoreContext } from "../store";
   import type { Writable } from "svelte/store";
-  import type { CartBusinessService } from "./cart/CartBusinessService";
+  import type { CartBusinessService } from "../cart/CartBusinessService";
   import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart, Menu } from "lucide-svelte";
-  import SearchBar from "./search/SearchBar.svelte";
+  import SearchBar from "../search/SearchBar.svelte";
   import SidebarMenu from "./SidebarMenu.svelte";
+
+  // Import from UI-only store
   import {
     currentViewStore,
     isCartOpenStore,
-    searchModeStore,
-    searchQueryStore,
     productNameStore,
     selectedProductHashStore,
     searchResultsStore,
     isViewAllStore,
-    setSearchState,
     showMenuStore,
-  } from "./UiStateStore";
+  } from "../stores/UiOnlyStore";
 
+  // Import from data trigger store
+  import {
+    searchModeStore,
+    searchQueryStore,
+  } from "../stores/DataTriggerStore";
+
+  // Import helper functions
+  import { setSearchState } from "../utils/UiStateHelpers";
   // Get the store for UI props
   const { getStore } = getContext<StoreContext>("store");
   const store = getStore();

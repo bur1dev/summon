@@ -7,81 +7,66 @@ interface VirtualGridConfig {
     containerCapacity?: number;
 }
 
-// Simplified callbacks - only notify about business data changes
 interface VirtualGridCallbacks {
     onTotalHeightChange: (height: number) => void;
     onItemsChange: (items: any[]) => void;
 }
 
 export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGridCallbacks) {
-    // === STATIC DATA (Stays reactive - changes rarely) ===
     let items = config.items;
     const itemWidth = config.itemWidth;
     const itemHeight = config.itemHeight;
 
-    // === DYNAMIC DATA (Pure vanilla JS - no component updates) ===
     let gridContainer: HTMLElement | null = null;
     let parentScrollContainer: HTMLElement | null = null;
 
-    // Grid calculations
     let gridWidth = 0;
     let columnsPerRow = 1;
     let totalHeight = 0;
 
-    // DOM element tracking for direct manipulation
     let productElements = new Map<number, HTMLElement>();
     let gridContainerElement: HTMLElement | null = null;
 
-    // Virtualization state
     let renderLoopActive = false;
     let currentVisibleIndices: number[] = [];
+    let previousVisibleSet = new Set<number>();
     let renderFrameId: number | null = null;
     let lastRenderTime = 0;
 
-    // Zoom tracking
     let currentZoom = typeof window !== "undefined" ? window.devicePixelRatio : 1;
     let zoomTimeout: ReturnType<typeof setTimeout> | undefined;
-
     let boundScrollHandler: (() => void) | null = null;
 
-    // === STATIC DATA UPDATES (Business logic changes) ===
     function updateItems(newItems: any[]) {
         items = newItems;
-
-        // Clear existing element references
-        productElements.clear();
-
-        // Notify component about business data change
+        previousVisibleSet.clear();
         callbacks.onItemsChange(newItems);
 
         if (gridContainer) {
-            // Force immediate element rescan after DOM updates
             setTimeout(async () => {
-                await tick(); // Ensure DOM has updated
-                forceElementRescan();
+                await tick();
+                scanForElements();
                 recalculateGrid();
-            }, 0);
+            }, 50);
         }
     }
 
-    // === CORE FIX: Robust element scanning and indexing ===
     function forceElementRescan() {
         if (!gridContainer) return;
 
-        productElements.clear();
+        if (productElements.size !== items.length) {
+            productElements.clear();
+        }
 
-        // Get all product elements and rebuild mapping based on current DOM order
         const elements = gridContainer.querySelectorAll('[data-virtual-index]');
         const elementArray = Array.from(elements) as HTMLElement[];
 
-        // Update data-virtual-index attributes to match current array order
         elementArray.forEach((element, domIndex) => {
             element.setAttribute('data-virtual-index', domIndex.toString());
             productElements.set(domIndex, element);
         });
     }
 
-    // === DIRECT DOM MANIPULATION (Performance-critical) ===
     function recalculateGrid() {
         if (!gridContainer) return;
 
@@ -95,20 +80,14 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
             const rowCount = Math.ceil(items.length / columnsPerRow);
             totalHeight = rowCount * itemHeight;
 
-            // Notify component of height change for container sizing
             callbacks.onTotalHeightChange(totalHeight);
-
             calculateAndApplyPositions();
         }, 10);
     }
 
     function calculateAndApplyPositions() {
         if (!columnsPerRow || !gridContainer) return;
-
-        // Calculate positions and which items should be visible
         const visibleIndices = calculateVisibleIndices();
-
-        // Apply positioning directly to DOM elements
         applyPositionsToDOM(visibleIndices);
     }
 
@@ -127,7 +106,7 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
         const viewportHeight = parentScrollContainer.clientHeight;
         const startRow = Math.floor(relativeScrollTop / itemHeight);
         const visibleRows = Math.ceil(viewportHeight / itemHeight);
-        const bufferRows = 4; // Only 2 rows buffer above and below
+        const bufferRows = 4;
         const startIndex = Math.max(0, (startRow - bufferRows) * columnsPerRow);
         const endIndex = Math.min(
             items.length,
@@ -143,76 +122,70 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
     function applyPositionsToDOM(visibleIndices: number[]) {
         if (!gridContainer || !columnsPerRow) return;
 
-        // Calculate layout parameters
+        const currentVisibleSet = new Set(visibleIndices);
+
         const cardWidth = itemWidth;
         const totalContentWidth = columnsPerRow * cardWidth;
         const remainingSpace = gridWidth - totalContentWidth;
         const gapBetweenItems = columnsPerRow > 1 ? remainingSpace / (columnsPerRow - 1) : 0;
 
-        // Hide all current elements first
-        productElements.forEach((element, index) => {
-            if (!visibleIndices.includes(index)) {
-                element.style.display = 'none';
+        // Batch all DOM updates
+        requestAnimationFrame(() => {
+            // Show new visible elements
+            for (const index of visibleIndices) {
+                if (index >= items.length) continue;
+
+                const element = productElements.get(index);
+                if (element && !previousVisibleSet.has(index)) {
+                    const row = Math.floor(index / columnsPerRow);
+                    const col = index % columnsPerRow;
+                    const leftPosition = col * (cardWidth + gapBetweenItems);
+                    const topPosition = row * itemHeight;
+
+                    element.style.display = 'block';
+                    element.style.transform = `translate3d(${leftPosition}px, ${topPosition}px, 0)`;
+                }
             }
+
+            // Hide elements that are no longer visible
+            for (const index of previousVisibleSet) {
+                if (!currentVisibleSet.has(index)) {
+                    const element = productElements.get(index);
+                    if (element) element.style.display = 'none';
+                }
+            }
+
+            previousVisibleSet = currentVisibleSet;
+            currentVisibleIndices = visibleIndices;
         });
-
-        // Show and position visible elements
-        visibleIndices.forEach(index => {
-            if (index >= items.length) return;
-
-            // Get element from cache - if not found, rescan
-            let element = productElements.get(index);
-            if (!element) {
-                // Element not in cache - force rescan
-                forceElementRescan();
-                element = productElements.get(index);
-            }
-
-            if (element) {
-                // Calculate position
-                const row = Math.floor(index / columnsPerRow);
-                const col = index % columnsPerRow;
-                const leftPosition = col * (cardWidth + gapBetweenItems);
-                const topPosition = row * itemHeight;
-
-                // Apply positioning using CSS transforms (most performant)
-                element.style.display = 'block';
-                element.style.position = 'absolute';
-                element.style.transform = `translate3d(${leftPosition}px, ${topPosition}px, 0)`;
-                element.style.width = `${cardWidth}px`;
-                element.style.height = `${itemHeight}px`;
-            }
-        });
-
-        currentVisibleIndices = visibleIndices;
     }
+
+    // SIMPLE: Fast array comparison
+    function arraysChanged(newIndices: number[]): boolean {
+        if (newIndices.length !== currentVisibleIndices.length) return true;
+        for (let i = 0; i < newIndices.length; i++) {
+            if (newIndices[i] !== currentVisibleIndices[i]) return true;
+        }
+        return false;
+    }
+
+    let scrollTimeout: number | null = null;
 
     function handleScroll() {
         if (!gridContainer || !parentScrollContainer || !columnsPerRow) return;
 
-        const visibleIndices = calculateVisibleIndices();
+        // Throttle scroll updates
+        if (scrollTimeout) return;
 
-        // Only update if indices changed significantly
-        if (JSON.stringify(visibleIndices) !== JSON.stringify(currentVisibleIndices)) {
-            applyPositionsToDOM(visibleIndices);
-        }
-    }
+        scrollTimeout = window.setTimeout(() => {
+            const visibleIndices = calculateVisibleIndices();
 
-    // === PERFORMANCE-CRITICAL RENDER LOOP (Vanilla JS) ===
-    function startRenderLoop() {
-        if (renderLoopActive) return;
-        renderLoopActive = true;
-
-        function renderFrame() {
-            const now = performance.now();
-            if (now - lastRenderTime >= 16) { // ~60fps
-                handleScroll();
-                lastRenderTime = now;
+            if (arraysChanged(visibleIndices)) {
+                applyPositionsToDOM(visibleIndices);
             }
-            renderFrameId = requestAnimationFrame(renderFrame);
-        }
 
-        renderFrameId = requestAnimationFrame(renderFrame);
+            scrollTimeout = null;
+        }, 16); // 60fps timing
     }
 
     function checkZoom() {
@@ -225,6 +198,7 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
             clearTimeout(zoomTimeout);
             zoomTimeout = setTimeout(() => {
                 productElements.clear();
+                previousVisibleSet.clear();
                 recalculateGrid();
             }, 300);
 
@@ -242,7 +216,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
     }
 
     function scanForElements() {
-        // Delegate to the more robust forceElementRescan
         forceElementRescan();
     }
 
@@ -257,15 +230,13 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
             parentScrollContainer.addEventListener('scroll', boundScrollHandler, { passive: true });
             parentScrollContainer.style.willChange = 'transform';
 
-            console.log('[VirtualGrid] Initialized with scroll container');
-
             setTimeout(() => {
                 recalculateGrid();
                 forceElementRescan();
                 handleScroll();
             }, 100);
         } else {
-            console.error("Global scroll container not found in useVirtualGrid!");
+            console.error("Global scroll container not found!");
         }
 
         window.addEventListener('resize', handleResize);
@@ -277,7 +248,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
         setTimeout(() => {
             recalculateGrid();
             forceElementRescan();
-            startRenderLoop();
         }, 50);
 
         return {
@@ -294,25 +264,16 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
                 window.removeEventListener('keyup', checkZoom);
 
                 productElements.clear();
+                previousVisibleSet.clear();
             }
         };
     }
 
-    // === PUBLIC API ===
     return {
-        // Action for binding to grid element
         action: (element: HTMLElement) => initialize(element),
-
-        // Method to update static data (business logic)
         updateItems,
-
-        // Method to manually trigger element scan (call after DOM updates)
         scanForElements,
-
-        // Method to manually recalculate (call after major layout changes)
         recalculateGrid,
-
-        // Method to get current total height (for immediate access)
         getCurrentTotalHeight: () => totalHeight
     };
 }

@@ -503,9 +503,13 @@
     box-sizing: border-box;
   }
 
-  .product-card.button-elevated {
-    z-index: 50;
-    position: relative;
+  /* Disable transitions during scroll */
+  :global(.products-grid .product-card) {
+    transition: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+    animation: none !important;
   }
 
   .product-card-content {

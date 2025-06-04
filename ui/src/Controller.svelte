@@ -255,8 +255,8 @@
     height: 100vh;
     overflow-y: auto;
     overflow-x: hidden;
-    position: relative; /* Establish stacking context */
-    z-index: 0; /* Base z-index for this container */
+    position: relative;
+    z-index: 0;
   }
 
   .global-scroll-container::-webkit-scrollbar {

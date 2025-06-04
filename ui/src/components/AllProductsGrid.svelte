@@ -244,10 +244,7 @@
     >
         {#if sortedFilteredProducts.length > 0}
             <!-- Fixed height container for virtual scrolling -->
-            <div
-                class="grid-container"
-                style="height: {totalHeight}px; position: relative;"
-            >
+            <div class="grid-container" style="height: {totalHeight}px;">
                 <!-- Render ALL products with virtual index attributes -->
                 <!-- useVirtualGrid will handle show/hide and positioning via direct CSS transforms -->
                 {#each sortedFilteredProducts as product, index (product.hash || index)}
@@ -315,9 +312,9 @@
         width: 100%;
         overflow: visible;
         transform: translateZ(0);
-        will-change: transform;
+        will-change: contents;
         backface-visibility: hidden;
-        contain: layout size;
+        contain: strict;
         perspective: 1000px;
         box-sizing: border-box;
         max-width: 100%;

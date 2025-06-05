@@ -305,6 +305,8 @@
         box-sizing: border-box;
         overflow: visible;
         max-width: 100%;
+        /* Remove debug border */
+        /* border: 1px solid rgb(247, 0, 255); */
     }
 
     .grid-container {
@@ -314,10 +316,14 @@
         transform: translateZ(0);
         will-change: contents;
         backface-visibility: hidden;
-        contain: strict;
+        /* Remove strict containment that can cause clipping */
+        /* contain: strict; */
+        contain: layout style;
         perspective: 1000px;
         box-sizing: border-box;
         max-width: 100%;
+        /* Remove debug border */
+        /* border: 2px solid rgb(47, 0, 255); */
     }
 
     .product-container {

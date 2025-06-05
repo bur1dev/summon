@@ -408,9 +408,6 @@ body {
 }
 
 /* Ensure navigation arrows stay above product cards but below sticky nav */
-.nav-arrow-btn {
-  z-index: 60 !important;
-}
 
 /* Navigation arrow buttons */
 /* Applied via <button class="nav-arrow-btn btn btn-icon ..."> */
@@ -420,8 +417,8 @@ body {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  /* For vertical centering */
-  z-index: 10;
+  z-index: 150 !important;
+
   /* To appear above product cards */
   color: var(--primary);
   /* Initial icon color, overrides default text color from .btn */

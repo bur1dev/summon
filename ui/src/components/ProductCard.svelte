@@ -15,23 +15,6 @@
 
   let showReportDialog: boolean = false;
   let showProductModal: boolean = false;
-  let buttonHovered: boolean = false;
-  let buttonElevated: boolean = false;
-  let elevationTimeout: number | undefined;
-
-  function handleButtonMouseEnter() {
-    buttonHovered = true;
-    buttonElevated = true;
-    clearTimeout(elevationTimeout);
-  }
-
-  function handleButtonMouseLeave() {
-    buttonHovered = false;
-    // Keep elevated during shrink animation
-    elevationTimeout = setTimeout(() => {
-      buttonElevated = false;
-    }, 300); // Match transition duration
-  }
 
   const dispatch = createEventDispatcher();
 
@@ -186,7 +169,6 @@
       if (isServiceReady) {
         const items = $cartService.getCartItems();
         updateItemCount(items);
-        clearTimeout(elevationTimeout);
       }
     }
   });
@@ -366,7 +348,7 @@
 </script>
 
 <div
-  class="product-card fade-in {buttonElevated ? 'button-elevated' : ''}"
+  class="product-card fade-in"
   role="button"
   tabindex="0"
   on:click={handleCardClick}
@@ -380,8 +362,6 @@
       console.log("Add button clicked");
       handleButtonClick(e);
     }}
-    on:mouseenter={handleButtonMouseEnter}
-    on:mouseleave={handleButtonMouseLeave}
   >
     {#if displayAmount > 0}
       <span
@@ -525,7 +505,7 @@
     width: 100%;
     height: 245px;
     object-fit: contain;
-    padding: 0;
+    padding: 5px;
     box-sizing: border-box;
     display: block;
   }

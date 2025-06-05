@@ -25,17 +25,13 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
     let totalHeight = 0;
 
     let productElements = new Map<number, HTMLElement>();
-    let gridContainerElement: HTMLElement | null = null;
 
-    let renderLoopActive = false;
     let currentVisibleIndices: number[] = [];
     let previousVisibleSet = new Set<number>();
     let renderFrameId: number | null = null;
-    let lastRenderTime = 0;
 
-    let currentZoom = typeof window !== "undefined" ? window.devicePixelRatio : 1;
-    let zoomTimeout: ReturnType<typeof setTimeout> | undefined;
     let boundScrollHandler: (() => void) | null = null;
+    let lastDevicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio : 1;
 
     function updateItems(newItems: any[]) {
         items = newItems;
@@ -49,6 +45,28 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
                 recalculateGrid();
             }, 50);
         }
+    }
+
+    function resetElements() {
+        if (!gridContainer) return;
+
+        // Clear all element positions and hide them immediately
+        productElements.forEach((element) => {
+            element.style.display = 'none';
+            element.style.transform = '';
+        });
+
+        // Clear tracking state
+        productElements.clear();
+        previousVisibleSet.clear();
+        currentVisibleIndices = [];
+
+        // Force immediate element rescan and position recalculation
+        setTimeout(async () => {
+            await tick();
+            forceElementRescan();
+            recalculateGrid();
+        }, 0);
     }
 
     function forceElementRescan() {
@@ -188,27 +206,36 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
         }, 16); // 60fps timing
     }
 
-    function checkZoom() {
-        if (typeof window === "undefined") return false;
-
-        const newZoom = window.devicePixelRatio;
-        if (newZoom !== currentZoom) {
-            currentZoom = newZoom;
-
-            clearTimeout(zoomTimeout);
-            zoomTimeout = setTimeout(() => {
-                productElements.clear();
-                previousVisibleSet.clear();
-                recalculateGrid();
-            }, 300);
-
-            return true;
-        }
-        return false;
+    function handleZoomChange() {
+        // IMMEDIATE: Hide all elements first to prevent mingling
+        productElements.forEach((element) => {
+            element.style.display = 'none';
+            element.style.transform = '';
+        });
+        
+        // Clear state immediately
+        productElements.clear();
+        previousVisibleSet.clear();
+        
+        // Force immediate recalculation without waiting
+        requestAnimationFrame(() => {
+            forceElementRescan();
+            recalculateGrid();
+        });
     }
 
     function handleResize() {
-        checkZoom();
+        // Simple, immediate zoom detection
+        if (typeof window !== "undefined") {
+            const currentRatio = window.devicePixelRatio;
+            if (currentRatio !== lastDevicePixelRatio) {
+                lastDevicePixelRatio = currentRatio;
+                // Zoom changed - reset elements immediately
+                handleZoomChange();
+                return; // Don't do regular resize logic
+            }
+        }
+        
         if (gridContainer) {
             gridWidth = gridContainer.offsetWidth;
             recalculateGrid();
@@ -221,7 +248,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
 
     function initialize(element: HTMLElement) {
         gridContainer = element;
-        gridContainerElement = element;
 
         parentScrollContainer = document.querySelector('.global-scroll-container') as HTMLElement;
 
@@ -240,10 +266,6 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
         }
 
         window.addEventListener('resize', handleResize);
-        window.addEventListener('mouseup', checkZoom);
-        window.addEventListener('keyup', checkZoom);
-
-        currentZoom = window.devicePixelRatio;
 
         setTimeout(() => {
             recalculateGrid();
@@ -252,16 +274,12 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
 
         return {
             destroy() {
-                renderLoopActive = false;
                 if (renderFrameId) cancelAnimationFrame(renderFrameId);
-                if (zoomTimeout) clearTimeout(zoomTimeout);
 
                 if (parentScrollContainer && boundScrollHandler) {
                     parentScrollContainer.removeEventListener('scroll', boundScrollHandler);
                 }
                 window.removeEventListener('resize', handleResize);
-                window.removeEventListener('mouseup', checkZoom);
-                window.removeEventListener('keyup', checkZoom);
 
                 productElements.clear();
                 previousVisibleSet.clear();
@@ -272,6 +290,8 @@ export function useVirtualGrid(config: VirtualGridConfig, callbacks: VirtualGrid
     return {
         action: (element: HTMLElement) => initialize(element),
         updateItems,
+        resetElements,
+        handleZoomChange,
         scanForElements,
         recalculateGrid,
         getCurrentTotalHeight: () => totalHeight

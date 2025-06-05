@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getContext, onMount, onDestroy, tick } from "svelte";
+    import { getContext, onMount, onDestroy } from "svelte";
     import type { StoreContext } from "../store";
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
@@ -22,7 +22,6 @@
     export let products: any[] = [];
 
     const { getStore } = getContext<StoreContext>("store");
-    const store = getStore();
     const dispatch = createEventDispatcher();
 
     let productsGridRef: HTMLElement;
@@ -52,6 +51,13 @@
         });
         return Array.from(brands).sort();
     })();
+
+    // Track previous sort/filter state to detect order changes
+    let previousSortState = {
+        sortBy: $sortByStore,
+        brands: new Set($selectedBrandsStore),
+        organic: $selectedOrganicStore
+    };
 
     // Apply sorting and filtering to products (BUSINESS LOGIC - stays reactive)
     $: sortedFilteredProducts = (() => {
@@ -86,6 +92,25 @@
             result.sort((a: any, b: any) => (b.price || 0) - (a.price || 0));
         }
 
+        // Detect if array order changed (not just data changes)
+        const currentSortState = {
+            sortBy: $sortByStore,
+            brands: new Set($selectedBrandsStore),
+            organic: $selectedOrganicStore
+        };
+
+        const orderChanged = 
+            currentSortState.sortBy !== previousSortState.sortBy ||
+            currentSortState.organic !== previousSortState.organic ||
+            currentSortState.brands.size !== previousSortState.brands.size ||
+            !Array.from(currentSortState.brands).every(brand => previousSortState.brands.has(brand));
+
+        if (orderChanged && virtualGrid) {
+            // Reset virtual grid elements when order changes
+            virtualGrid.resetElements();
+        }
+
+        previousSortState = currentSortState;
         return result;
     })();
 
@@ -99,7 +124,7 @@
         onTotalHeightChange: (height: number) => {
             totalHeight = height;
         },
-        onItemsChange: (items: any[]) => {
+        onItemsChange: () => {
             // Trigger element rescan after DOM updates
             setTimeout(() => {
                 if (virtualGrid) {
@@ -129,7 +154,7 @@
         {
             debounceMs: 50,
             requiresTick: true,
-        },
+        }
     );
 
     // Update virtual grid when BUSINESS DATA changes (stay reactive)

@@ -1,12 +1,19 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
     import { PencilLine, Plus, Minus, X, Save } from "lucide-svelte";
-    import type { Address } from "./AddressService";
+    import type { Address } from "../services/AddressService";
     import type {
         CartBusinessService,
         DeliveryTimeSlot,
-    } from "./CartBusinessService";
+    } from "../services/CartBusinessService";
     import { PriceService } from "../services/PriceService";
+    import { CartInteractionService } from "../services/CartInteractionService";
+    import {
+        getIncrementValue,
+        getDisplayUnit,
+        isSoldByWeight,
+        getCartItemKey,
+    } from "../utils/cartHelpers";
 
     // Props
     export let cartItems: any[] = [];
@@ -64,9 +71,9 @@
     // To detect new cart items
     let previousCartItems: any[] = [...cartItems];
 
-    // Create a composite key for tracking updates
+    // Use cart helper for item key creation
     function getItemKey(item: any): string {
-        return `${item.groupHash}_${item.productIndex}`;
+        return getCartItemKey(item.groupHash, item.productIndex);
     }
 
     // Watch for cart changes to clear updating status
@@ -129,19 +136,34 @@
         newQuantity: any,
         note: any,
     ) {
-        if (!cartService || newQuantity < 1) return;
+        if (newQuantity < 1) return;
 
-        // Add to updating products with timestamp using composite key
-        const itemKey = `${groupHash}_${productIndex}`;
+        // Add to updating products with timestamp using cart helper
+        const itemKey = getCartItemKey(groupHash, productIndex);
         updatingProducts.set(itemKey, Date.now());
 
         try {
+            // Use cartService directly since it's passed as prop
+            if (!cartService) {
+                updatingProducts.delete(itemKey);
+                updatingProducts = new Map(updatingProducts);
+                return;
+            }
+
             await cartService.addToCart(
                 groupHash,
                 productIndex,
                 newQuantity,
                 note,
             );
+
+            const success = true;
+
+            if (!success) {
+                updatingProducts.delete(itemKey);
+                updatingProducts = new Map(updatingProducts);
+                return;
+            }
 
             // Add a timeout as fallback to clear updating status
             setTimeout(() => {
@@ -164,7 +186,7 @@
     async function handleRemove(groupHash: any, productIndex: any) {
         if (!groupHash) return;
 
-        const itemKey = `${groupHash}_${productIndex}`;
+        const itemKey = getCartItemKey(groupHash, productIndex);
         if (!cartService || updatingProducts.has(itemKey)) return;
 
         // Mark as updating
@@ -184,8 +206,7 @@
 
     function handleDecrementItem(item: any) {
         const itemKey = getItemKey(item);
-        const isSoldByWeight = item.productDetails?.sold_by === "WEIGHT";
-        const incrementValue = isSoldByWeight ? 0.25 : 1;
+        const incrementValue = getIncrementValue(item.productDetails);
 
         if (item.quantity > incrementValue && !updatingProducts.has(itemKey)) {
             updateQuantity(
@@ -199,8 +220,7 @@
 
     function handleIncrementItem(item: any) {
         const itemKey = getItemKey(item);
-        const isSoldByWeight = item.productDetails?.sold_by === "WEIGHT";
-        const incrementValue = isSoldByWeight ? 0.25 : 1;
+        const incrementValue = getIncrementValue(item.productDetails);
 
         if (!updatingProducts.has(itemKey)) {
             updateQuantity(
@@ -214,7 +234,7 @@
 
     // Returns true if a product is currently updating
     function isUpdating(groupHash: any, productIndex: any): boolean {
-        const itemKey = `${groupHash}_${productIndex}`;
+        const itemKey = getCartItemKey(groupHash, productIndex);
         return updatingProducts.has(itemKey);
     }
 
@@ -322,9 +342,9 @@
             savePreference !== (existingPreference !== null) || noteChanged;
     }
 
-    // Helper to determine display unit based on product type
-    function getDisplayUnit(item: any): string {
-        return item.productDetails?.sold_by === "WEIGHT" ? "lb" : "ct";
+    // Use cart helper for display unit
+    function getItemDisplayUnit(item: any): string {
+        return getDisplayUnit(item.productDetails);
     }
 </script>
 
@@ -551,7 +571,7 @@
                                                     )
                                                         ? "..."
                                                         : item.quantity}
-                                                    {getDisplayUnit(item)}
+                                                    {getItemDisplayUnit(item)}
                                                 </span>
                                                 <button
                                                     class="quantity-btn plus-btn"

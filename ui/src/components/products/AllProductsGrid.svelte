@@ -1,20 +1,20 @@
 <script lang="ts">
     import { getContext, onMount, onDestroy } from "svelte";
-    import type { StoreContext } from "../store";
+    import type { StoreContext } from "../../store";
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
-    import SortFilterDropdown from "./SortFilterDropdown.svelte";
+    import SortFilterDropdown from "../SortFilterDropdown.svelte";
 
     // Import from data trigger store (these control filtering/sorting)
     import {
         sortByStore,
         selectedBrandsStore,
         selectedOrganicStore,
-    } from "../stores/DataTriggerStore";
+    } from "../../stores/DataTriggerStore";
 
-    import { shouldShowSortControls } from "../utils/categoryUtils";
-    import { useResizeObserver } from "../utils/useResizeObserver";
-    import { useVirtualGrid } from "../utils/useVirtualGrid";
+    import { shouldShowSortControls } from "../../utils/categoryUtils";
+    import { useResizeObserver } from "../../utils/useResizeObserver";
+    import { useVirtualGrid } from "../../utils/useVirtualGrid";
 
     export let selectedCategory: string;
     export let selectedSubcategory: string | null = null;
@@ -56,7 +56,7 @@
     let previousSortState = {
         sortBy: $sortByStore,
         brands: new Set($selectedBrandsStore),
-        organic: $selectedOrganicStore
+        organic: $selectedOrganicStore,
     };
 
     // Apply sorting and filtering to products (BUSINESS LOGIC - stays reactive)
@@ -96,14 +96,16 @@
         const currentSortState = {
             sortBy: $sortByStore,
             brands: new Set($selectedBrandsStore),
-            organic: $selectedOrganicStore
+            organic: $selectedOrganicStore,
         };
 
-        const orderChanged = 
+        const orderChanged =
             currentSortState.sortBy !== previousSortState.sortBy ||
             currentSortState.organic !== previousSortState.organic ||
             currentSortState.brands.size !== previousSortState.brands.size ||
-            !Array.from(currentSortState.brands).every(brand => previousSortState.brands.has(brand));
+            !Array.from(currentSortState.brands).every((brand) =>
+                previousSortState.brands.has(brand),
+            );
 
         if (orderChanged && virtualGrid) {
             // Reset virtual grid elements when order changes
@@ -154,7 +156,7 @@
         {
             debounceMs: 50,
             requiresTick: true,
-        }
+        },
     );
 
     // Update virtual grid when BUSINESS DATA changes (stay reactive)

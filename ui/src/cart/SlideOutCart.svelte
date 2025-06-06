@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import type { Writable } from "svelte/store";
-  import type { CartBusinessService } from "./CartBusinessService";
+  import type { CartBusinessService } from "../services/CartBusinessService";
   import type { ProductDataService } from "../services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
   import ProductCartItem from "./ProductCartItem.svelte";

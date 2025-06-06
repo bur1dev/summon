@@ -2,13 +2,13 @@
   import { getContext } from "svelte";
   import type { Writable } from "svelte/store";
   import type { ShopStore, StoreContext, UIProps } from "../store";
-  import type { CartBusinessService } from "../cart/CartBusinessService";
+  import type { CartBusinessService } from "../services/CartBusinessService";
   import type { DataManager } from "../services/DataManager";
-  import ProductCard from "./ProductCard.svelte";
+  import ProductCard from "./products/ProductCard.svelte";
   import { onMount, onDestroy } from "svelte";
   import SearchResults from "../search/SearchResults.svelte";
   import ReportCategoryDialog from "./category reports/ReportCategoryDialog.svelte";
-  import ProductBrowserData from "./ProductBrowserData.svelte";
+  import ProductBrowserData from "./products/ProductBrowserData.svelte";
   import CheckedOutCarts from "../cart/CheckedOutCartsView.svelte";
 
   // Import from UI-only store

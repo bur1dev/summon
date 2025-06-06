@@ -1,9 +1,9 @@
 <script lang="ts">
-    import NavigationArrows from "./NavigationArrows.svelte";
+    import NavigationArrows from "../NavigationArrows.svelte";
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import { ChevronRight } from "lucide-svelte";
-    import type { DataManager } from "../services/DataManager";
+    import type { DataManager } from "../../services/DataManager";
 
     // Required props
     export let title: string;

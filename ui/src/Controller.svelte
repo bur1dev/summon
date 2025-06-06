@@ -45,7 +45,7 @@
   } from "./stores/DataTriggerStore";
 
   import SidebarMenu from "./components/SidebarMenu.svelte";
-  import type { CartBusinessService } from "./cart/CartBusinessService";
+  import type { CartBusinessService } from "./services/CartBusinessService";
 
   export let roleName = "";
   export let client: AppClient;

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import type { Address } from "./AddressService";
+    import type { Address } from "../services/AddressService";
 
     export let initialAddress: Partial<Address> = {
         street: "",

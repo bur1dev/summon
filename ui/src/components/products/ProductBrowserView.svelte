@@ -2,12 +2,12 @@
     import { createEventDispatcher } from "svelte";
     import AllProductsGrid from "./AllProductsGrid.svelte";
     import ProductRow from "./ProductRow.svelte";
-    import type { DataManager } from "../services/DataManager";
+    import type { DataManager } from "../../services/DataManager";
     import {
         getAllSubcategories,
         isGridOnlySubcategory,
         getFilteredProductTypes,
-    } from "../utils/categoryUtils";
+    } from "../../utils/categoryUtils";
 
     // Props passed from data component
     export let isHomeView: boolean;

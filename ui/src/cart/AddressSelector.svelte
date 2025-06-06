@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from "svelte";
-    import { AddressService, type Address } from "./AddressService";
+    import { AddressService, type Address } from "../services/AddressService";
     import AddressForm from "./AddressForm.svelte";
     import { MapPin, NotebookPen } from "lucide-svelte";
 

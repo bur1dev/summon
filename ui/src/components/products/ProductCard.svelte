@@ -2,13 +2,20 @@
   import { getContext, onMount, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
   import { BarChart, Plus, Minus, Flag } from "lucide-svelte";
-  import { encodeHashToBase64 } from "@holochain/client";
-  import ReportCategoryDialog from "./category reports/ReportCategoryDialog.svelte";
-  import ProductDetailModal from "./ProductDetailModal.svelte";
+  import ReportCategoryDialog from "../category reports/ReportCategoryDialog.svelte";
+  import ProductDetailModal from "./modal/ProductDetailModal.svelte";
   import { createEventDispatcher } from "svelte";
 
-  import { PriceService } from "../services/PriceService";
-  import type { CartBusinessService } from "../cart/CartBusinessService";
+  import { PriceService } from "../../services/PriceService";
+  import type { CartBusinessService } from "../../services/CartBusinessService";
+  import { CartInteractionService } from "../../services/CartInteractionService";
+  import {
+    getIncrementValue,
+    isSoldByWeight,
+    parseProductHash,
+    getEffectiveHash,
+    formatQuantityDisplay,
+  } from "../../utils/cartHelpers";
 
   export let selectedCategory: string = "";
   export let selectedSubcategory: string = "";
@@ -17,14 +24,6 @@
   let showProductModal: boolean = false;
 
   const dispatch = createEventDispatcher();
-
-  // Define types for the cart service
-  interface CartItem {
-    groupHash: string;
-    productIndex: number;
-    quantity: number;
-    // Add other properties if they exist
-  }
 
   // Get cart service directly from the context and type it as a Svelte store
   const cartService =
@@ -40,106 +39,38 @@
   let isServiceReady: boolean = false;
   let unsubscribeReadyState: (() => void) | null = null;
 
-  // Determine if product is sold by weight
-  $: isSoldByWeight = product.sold_by === "WEIGHT";
-  $: displayAmount = isSoldByWeight ? itemWeight : itemCount;
-  $: displayUnit = isSoldByWeight ? "lbs" : "ct";
-  $: incrementValue = isSoldByWeight ? 0.25 : 1;
+  // Use cart helpers for product properties
+  $: productIsSoldByWeight = isSoldByWeight(product);
+  $: displayAmount = productIsSoldByWeight ? itemWeight : itemCount;
+  $: incrementValue = getIncrementValue(product);
 
   // Use PriceService for display prices
   $: displayPrices = PriceService.getDisplayPrices(product);
 
-  // Store both original and base64 formats of the group hash
-  let groupHashOriginal: string = ""; // Original format (comma-separated numbers)
-  let groupHashBase64: string = ""; // Base64 format
+  // Use cart helpers for hash parsing
+  let groupHashBase64: string = "";
   let productIndex: number = 0;
 
   $: {
-    const effectiveHash =
-      actionHash ||
-      product?.hash ||
-      product?.action_hash ||
-      product?.entry_hash ||
-      product?.actionHash;
-
-    if (
-      effectiveHash &&
-      typeof effectiveHash === "string" &&
-      effectiveHash.includes("_")
-    ) {
-      const lastUnderscoreIndex = effectiveHash.lastIndexOf("_");
-      groupHashOriginal = effectiveHash.substring(0, lastUnderscoreIndex);
-      productIndex =
-        parseInt(effectiveHash.substring(lastUnderscoreIndex + 1)) || 0;
-
-      // Convert comma-separated to base64 if needed
-      if (groupHashOriginal.includes(",")) {
-        try {
-          const byteArray = new Uint8Array(
-            groupHashOriginal.split(",").map(Number),
-          );
-          groupHashBase64 = encodeHashToBase64(byteArray);
-        } catch (e) {
-          console.error("Error converting hash format:", e);
-          groupHashBase64 = groupHashOriginal;
-        }
-      } else {
-        // Already in base64 format
-        groupHashBase64 = groupHashOriginal;
-      }
-    } else if (effectiveHash && typeof effectiveHash === "object") {
-      // Check if it's a composite hash from search with groupHash and index
-      if (effectiveHash.groupHash && typeof effectiveHash.index === "number") {
-        // It's a composite hash - extract components
-        if (typeof effectiveHash.groupHash === "string") {
-          // GroupHash is already a string (likely base64)
-          groupHashOriginal = effectiveHash.groupHash;
-          groupHashBase64 = effectiveHash.groupHash;
-        } else {
-          // GroupHash is a Uint8Array
-          groupHashOriginal = String(effectiveHash.groupHash);
-          groupHashBase64 = encodeHashToBase64(effectiveHash.groupHash);
-        }
-        // Use the index from composite hash
-        productIndex = effectiveHash.index;
-      } else {
-        // Fallback for backward compatibility - treat as Uint8Array
-        groupHashOriginal = String(effectiveHash);
-        groupHashBase64 = encodeHashToBase64(effectiveHash);
-        productIndex = 0; // Assume index 0 if not specified
-      }
-    } else if (
-      effectiveHash &&
-      typeof effectiveHash === "string" &&
-      !effectiveHash.includes("_")
-    ) {
-      // It's already a base64 string
-      groupHashOriginal = effectiveHash;
-      groupHashBase64 = effectiveHash;
-      productIndex = 0;
-    }
+    const effectiveHash = getEffectiveHash(product, actionHash);
+    const parsed = parseProductHash(effectiveHash);
+    groupHashBase64 = parsed.groupHash;
+    productIndex = parsed.productIndex;
   }
 
   // Update item count whenever it changes
   function updateItemCount(items: any[]) {
-    if (!items || !Array.isArray(items)) return;
-
-    // Try to find the item by either the original hash format or the base64 format
-    const item = items.find(
-      (item) =>
-        (item &&
-          item.groupHash === groupHashBase64 &&
-          item.productIndex === productIndex) ||
-        (item &&
-          item.groupHash === groupHashOriginal &&
-          item.productIndex === productIndex),
+    const quantity = CartInteractionService.getCurrentQuantity(
+      items,
+      groupHashBase64,
+      productIndex,
     );
 
-    if (item) {
-      if (isSoldByWeight) {
-        itemWeight = item.quantity;
+    if (quantity > 0) {
+      if (productIsSoldByWeight) {
+        itemWeight = quantity;
       } else {
-        itemCount = item.quantity;
+        itemCount = quantity;
       }
     } else {
       itemCount = 0;
@@ -267,53 +198,39 @@
     }
   }
 
-  // Add product to cart
+  // Add product to cart using centralized service
   async function addProductToCart() {
-    try {
-      const quantity = isSoldByWeight ? 1 : 1; // Default to 1 lb or 1 ct
-      if ($cartService) {
-        const result = await $cartService.addToCart(
-          groupHashBase64,
-          productIndex,
-          quantity,
-        );
-      }
-    } catch (error) {
-      console.error("Error adding to cart:", error);
-    }
+    await CartInteractionService.addToCart(
+      cartService,
+      groupHashBase64,
+      productIndex,
+    );
   }
 
-  // Increment item quantity
+  // Increment item quantity using centralized service
   async function incrementCount(e: MouseEvent | KeyboardEvent) {
     e.stopPropagation();
-    if (!$cartService) return;
-
-    try {
-      const currentAmount = isSoldByWeight ? itemWeight : itemCount;
-      const newAmount = currentAmount + incrementValue;
-      await $cartService.addToCart(groupHashBase64, productIndex, newAmount);
-    } catch (error) {
-      console.error("Error incrementing item:", error);
-    }
+    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
+    await CartInteractionService.incrementItem(
+      cartService,
+      groupHashBase64,
+      productIndex,
+      currentAmount,
+      product,
+    );
   }
 
-  // Decrement item quantity
+  // Decrement item quantity using centralized service
   async function decrementCount(e: MouseEvent | KeyboardEvent) {
     e.stopPropagation();
-    if (!$cartService) return;
-
-    try {
-      const currentAmount = isSoldByWeight ? itemWeight : itemCount;
-      const newAmount = currentAmount - incrementValue;
-
-      if (newAmount > 0) {
-        await $cartService.addToCart(groupHashBase64, productIndex, newAmount);
-      } else {
-        await $cartService.addToCart(groupHashBase64, productIndex, 0);
-      }
-    } catch (error) {
-      console.error("Error decrementing item:", error);
-    }
+    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
+    await CartInteractionService.decrementItem(
+      cartService,
+      groupHashBase64,
+      productIndex,
+      currentAmount,
+      product,
+    );
   }
 
   // Add this function
@@ -382,8 +299,7 @@
         on:click|stopPropagation={() => {}}
         on:keydown={() => {}}
       >
-        {displayAmount}
-        {displayUnit}
+        {formatQuantityDisplay(displayAmount, product)}
       </span>
       <span
         class="plus counter-btn"
@@ -607,7 +523,7 @@
 
   /* Counter button styles - futuristic look */
   .add-btn.expanded {
-    width: 170px;
+    width: 180px;
     border-radius: 30px; /* Pill shape when expanded */
     display: flex;
     justify-content: space-between;

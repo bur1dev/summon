@@ -2,7 +2,7 @@
   import { getContext, onMount } from "svelte";
   import type { StoreContext } from "../store";
   import type { Writable } from "svelte/store";
-  import type { CartBusinessService } from "../cart/CartBusinessService";
+  import type { CartBusinessService } from "../services/CartBusinessService";
   import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart, Menu } from "lucide-svelte";
   import SearchBar from "../search/SearchBar.svelte";

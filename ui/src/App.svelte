@@ -7,8 +7,8 @@
     encodeHashToBase64,
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
-  import { CartBusinessService } from "./cart/CartBusinessService";
-  import { AddressService } from "./cart/AddressService";
+  import { CartBusinessService } from "./services/CartBusinessService";
+  import { AddressService } from "./services/AddressService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
   import { ShopStore, type StoreContext } from "./store";

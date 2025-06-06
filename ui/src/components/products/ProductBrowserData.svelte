@@ -1,9 +1,9 @@
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
-    import type { DataManager } from "../services/DataManager";
-    import { ProductRowCacheService } from "../services/ProductRowCacheService";
+    import type { DataManager } from "../../services/DataManager";
+    import { ProductRowCacheService } from "../../services/ProductRowCacheService";
     import { tick } from "svelte";
-    import { useResizeObserver } from "../utils/useResizeObserver";
+    import { useResizeObserver } from "../../utils/useResizeObserver";
     import ProductBrowserView from "./ProductBrowserView.svelte";
     import {
         getSubcategoryConfig,
@@ -11,7 +11,7 @@
         getFilteredProductTypes,
         hasProductTypes,
         getAllSubcategories,
-    } from "../utils/categoryUtils";
+    } from "../../utils/categoryUtils";
 
     // Required props
     export let selectedCategory: string | null = null;

@@ -1,11 +1,13 @@
 <script lang="ts">
     import CartItem from "./CartItem.svelte";
-    import ProductDetailModal from "../components/ProductDetailModal.svelte";
+    import ProductDetailModal from "../components/products/modal/ProductDetailModal.svelte";
     import { getContext } from "svelte";
     import { PencilLine, Plus, Minus } from "lucide-svelte";
     import type { Writable } from "svelte/store";
-    import type { CartBusinessService } from "./CartBusinessService";
+    import type { CartBusinessService } from "../services/CartBusinessService";
     import { PriceService } from "../services/PriceService";
+    import { CartInteractionService } from "../services/CartInteractionService";
+    import { getIncrementValue, getDisplayUnit, isSoldByWeight } from "../utils/cartHelpers";
 
     // Props - UPDATED FOR NEW STRUCTURE
     export let product: any;
@@ -22,66 +24,40 @@
     // State for modal
     let showModal = false;
 
-    // Determine if product is sold by weight
-    const isSoldByWeight = product.sold_by === "WEIGHT";
-    const displayUnit = isSoldByWeight ? "lbs" : "ct";
-    const incrementValue = isSoldByWeight ? 0.25 : 1;
+    // Use cart helpers for product properties
+    const productIsSoldByWeight = isSoldByWeight(product);
+    const displayUnit = getDisplayUnit(product);
+    const incrementValue = getIncrementValue(product);
 
     // Use PriceService for calculations
     $: itemTotals = PriceService.calculateItemTotal(product, quantity);
     $: hasPromo = PriceService.hasPromoPrice(product);
 
-    // Methods - UPDATED FOR NEW STRUCTURE
+    // Cart interactions using centralized service
     const handleDecrementItem = async () => {
-        if (isUpdating || !$cartServiceStore) return;
+        if (isUpdating) return;
         isUpdating = true;
 
         try {
-            const newQuantity = quantity - incrementValue;
-            if (newQuantity > 0) {
-                await $cartServiceStore.addToCart(
-                    groupHash,
-                    productIndex,
-                    newQuantity,
-                    note || undefined,
-                );
-            } else {
-                // Setting to 0 to remove item
-                await $cartServiceStore.addToCart(groupHash, productIndex, 0);
-            }
-        } catch (error) {
-            console.error("Error decreasing quantity:", error);
+            await CartInteractionService.decrementItem(cartServiceStore, groupHash, productIndex, quantity, product, note || undefined);
         } finally {
             isUpdating = false;
         }
     };
 
     const handleIncrementItem = async () => {
-        if (isUpdating || !$cartServiceStore) return;
+        if (isUpdating) return;
         isUpdating = true;
 
         try {
-            await $cartServiceStore.addToCart(
-                groupHash,
-                productIndex,
-                quantity + incrementValue,
-                note || undefined,
-            );
-        } catch (error) {
-            console.error("Error increasing quantity:", error);
+            await CartInteractionService.incrementItem(cartServiceStore, groupHash, productIndex, quantity, product, note || undefined);
         } finally {
             isUpdating = false;
         }
     };
 
     const handleRemove = async () => {
-        if (!$cartServiceStore) return;
-
-        try {
-            await $cartServiceStore.addToCart(groupHash, productIndex, 0);
-        } catch (error) {
-            console.error("Error removing item:", error);
-        }
+        await CartInteractionService.removeItem(cartServiceStore, groupHash, productIndex);
     };
 
     const handleInstructionsClick = () => {

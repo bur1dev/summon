@@ -4,13 +4,13 @@
         encodeHashToBase64,
         decodeHashFromBase64,
     } from "@holochain/client";
-    import { AddressService } from "./AddressService";
-    import type { Address } from "./AddressService";
-    import type { CartBusinessService } from "./CartBusinessService";
+    import { AddressService } from "../services/AddressService";
+    import type { Address } from "../services/AddressService";
+    import type { CartBusinessService } from "../services/CartBusinessService";
     import type {
         DeliveryTimeSlot,
         CheckoutDetails,
-    } from "./CartBusinessService";
+    } from "../services/CartBusinessService";
     import AddressSelector from "./AddressSelector.svelte";
     import DeliveryTimeSelector from "./DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";

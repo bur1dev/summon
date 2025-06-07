@@ -7,10 +7,10 @@
   import { createEventDispatcher } from "svelte";
 
   import { PriceService } from "../../services/PriceService";
+  import { StockService } from "../../services/StockService";
   import type { CartBusinessService } from "../../services/CartBusinessService";
   import { CartInteractionService } from "../../services/CartInteractionService";
   import {
-    getIncrementValue,
     isSoldByWeight,
     parseProductHash,
     getEffectiveHash,
@@ -42,10 +42,12 @@
   // Use cart helpers for product properties
   $: productIsSoldByWeight = isSoldByWeight(product);
   $: displayAmount = productIsSoldByWeight ? itemWeight : itemCount;
-  $: incrementValue = getIncrementValue(product);
 
   // Use PriceService for display prices
   $: displayPrices = PriceService.getDisplayPrices(product);
+
+  // Use StockService for stock information
+  $: stockInfo = StockService.getStockInfo(product);
 
   // Use cart helpers for hash parsing
   let groupHashBase64: string = "";
@@ -233,35 +235,6 @@
     );
   }
 
-  // Add this function
-  function normalizeStockStatus(status: any): string {
-    if (!status) return "UNKNOWN";
-    const normalized = String(status).toUpperCase();
-    if (normalized === "HIGH" || normalized === "IN_STOCK") return "HIGH";
-    if (normalized === "LOW" || normalized === "LIMITED") return "LOW";
-    return "UNKNOWN";
-  }
-
-  // More debugging in your getStockText function
-  function getStockText(status: any): string {
-    // Additional defensive check
-    if (!status) {
-      console.warn("Empty stock status for product:", product.name);
-      return "Maybe out";
-    }
-    const normalizedStatus = normalizeStockStatus(status);
-    if (normalizedStatus === "HIGH") return "Many in stock";
-    if (normalizedStatus === "LOW") return "Low stock";
-    return "Maybe out";
-  }
-
-  // Update this function
-  function getStockColor(status: any): string {
-    const normalizedStatus = normalizeStockStatus(status);
-    if (normalizedStatus === "HIGH") return "var(--success)";
-    if (normalizedStatus === "LOW") return "var(--warning)";
-    return "var(--error)";
-  }
 </script>
 
 <div
@@ -354,11 +327,9 @@
     <div class="stock" style="display: flex; align-items: center;">
       <BarChart
         size={30}
-        style="margin-right: 5px; color: {getStockColor(
-          product.stocks_status,
-        )};"
+        style="margin-right: 5px; color: {stockInfo.color};"
       />
-      {getStockText(product.stocks_status)}
+      {stockInfo.text}
     </div>
   </div>
 </div>

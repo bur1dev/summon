@@ -1,11 +1,15 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
+    import { StockService } from "../../../services/StockService";
     
     const dispatch = createEventDispatcher();
     
     export let product: any;
     export let selectedCategory: string = "";
     export let selectedSubcategory: string = "";
+
+    // Use StockService for stock information
+    $: stockInfo = StockService.getStockInfo(product);
 
     function handleShopAllClick() {
         const productType = product.product_type || product.category;
@@ -37,13 +41,7 @@
 
 <div class="product-info">
     <div class="stock-status">
-        {#if product.stocks_status === "HIGH"}
-            <span class="stock-high">Many in stock</span>
-        {:else if product.stocks_status === "LOW"}
-            <span class="stock-low">Low stock</span>
-        {:else}
-            <span class="stock-out">Maybe out</span>
-        {/if}
+        <span class="{stockInfo.cssClass}">{stockInfo.text}</span>
     </div>
 
     <h1 id="product-title" class="product-title">

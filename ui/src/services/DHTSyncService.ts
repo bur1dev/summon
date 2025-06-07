@@ -5,6 +5,7 @@ import type { Writable } from "svelte/store";
 import type { AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
 import type { ShopStore } from "../store";
+import { StockService } from "./StockService";
 
 interface DecodedSingleProductFields {
   name: string;
@@ -38,14 +39,6 @@ interface StoreState {
   };
 }
 
-// Add this function near the top with other utility functions
-function normalizeStockStatus(status: any): string {
-  if (!status) return "UNKNOWN"; // Changed from "HIGH" to "UNKNOWN"
-  const normalized = String(status).toUpperCase();
-  if (normalized === "HIGH" || normalized === "IN_STOCK") return "HIGH";
-  if (normalized === "LOW" || normalized === "LIMITED") return "LOW";
-  return "UNKNOWN"; // Changed from "HIGH" to "UNKNOWN" - more honest
-}
 
 // Add this function to normalize promo prices during DHT sync
 function normalizePromoPrice(promoPrice: number | null | undefined, regularPrice: number | null | undefined): number | null {
@@ -172,7 +165,7 @@ export class ProductStore {
             price: (typeof product.price === 'number') ? product.price : (product.items?.[0]?.price?.regular ?? 0),
             promo_price: normalizePromoPrice(product.promo_price, product.price),
             size: product.size || "",
-            stocks_status: normalizeStockStatus(product.stocks_status),
+            stocks_status: StockService.normalizeStatus(product.stocks_status),
             category: product.category,
             subcategory: product.subcategory || null,
             product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,
@@ -660,7 +653,7 @@ export class ProductStore {
               promo_price: normalizePromoPrice(product.promo_price, product.price),
 
               size: product.size || "",
-              stocks_status: normalizeStockStatus(product.stocks_status),
+              stocks_status: StockService.normalizeStatus(product.stocks_status),
               category: product.category, // Product's own primary category
               subcategory: product.subcategory || null,
               product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,

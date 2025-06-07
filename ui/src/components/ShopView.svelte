@@ -2,19 +2,14 @@
   import { getContext } from "svelte";
   import type { Writable } from "svelte/store";
   import type { ShopStore, StoreContext, UIProps } from "../store";
-  import type { CartBusinessService } from "../services/CartBusinessService";
   import type { DataManager } from "../services/DataManager";
-  import ProductCard from "./products/ProductCard.svelte";
-  import { onMount, onDestroy } from "svelte";
   import SearchResults from "../search/SearchResults.svelte";
   import ReportCategoryDialog from "./category reports/ReportCategoryDialog.svelte";
   import ProductBrowserData from "./products/ProductBrowserData.svelte";
-  import CheckedOutCarts from "../cart/CheckedOutCartsView.svelte";
 
   // Import from UI-only store
   import {
     currentViewStore,
-    isCartOpenStore,
     showReportDialogStore,
     reportedProductStore,
     productNameStore,
@@ -33,13 +28,7 @@
     selectedSubcategoryStore,
     selectedProductTypeStore,
     isHomeViewStore,
-    sortByStore,
-    selectedBrandsStore,
-    selectedOrganicStore,
   } from "../stores/DataTriggerStore";
-
-  // Import helpers
-  import { resetSearchState } from "../utils/UiStateHelpers";
 
   // UPDATED: Import category utilities
   import {
@@ -47,10 +36,11 @@
     getFilteredProductTypes,
   } from "../utils/categoryUtils";
 
+  // Import the BrowserNavigationService
+  import { browserNavigationService } from "../services/BrowserNavigationService";
+
   const storeContext = getContext<StoreContext>("store");
   let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
-
-  const cartService = getContext<Writable<CartBusinessService>>("cartService");
 
   // STEP 2: Get DataManager from context instead of ProductDataService
   const dataManager = getContext<DataManager>("dataManager");
@@ -81,59 +71,27 @@
     }
   }
 
-  function handleCategorySelect({
+  async function handleCategorySelect({
     detail: { category, subcategory },
   }: {
     detail: { category: any; subcategory: any };
   }) {
-    sortByStore.set("best");
-    selectedBrandsStore.set(new Set());
-    selectedOrganicStore.set("all");
-
+    // Use BrowserNavigationService for navigation
     if (category === null && subcategory === null) {
-      $isHomeViewStore = true;
-      $searchModeStore = false;
-      $selectedCategoryStore = null;
-      $selectedSubcategoryStore = null;
+      await browserNavigationService.navigateToHome();
+    } else if (subcategory) {
+      await browserNavigationService.navigateToSubcategory(category, subcategory);
     } else {
-      $isHomeViewStore = false;
-      $searchModeStore = false;
-      if (store && uiProps && $uiProps) {
-        const currentProps = $uiProps as any;
-        store.setUIprops({ ...(currentProps || {}), searchMode: false });
-      }
-      $selectedCategoryStore = category;
-      $selectedSubcategoryStore = subcategory;
-      $selectedProductTypeStore = "All";
+      await browserNavigationService.navigateToCategory(category);
     }
 
-    const scrollContainer = document.querySelector(".global-scroll-container");
-    if (scrollContainer) {
-      scrollContainer.scrollTop = 0;
-    } else {
-      window.scrollTo(0, 0);
+    // Update UI props if needed
+    if (store && uiProps && $uiProps) {
+      const currentProps = $uiProps as any;
+      store.setUIprops({ ...(currentProps || {}), searchMode: false });
     }
   }
 
-  function handleProductTypeSelect({ detail }: { detail: any }) {
-    if (detail.category && detail.subcategory) {
-      $selectedCategoryStore = detail.category;
-      $selectedSubcategoryStore = detail.subcategory;
-      $selectedProductTypeStore = detail.productType;
-      $isHomeViewStore = false;
-      $searchModeStore = false;
-    } else {
-      $selectedProductTypeStore = detail.productType;
-    }
-  }
-
-  function handleViewMore({
-    detail: { category, subcategory },
-  }: {
-    detail: { category: any; subcategory: any };
-  }) {
-    handleCategorySelect({ detail: { category, subcategory } });
-  }
 
   async function handleReportSubmit(event: CustomEvent) {
     try {
@@ -188,9 +146,7 @@
                       ? 'active'
                       : ''}"
                     on:click={() =>
-                      handleProductTypeSelect({
-                        detail: { productType: "All" },
-                      })}
+                      browserNavigationService.navigateToProductType("All")}
                   >
                     All
                   </button>
@@ -201,7 +157,7 @@
                         ? 'active'
                         : ''}"
                       on:click={() =>
-                        handleProductTypeSelect({ detail: { productType } })}
+                        browserNavigationService.navigateToProductType(productType)}
                     >
                       {productType}
                     </button>
@@ -225,35 +181,11 @@
                 $reportedProductStore = event.detail;
                 $showReportDialogStore = true;
               }}
-              on:productTypeSelect={handleProductTypeSelect}
-            />
-          {:else if $isHomeViewStore}
-            <ProductBrowserData
-              selectedCategory={null}
-              selectedSubcategory={null}
-              selectedProductType={"All"}
-              isHomeView={true}
-              {featuredSubcategories}
-              searchMode={$searchModeStore}
-              {dataManager}
-              on:viewMore={handleViewMore}
-              on:productTypeSelect={handleProductTypeSelect}
-              on:reportCategory={(event) => {
-                $reportedProductStore = event.detail;
-                $showReportDialogStore = true;
-              }}
             />
           {:else}
             <ProductBrowserData
-              selectedCategory={$selectedCategoryStore}
-              selectedSubcategory={$selectedSubcategoryStore}
-              selectedProductType={$selectedProductTypeStore}
-              isHomeView={false}
-              featuredSubcategories={[]}
-              searchMode={$searchModeStore}
               {dataManager}
-              on:viewMore={handleViewMore}
-              on:productTypeSelect={handleProductTypeSelect}
+              {featuredSubcategories}
               on:reportCategory={(event) => {
                 $reportedProductStore = event.detail;
                 $showReportDialogStore = true;

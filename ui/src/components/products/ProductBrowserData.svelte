@@ -1,7 +1,6 @@
 <script lang="ts">
-    import { onMount, onDestroy, createEventDispatcher } from "svelte";
+    import { onDestroy, createEventDispatcher } from "svelte";
     import type { DataManager } from "../../services/DataManager";
-    import { ProductRowCacheService } from "../../services/ProductRowCacheService";
     import { tick } from "svelte";
     import { useResizeObserver } from "../../utils/useResizeObserver";
     import ProductBrowserView from "./ProductBrowserView.svelte";
@@ -9,19 +8,23 @@
         getSubcategoryConfig,
         isGridOnlySubcategory,
         getFilteredProductTypes,
-        hasProductTypes,
         getAllSubcategories,
     } from "../../utils/categoryUtils";
 
-    // Required props
-    export let selectedCategory: string | null = null;
-    export let selectedSubcategory: string | null = null;
-    export let selectedProductType: string = "All";
-    export let searchMode: boolean = false;
-    export let dataManager: DataManager;
+    // Import stores for direct reactive subscriptions
+    import {
+        selectedCategoryStore,
+        selectedSubcategoryStore,
+        selectedProductTypeStore,
+        isHomeViewStore,
+        searchModeStore,
+    } from "../../stores/DataTriggerStore";
 
-    // New props for home view
-    export let isHomeView: boolean = false;
+    // Import the BrowserNavigationService
+    import { browserNavigationService } from "../../services/BrowserNavigationService";
+
+    // Required props
+    export let dataManager: DataManager;
     export let featuredSubcategories: Array<{
         category: string;
         subcategory: string | null;
@@ -49,7 +52,21 @@
         category: null as string | null,
         subcategory: null as string | null,
         productType: "All",
+        isHomeView: true,
+        searchMode: false,
     };
+
+    // Ultra-simple navigation ID to prevent race conditions
+    let navigationId = 0;
+    let navigationDebounceId: number | null = null;
+
+    // Utility for container capacity calculation
+    const calculateContainerCapacity = (container: HTMLElement) =>
+        Math.max(1, Math.floor(container.offsetWidth / 245));
+
+    // Utility for consistent product slicing
+    const sliceProducts = (products: any[], capacity: number) =>
+        products.length > capacity ? products.slice(0, capacity) : products;
 
     const resizeObserver = useResizeObserver(
         ({ element, identifier }) => {
@@ -65,42 +82,105 @@
 
     export const action = resizeObserver.action;
 
-    onMount(() => {
-        // Initial load handled by consolidated reactive statement
-    });
+    // Reactive navigation handling - respond to store changes
+    $: navigationState = {
+        category: $selectedCategoryStore,
+        subcategory: $selectedSubcategoryStore,
+        productType: $selectedProductTypeStore,
+        isHomeView: $isHomeViewStore,
+        searchMode: $searchModeStore,
+    };
+
+    $: handleNavigationChange(navigationState);
+
+    // Handle navigation state changes with debouncing
+    function handleNavigationChange(newState: typeof navigationState) {
+        // Fast navigation state comparison using key concatenation
+        const newStateKey = `${newState.category}|${newState.subcategory}|${newState.productType}|${newState.isHomeView}|${newState.searchMode}`;
+        const currentStateKey = `${currentNavigationState.category}|${currentNavigationState.subcategory}|${currentNavigationState.productType}|${currentNavigationState.isHomeView}|${currentNavigationState.searchMode}`;
+        const hasChanged = newStateKey !== currentStateKey;
+
+        if (hasChanged) {
+            // Check if this is a major navigation change (category/home)
+            const isMajorChange =
+                newState.category !== currentNavigationState.category ||
+                newState.isHomeView !== currentNavigationState.isHomeView ||
+                newState.searchMode !== currentNavigationState.searchMode;
+
+            // Clear previous debounce
+            if (navigationDebounceId) {
+                clearTimeout(navigationDebounceId);
+            }
+
+            // Only debounce minor changes (subcategory/productType within same category)
+            const debounceMs = isMajorChange ? 0 : 10;
+
+            navigationDebounceId = setTimeout(() => {
+                currentNavigationState = newState;
+
+                // Handle navigation
+                if (newState.searchMode) {
+                    resetState();
+                } else if (
+                    newState.isHomeView &&
+                    featuredSubcategories.length > 0
+                ) {
+                    handleNavigation("home");
+                } else if (newState.category && newState.subcategory) {
+                    handleNavigation("subcategory");
+                } else if (newState.category && !newState.subcategory) {
+                    handleNavigation("category");
+                } else {
+                }
+
+                navigationDebounceId = null;
+            }, debounceMs);
+        }
+    }
 
     onDestroy(() => {
         categoryProducts = {};
         allCategoryProducts = [];
         resizeObserver.disconnect();
+
+        // Clean up timeouts
+        if (navigationDebounceId) {
+            clearTimeout(navigationDebounceId);
+        }
     });
 
-    // CONSOLIDATED REACTIVE STATEMENT
-    $: {
-        if (searchMode) {
-            resetState();
-        } else {
-            currentNavigationState = {
-                category: selectedCategory,
-                subcategory: selectedSubcategory,
-                productType: selectedProductType,
-            };
+    // Ultra-simple navigation with race condition protection
+    async function handleNavigation(type: "home" | "category" | "subcategory") {
+        const currentId = ++navigationId; // Increment and capture navigation ID
 
-            if (isHomeView && featuredSubcategories.length > 0) {
-                loadHomeView();
-            } else if (selectedCategory && selectedSubcategory) {
-                loadProductsForCategory();
-            } else if (selectedCategory && !selectedSubcategory) {
-                loadProductsForCategory();
-            }
+        // Pause grid systems during navigation
+        resizeObserver.disconnect();
+
+        // Wait for DOM to settle
+        await tick();
+
+        switch (type) {
+            case "home":
+                await loadHomeView(currentId);
+                break;
+            case "category":
+            case "subcategory":
+                await loadProductsForCategory(currentId);
+                break;
+        }
+
+        // Only re-register observers if this navigation is still current
+        if (currentId === navigationId) {
+            await tick();
+            setTimeout(async () => {
+                await tick();
+                await registerResizeObservers();
+            }, 100);
         }
     }
 
     function handleResize(identifier: string, container: HTMLElement) {
-        const newCapacity = Math.max(
-            1,
-            Math.floor(container.offsetWidth / 245),
-        );
+        const newCapacity = calculateContainerCapacity(container);
         const oldCapacity = rowCapacities[identifier] || containerCapacity;
 
         if (newCapacity !== oldCapacity) {
@@ -151,21 +231,26 @@
         startIndex: number,
         capacity: number,
     ) {
-        let category = selectedCategory;
-        let subcategory = selectedSubcategory;
+        let category = currentNavigationState.category;
+        let subcategory = currentNavigationState.subcategory;
 
-        if (isHomeView && identifier.includes("_")) {
+        if (currentNavigationState.isHomeView && identifier.includes("_")) {
             const parts = identifier.split("_");
             category = parts[0];
             subcategory = parts[1];
-        } else if (!isHomeView && !selectedSubcategory) {
+        } else if (
+            !currentNavigationState.isHomeView &&
+            !currentNavigationState.subcategory
+        ) {
             subcategory = identifier;
         }
 
         if (!category || !subcategory) return;
 
         try {
-            const isInSubcategoryView = selectedCategory && selectedSubcategory;
+            const isInSubcategoryView =
+                currentNavigationState.category &&
+                currentNavigationState.subcategory;
             const isProductTypeRow =
                 isInSubcategoryView &&
                 getFilteredProductTypes(category, subcategory).includes(
@@ -190,19 +275,23 @@
             }
 
             if (result?.products) {
-                const productsToDisplay = result.products.slice(0, capacity);
-                categoryProducts[identifier] = productsToDisplay;
-                categoryProducts = { ...categoryProducts };
-
+                categoryProducts[identifier] = sliceProducts(
+                    result.products,
+                    capacity,
+                );
+                const productsCount = categoryProducts[identifier].length;
                 currentRanges[identifier] = {
                     start: startIndex,
-                    end: startIndex + productsToDisplay.length,
+                    end: startIndex + productsCount,
                 };
-                currentRanges = { ...currentRanges };
 
                 hasMore[identifier] =
                     result.hasMore || result.products.length > capacity;
-                hasMore = { ...hasMore };
+
+                // Single reactive trigger
+                categoryProducts = categoryProducts;
+                currentRanges = currentRanges;
+                hasMore = hasMore;
             }
         } catch (error) {
             console.error(
@@ -212,8 +301,12 @@
         }
     }
 
-    async function loadProductsForCategory() {
-        if (!selectedCategory || searchMode) return;
+    async function loadProductsForCategory(navId: number) {
+        if (
+            !currentNavigationState.category ||
+            currentNavigationState.searchMode
+        )
+            return;
 
         resetState();
 
@@ -227,22 +320,23 @@
             }
         }
 
-        containerCapacity = Math.max(
-            1,
-            Math.floor(mainGridContainer.offsetWidth / 245),
-        );
+        containerCapacity = calculateContainerCapacity(mainGridContainer);
 
-        if (selectedCategory && !selectedSubcategory) {
-            await loadMainCategoryView(containerCapacity);
-        } else if (selectedCategory && selectedSubcategory) {
-            await loadSubcategoryView(containerCapacity);
+        if (
+            currentNavigationState.category &&
+            !currentNavigationState.subcategory
+        ) {
+            await loadMainCategoryView(containerCapacity, navId);
+        } else if (
+            currentNavigationState.category &&
+            currentNavigationState.subcategory
+        ) {
+            await loadSubcategoryView(containerCapacity, navId);
         }
-
-        await registerResizeObservers();
     }
 
-    async function loadHomeView() {
-        if (searchMode) return;
+    async function loadHomeView(navId: number) {
+        if (currentNavigationState.searchMode) return;
 
         resetState();
 
@@ -256,10 +350,7 @@
             }
         }
 
-        containerCapacity = Math.max(
-            1,
-            Math.floor(mainGridContainer.offsetWidth / 245),
-        );
+        containerCapacity = calculateContainerCapacity(mainGridContainer);
 
         const BATCH_SIZE = 3;
 
@@ -290,84 +381,104 @@
                     .filter(Boolean),
             );
 
-            await processHomeViewResults(batchResults, containerCapacity);
-            await tick();
-            await registerResizeObservers();
+            // Only update if this navigation is still current
+            if (navId === navigationId) {
+                await processResults(
+                    batchResults,
+                    containerCapacity,
+                    "homeView",
+                );
+                await tick();
+            }
         }
     }
 
-    async function loadProductsForProductType() {
-        if (!selectedCategory || !selectedSubcategory || searchMode) return;
-
+    async function loadProductsForProductType(navId: number) {
         if (
-            currentNavigationState.category !== selectedCategory ||
-            currentNavigationState.subcategory !== selectedSubcategory ||
-            currentNavigationState.productType !== selectedProductType
-        ) {
+            !currentNavigationState.category ||
+            !currentNavigationState.subcategory ||
+            currentNavigationState.searchMode
+        )
             return;
-        }
 
         allCategoryProducts = [];
 
         try {
-            if (selectedProductType !== "All") {
+            if (currentNavigationState.productType !== "All") {
                 const result = await dataManager.loadProductTypeProducts(
-                    selectedCategory,
-                    selectedSubcategory,
-                    selectedProductType,
+                    currentNavigationState.category,
+                    currentNavigationState.subcategory,
+                    currentNavigationState.productType,
                     false,
                 );
 
-                if (result?.products) {
-                    allCategoryProducts = result.products;
-                    allProductsTotal = result.total;
-                } else {
-                    allCategoryProducts = [];
-                    allProductsTotal = 0;
+                // Only update if this navigation is still current
+                if (navId === navigationId) {
+                    if (result?.products) {
+                        allCategoryProducts = result.products;
+                        allProductsTotal = result.total;
+                    } else {
+                        allCategoryProducts = [];
+                        allProductsTotal = 0;
+                    }
                 }
             } else {
-                loadProductsForCategory();
+                await loadProductsForCategory(navId);
             }
         } catch (error) {
             console.error(
-                `API Error loading grid for product type ${selectedProductType}:`,
+                `API Error loading grid for product type ${currentNavigationState.productType}:`,
                 error,
             );
-            allCategoryProducts = [];
-            allProductsTotal = 0;
+            // Only update if this navigation is still current
+            if (navId === navigationId) {
+                allCategoryProducts = [];
+                allProductsTotal = 0;
+            }
         }
     }
 
-    async function loadMainCategoryView(capacity: number) {
-        if (!selectedCategory) return;
+    async function loadMainCategoryView(capacity: number, navId: number) {
+        if (!currentNavigationState.category) return;
 
-        const subcategories = getAllSubcategories(selectedCategory);
+        const subcategories = getAllSubcategories(
+            currentNavigationState.category,
+        );
         const initialSubcategories = subcategories.slice(0, 3);
 
         const initialResults = await Promise.all(
             initialSubcategories.map(async (sub) => {
                 return await dataManager.loadSubcategoryProducts(
-                    selectedCategory!,
+                    currentNavigationState.category!,
                     sub.name,
                     capacity,
                 );
             }),
         );
-        await processSubcategoryResults(initialResults, capacity);
-        await tick();
 
-        if (subcategories.length > 3) {
-            await loadRemainingSubcategories(subcategories.slice(3), capacity);
+        // Only update if this navigation is still current
+        if (navId === navigationId) {
+            await processResults(initialResults, capacity, "subcategory");
+            await tick();
+
+            if (subcategories.length > 3) {
+                await loadRemainingSubcategories(
+                    subcategories.slice(3),
+                    capacity,
+                    navId,
+                );
+            }
+
+            await loadAllCategoryProducts(navId);
         }
-
-        await loadAllCategoryProducts();
     }
 
     async function loadRemainingSubcategories(
         remainingSubcategories: any[],
         capacity: number,
+        navId: number,
     ) {
-        if (!selectedCategory) return;
+        if (!currentNavigationState.category) return;
 
         const BATCH_SIZE = 5;
         for (let i = 0; i < remainingSubcategories.length; i += BATCH_SIZE) {
@@ -379,72 +490,89 @@
             const batchResults = await Promise.all(
                 currentBatch.map(async (sub: any) => {
                     return await dataManager.loadSubcategoryProducts(
-                        selectedCategory!,
+                        currentNavigationState.category!,
                         sub.name,
                         capacity,
                     );
                 }),
             );
-            await processSubcategoryResults(batchResults, capacity);
-            await tick();
-            await registerResizeObservers();
+
+            // Only update if this navigation is still current
+            if (navId === navigationId) {
+                await processResults(batchResults, capacity, "subcategory");
+                await tick();
+            }
         }
     }
 
-    async function loadSubcategoryView(capacity: number) {
-        if (!selectedCategory || !selectedSubcategory) return;
+    async function loadSubcategoryView(capacity: number, navId: number) {
+        if (
+            !currentNavigationState.category ||
+            !currentNavigationState.subcategory
+        )
+            return;
 
         const subcategoryConfig = getSubcategoryConfig(
-            selectedCategory,
-            selectedSubcategory,
+            currentNavigationState.category,
+            currentNavigationState.subcategory,
         );
         if (!subcategoryConfig) {
             console.error(
-                `Configuration not found for subcategory: ${selectedSubcategory}`,
+                `Configuration not found for subcategory: ${currentNavigationState.subcategory}`,
             );
             return;
         }
 
-        if (isGridOnlySubcategory(selectedCategory, selectedSubcategory)) {
-            await loadGridOnlySubcategory();
-        } else if (selectedProductType === "All") {
-            await loadProductTypesView(capacity);
+        if (
+            isGridOnlySubcategory(
+                currentNavigationState.category,
+                currentNavigationState.subcategory,
+            )
+        ) {
+            await loadGridOnlySubcategory(navId);
+        } else if (currentNavigationState.productType === "All") {
+            await loadProductTypesView(capacity, navId);
         } else {
-            loadProductsForProductType();
+            await loadProductsForProductType(navId);
         }
     }
 
-    async function loadGridOnlySubcategory() {
+    async function loadGridOnlySubcategory(navId: number) {
         if (
-            currentNavigationState.category !== selectedCategory ||
-            currentNavigationState.subcategory !== selectedSubcategory
-        ) {
+            !currentNavigationState.category ||
+            !currentNavigationState.subcategory
+        )
             return;
-        }
-
-        if (!selectedCategory || !selectedSubcategory) return;
 
         const result = await dataManager.loadProductTypeProducts(
-            selectedCategory,
-            selectedSubcategory,
+            currentNavigationState.category,
+            currentNavigationState.subcategory,
             null,
             false,
         );
-        if (result?.products) {
-            allCategoryProducts = result.products;
-            allProductsTotal = result.total;
-        } else {
-            allCategoryProducts = [];
-            allProductsTotal = 0;
+
+        // Only update if this navigation is still current
+        if (navId === navigationId) {
+            if (result?.products) {
+                allCategoryProducts = result.products;
+                allProductsTotal = result.total;
+            } else {
+                allCategoryProducts = [];
+                allProductsTotal = 0;
+            }
         }
     }
 
-    async function loadProductTypesView(capacity: number) {
-        if (!selectedCategory || !selectedSubcategory) return;
+    async function loadProductTypesView(capacity: number, navId: number) {
+        if (
+            !currentNavigationState.category ||
+            !currentNavigationState.subcategory
+        )
+            return;
 
         const productTypes = getFilteredProductTypes(
-            selectedCategory,
-            selectedSubcategory,
+            currentNavigationState.category,
+            currentNavigationState.subcategory,
         );
 
         const BATCH_SIZE = 5;
@@ -454,37 +582,36 @@
             const batchResults = await Promise.all(
                 currentBatch.map(async (type) => {
                     return await dataManager.loadProductTypeProducts(
-                        selectedCategory!,
-                        selectedSubcategory!,
+                        currentNavigationState.category!,
+                        currentNavigationState.subcategory!,
                         type,
                         true,
                         capacity,
                     );
                 }),
             );
-            await processProductTypeResults(batchResults, capacity);
-            await tick();
-            await registerResizeObservers();
+
+            // Only update if this navigation is still current
+            if (navId === navigationId) {
+                await processResults(batchResults, capacity, "productType");
+                await tick();
+            }
         }
     }
 
-    async function loadAllCategoryProducts() {
+    async function loadAllCategoryProducts(navId: number) {
         if (currentNavigationState.subcategory !== null) {
             return;
         }
 
-        if (!selectedCategory) return;
+        if (!currentNavigationState.category) return;
 
-        const categoryAtStart = selectedCategory; // Capture category at start
-        const gridData =
-            await dataManager.loadAllCategoryProducts(selectedCategory);
+        const gridData = await dataManager.loadAllCategoryProducts(
+            currentNavigationState.category,
+        );
 
-        // Only update if still on same category
-        if (
-            currentNavigationState.category === categoryAtStart &&
-            currentNavigationState.subcategory === null &&
-            selectedCategory === categoryAtStart
-        ) {
+        // Only update if this navigation is still current
+        if (navId === navigationId) {
             if (gridData?.products) {
                 allCategoryProducts = gridData.products;
                 allProductsTotal = gridData.total;
@@ -509,11 +636,24 @@
         });
     }
 
-    async function processSubcategoryResults(results: any[], capacity: number) {
+    // Unified processing function for all result types
+    async function processResults(
+        results: any[],
+        capacity: number,
+        type: "subcategory" | "homeView" | "productType",
+    ) {
         for (const result of results) {
-            if (!result?.products?.length || !result?.name) continue;
-            const identifier = result.name;
-            const initialProducts = result.products.slice(0, capacity);
+            // Extract identifier based on type
+            const identifier =
+                type === "subcategory"
+                    ? result.name
+                    : type === "homeView"
+                      ? result.identifier
+                      : result.type;
+
+            if (!result?.products?.length || !identifier) continue;
+
+            const initialProducts = sliceProducts(result.products, capacity);
             currentRanges[identifier] = {
                 start: 0,
                 end: initialProducts.length,
@@ -524,73 +664,33 @@
             rowCapacities[identifier] = capacity;
             visibleGroups.add(identifier);
 
-            // Use total from backend result (calculated from link tags)
-            totalProducts[identifier] =
-                result.total || result.products?.length || 0;
-        }
-
-        categoryProducts = { ...categoryProducts };
-        currentRanges = { ...currentRanges };
-        totalProducts = { ...totalProducts };
-        hasMore = { ...hasMore };
-        rowCapacities = { ...rowCapacities };
-    }
-
-    async function processHomeViewResults(results: any[], capacity: number) {
-        for (const result of results) {
-            if (!result?.products?.length || !result?.identifier) continue;
-            const identifier = result.identifier;
-            const initialProducts = result.products.slice(0, capacity);
-            currentRanges[identifier] = {
-                start: 0,
-                end: initialProducts.length,
-            };
-            categoryProducts[identifier] = initialProducts;
-            hasMore[identifier] =
-                result.hasMore || result.products.length > capacity;
-            rowCapacities[identifier] = capacity;
-            visibleGroups.add(identifier);
-
-            // NEW: Calculate and set total products for this identifier
-            try {
-                const total = await dataManager.getTotalProductsForPath(
-                    result.category,
-                    result.subcategory,
-                );
-                totalProducts[identifier] = total;
-            } catch (error) {
-                console.error(`Error getting total for ${identifier}:`, error);
-                totalProducts[identifier] = result.products?.length || 0;
-            }
-        }
-        categoryProducts = { ...categoryProducts };
-        currentRanges = { ...currentRanges };
-        totalProducts = { ...totalProducts };
-        hasMore = { ...hasMore };
-        rowCapacities = { ...rowCapacities };
-    }
-
-    async function processProductTypeResults(results: any[], capacity: number) {
-        for (const result of results) {
-            if (!result?.products?.length || !result?.type) continue;
-            const identifier = result.type;
-            const initialProducts = result.products.slice(0, capacity);
-            currentRanges[identifier] = {
-                start: 0,
-                end: initialProducts.length,
-            };
-            categoryProducts[identifier] = initialProducts;
-            hasMore[identifier] =
-                result.hasMore || result.products.length > capacity;
-            rowCapacities[identifier] = capacity;
-            visibleGroups.add(identifier);
-
-            // NEW: Calculate and set total products for this identifier
-            if (selectedCategory && selectedSubcategory) {
+            // Calculate totals based on type
+            if (type === "subcategory") {
+                totalProducts[identifier] =
+                    result.total || result.products?.length || 0;
+            } else if (type === "homeView") {
                 try {
                     const total = await dataManager.getTotalProductsForPath(
-                        selectedCategory,
-                        selectedSubcategory,
+                        result.category,
+                        result.subcategory,
+                    );
+                    totalProducts[identifier] = total;
+                } catch (error) {
+                    console.error(
+                        `Error getting total for ${identifier}:`,
+                        error,
+                    );
+                    totalProducts[identifier] = result.products?.length || 0;
+                }
+            } else if (
+                type === "productType" &&
+                currentNavigationState.category &&
+                currentNavigationState.subcategory
+            ) {
+                try {
+                    const total = await dataManager.getTotalProductsForPath(
+                        currentNavigationState.category,
+                        currentNavigationState.subcategory,
                         identifier,
                     );
                     totalProducts[identifier] = total;
@@ -603,11 +703,13 @@
                 }
             }
         }
-        categoryProducts = { ...categoryProducts };
-        currentRanges = { ...currentRanges };
-        totalProducts = { ...totalProducts };
-        hasMore = { ...hasMore };
-        rowCapacities = { ...rowCapacities };
+
+        // Single reactive trigger
+        categoryProducts = categoryProducts;
+        currentRanges = currentRanges;
+        totalProducts = totalProducts;
+        hasMore = hasMore;
+        rowCapacities = rowCapacities;
     }
 
     function resetState() {
@@ -641,8 +743,6 @@
             return;
         }
 
-        const capacity = rowCapacities[identifier] || containerCapacity;
-
         currentRanges[identifier] = {
             start: newStart,
             end: newStart + products.length,
@@ -658,10 +758,11 @@
         hasMore[identifier] = newHasMore;
         categoryProducts[identifier] = products;
 
-        currentRanges = { ...currentRanges };
-        totalProducts = { ...totalProducts };
-        categoryProducts = { ...categoryProducts };
-        hasMore = { ...hasMore };
+        // Single reactive trigger
+        currentRanges = currentRanges;
+        totalProducts = totalProducts;
+        categoryProducts = categoryProducts;
+        hasMore = hasMore;
     }
 
     function handleBoundariesInitialized(event: CustomEvent) {
@@ -669,7 +770,7 @@
         if (id && typeof grandTotal === "number") {
             if (totalProducts[id] !== grandTotal) {
                 totalProducts[id] = grandTotal;
-                totalProducts = { ...totalProducts };
+                totalProducts = totalProducts;
             }
         }
     }
@@ -678,34 +779,28 @@
         dispatch("reportCategory", event.detail);
     }
 
-    function handleProductTypeSelect(event: CustomEvent) {
-        dispatch("productTypeSelect", event.detail);
+    async function handleProductTypeSelect(event: CustomEvent) {
+        const { productType, category, subcategory } = event.detail;
+        await browserNavigationService.navigateToProductType(
+            productType,
+            category,
+            subcategory,
+        );
     }
 
-    function handleViewMore(event: CustomEvent) {
-        dispatch("viewMore", event.detail);
+    async function handleViewMore(event: CustomEvent) {
+        const { category, subcategory } = event.detail;
+        await browserNavigationService.navigateViewMore(category, subcategory);
     }
 
     // mainGridContainer is now passed as a prop to the view component
-
-    function getSubcategoryFromIdentifier(identifier: string): string {
-        if (!identifier.includes("_")) return identifier;
-        const parts = identifier.split("_");
-        return parts[1];
-    }
-
-    function getCategoryFromIdentifier(identifier: string): string | null {
-        if (!identifier.includes("_")) return selectedCategory;
-        const parts = identifier.split("_");
-        return parts[0];
-    }
 </script>
 
 <ProductBrowserView
-    {isHomeView}
-    {selectedCategory}
-    {selectedSubcategory}
-    {selectedProductType}
+    isHomeView={currentNavigationState.isHomeView}
+    selectedCategory={currentNavigationState.category}
+    selectedSubcategory={currentNavigationState.subcategory}
+    selectedProductType={currentNavigationState.productType}
     {categoryProducts}
     {allCategoryProducts}
     {currentRanges}

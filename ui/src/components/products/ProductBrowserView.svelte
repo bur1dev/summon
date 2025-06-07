@@ -44,9 +44,6 @@
         dispatch("productTypeSelect", event.detail);
     }
 
-    function handleViewMore(category: string | null, subcategory: string) {
-        dispatch("viewMore", { category, subcategory });
-    }
 
     function getSubcategoryFromIdentifier(identifier: string): string {
         if (!identifier.includes("_")) return identifier;
@@ -83,8 +80,6 @@
                         containerCapacity}
                     {action}
                     bind:this={gridContainer[identifier]}
-                    onViewMore={() =>
-                        handleViewMore(rowCategory, rowSubcategory)}
                     on:dataLoaded={handleDataLoaded}
                     on:boundariesInitialized={handleBoundariesInitialized}
                     on:reportCategory={handleReportCategory}
@@ -111,8 +106,6 @@
                         containerCapacity}
                     {action}
                     bind:this={gridContainer[identifier]}
-                    onViewMore={() =>
-                        handleViewMore(selectedCategory, identifier)}
                     on:dataLoaded={handleDataLoaded}
                     on:boundariesInitialized={handleBoundariesInitialized}
                     on:reportCategory={handleReportCategory}
@@ -159,10 +152,6 @@
                         {action}
                         bind:this={gridContainer[identifier]}
                         isProductType={true}
-                        onViewMore={() =>
-                            dispatch("productTypeSelect", {
-                                productType: identifier,
-                            })}
                         on:dataLoaded={handleDataLoaded}
                         on:boundariesInitialized={handleBoundariesInitialized}
                         on:reportCategory={handleReportCategory}

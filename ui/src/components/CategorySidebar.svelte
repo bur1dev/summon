@@ -1,20 +1,16 @@
 <script lang="ts">
-  import { getContext, onMount } from "svelte"; // onMount isn't used, consider removing if not needed elsewhere
-  import type { ShopStore } from "../store";
-  import { createEventDispatcher } from "svelte";
   import { mainCategories } from "../utils/categoryData";
 
   // Import from data trigger store - all these control data loading
   import {
-    isHomeViewStore,
     selectedCategoryStore,
     selectedSubcategoryStore,
   } from "../stores/DataTriggerStore";
+  
+  // Import the BrowserNavigationService
+  import { browserNavigationService } from "../services/BrowserNavigationService";
 
-  const dispatch = createEventDispatcher();
 
-  const { getStore }: any = getContext("store");
-  let store: ShopStore = getStore();
 
   let currentPage = 0;
   // let hasMore = false; // Not used, consider removing
@@ -31,11 +27,11 @@
   $: selectedCategory = $selectedCategoryStore;
   $: selectedSubcategory = $selectedSubcategoryStore;
 
-  function selectCategory(category: string) {
+  async function selectCategory(category: string) {
     currentPage = 0;
-    $selectedCategoryStore = category;
-    $selectedSubcategoryStore = null;
-    $isHomeViewStore = false;
+    
+    // Use BrowserNavigationService for navigation
+    await browserNavigationService.navigateToCategory(category);
 
     setTimeout(() => {
       if (sidebarElement && headerElement) {
@@ -72,32 +68,26 @@
         }
       }
     }, 100);
-
-    dispatch("categorySelect", { category, subcategory: null });
   }
 
-  function selectSubcategory(subcategory: string) {
+  async function selectSubcategory(subcategory: string) {
     currentPage = 0;
-    $selectedSubcategoryStore = subcategory; // This uses the store directly
-    $isHomeViewStore = false;
-
-    dispatch("categorySelect", {
-      category: $selectedCategoryStore, // Use the store value for consistency
-      subcategory,
-    });
+    
+    // Use BrowserNavigationService for navigation
+    const currentCategory = $selectedCategoryStore;
+    if (currentCategory) {
+      await browserNavigationService.navigateToSubcategory(currentCategory, subcategory);
+    }
   }
 
-  function goToHome() {
-    $selectedCategoryStore = null;
-    $selectedSubcategoryStore = null;
-    $isHomeViewStore = true;
+  async function goToHome() {
+    // Use BrowserNavigationService for navigation
+    await browserNavigationService.navigateToHome();
 
     // Scroll to top when going home
     if (sidebarElement) {
       sidebarElement.scrollTo({ top: 0, behavior: "smooth" });
     }
-
-    dispatch("categorySelect", { category: null, subcategory: null });
   }
 </script>
 

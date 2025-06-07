@@ -1,18 +1,18 @@
 :root {
   --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --primary: #00B8D9;
-  --primary-dark: #0095B0;
-  --secondary: #6554C0;
-  --text-primary: #4A442D;
-  --text-secondary: #78715B;
-  --background: #FDF5E6;
-  --surface: #ffffff;
-  --surface-hover: #F5EAD6;
-  --border: #DCD0C0;
-  --border-lighter: #EAE0D0;
-  --success: #508550;
-  --warning: #f9b522;
-  --error: #B22222;
+  --primary: #ff7300;
+  --primary-dark: #E03C00;
+  --secondary: #E91E63;
+  --text-primary: #1A1A1A;
+  --text-secondary: #5A5A5A;
+  --background: #FFFFFF;
+  --surface: #F8F8F8;
+  --surface-hover: #F0F0F0;
+  --border: #E0E0E0;
+  --border-lighter: #F0F0F0;
+  --success: #00C851;
+  --warning: #FFBB33;
+  --error: #FF4444;
   --button-text: #FFFFFF;
   /* Horizontal padding for all content containers */
   --content-padding-x: 16px;

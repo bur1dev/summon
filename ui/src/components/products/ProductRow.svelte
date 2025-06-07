@@ -4,6 +4,7 @@
     import { createEventDispatcher } from "svelte";
     import { ChevronRight } from "lucide-svelte";
     import type { DataManager } from "../../services/DataManager";
+    import { browserNavigationService } from "../../services/BrowserNavigationService";
 
     // Required props
     export let title: string;
@@ -11,18 +12,27 @@
     export let products: any[] = [];
     export let currentRanges: Record<string, any>;
     export let totalProducts: Record<string, any> = {};
-    // STEP 2: Use DataManager instead of ProductDataService
     export let dataManager: DataManager;
     export let selectedCategory: string;
     export let selectedSubcategory: string;
     export let mainGridContainer: HTMLElement;
     export let isProductType = false;
-    export let onViewMore = () => {};
     export let action: any;
     export let hasMore: Record<string, any> = {};
     export let containerCapacity = 4;
 
     const dispatch = createEventDispatcher();
+
+    // Centralized navigation logic using BrowserNavigationService
+    async function handleViewMore() {
+        if (isProductType) {
+            // Navigate to product type view
+            await browserNavigationService.navigateToProductType(identifier, selectedCategory, selectedSubcategory);
+        } else {
+            // Navigate to subcategory view
+            await browserNavigationService.navigateViewMore(selectedCategory, identifier);
+        }
+    }
 
     function handleReportCategory(event: CustomEvent) {
         dispatch("reportCategory", event.detail);
@@ -38,9 +48,9 @@
             class="view-all-link btn btn-text"
             role="button"
             tabindex="0"
-            on:click|stopPropagation={onViewMore}
+            on:click|stopPropagation={handleViewMore}
             on:keydown|stopPropagation={(e) => {
-                if (e.key === "Enter" || e.key === " ") onViewMore();
+                if (e.key === "Enter" || e.key === " ") handleViewMore();
             }}
         >
             View More

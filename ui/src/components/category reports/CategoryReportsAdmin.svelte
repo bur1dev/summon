@@ -11,6 +11,7 @@
         RefreshCw,
     } from "lucide-svelte";
     import type { StoreContext, ShopStore } from "../../store"; // Adjust path if needed
+    import { clickable } from "../../actions/clickable";
 
     // This must be at the top level
     const storeContext = getContext<StoreContext>("store");
@@ -910,17 +911,9 @@
     <div
         class="overlay"
         style="background-color: rgba(0,0,0,0.7); z-index: 9999;"
-        role="button"
-        tabindex="0"
-        on:click|self={() => {
+        use:clickable={() => {
             showApproveDialog = false;
             selectedReport = null;
-        }}
-        on:keydown|self={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-                showApproveDialog = false;
-                selectedReport = null;
-            }
         }}
         use:portal
     >
@@ -1127,14 +1120,8 @@
 {#if syncStatusModalOpen}
     <div
         class="sync-modal-overlay"
-        role="button"
-        tabindex="0"
-        on:click={() => !syncStatus.inProgress && (syncStatusModalOpen = false)}
-        on:keydown={(e) => {
-            if (
-                (e.key === "Enter" || e.key === " ") &&
-                !syncStatus.inProgress
-            ) {
+        use:clickable={() => {
+            if (!syncStatus.inProgress) {
                 syncStatusModalOpen = false;
             }
         }}

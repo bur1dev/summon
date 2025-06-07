@@ -5,6 +5,7 @@
   import ReportCategoryDialog from "../category reports/ReportCategoryDialog.svelte";
   import ProductDetailModal from "./modal/ProductDetailModal.svelte";
   import { createEventDispatcher } from "svelte";
+  import { clickable } from "../../actions/clickable";
 
   import { PriceService } from "../../services/PriceService";
   import { StockService } from "../../services/StockService";
@@ -168,36 +169,42 @@
     addProductToCart();
   }
 
-  function handleCardClick(e: MouseEvent) {
-    // Prevent modal from opening when clicking on specific interactive elements
-    if (
-      (e.target as Element).closest(".add-btn") ||
-      (e.target as Element).closest(".report-btn") ||
-      (e.target as Element).closest(".minus") ||
-      (e.target as Element).closest(".plus")
-    ) {
-      return;
+  function handleCardClick(e?: Event) {
+    // With clickable action, counter buttons use stopPropagation
+    // So we only need to check for add-btn and report-btn
+    if (e && e.target) {
+      const target = e.target as Element;
+      if (
+        target.closest(".add-btn") ||
+        target.closest(".report-btn")
+      ) {
+        return;
+      }
     }
 
     showProductModal = true;
   }
 
-  function handleCardKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      showProductModal = true;
-    }
+  async function handleIncrementClick() {
+    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
+    await CartInteractionService.incrementItem(
+      cartService,
+      groupHashBase64,
+      productIndex,
+      currentAmount,
+      product,
+    );
   }
 
-  function handleCounterKeydown(event: KeyboardEvent, action: string) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      if (action === "increment") {
-        incrementCount(event as any);
-      } else if (action === "decrement") {
-        decrementCount(event as any);
-      }
-    }
+  async function handleDecrementClick() {
+    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
+    await CartInteractionService.decrementItem(
+      cartService,
+      groupHashBase64,
+      productIndex,
+      currentAmount,
+      product,
+    );
   }
 
   // Add product to cart using centralized service
@@ -209,40 +216,12 @@
     );
   }
 
-  // Increment item quantity using centralized service
-  async function incrementCount(e: MouseEvent | KeyboardEvent) {
-    e.stopPropagation();
-    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await CartInteractionService.incrementItem(
-      cartService,
-      groupHashBase64,
-      productIndex,
-      currentAmount,
-      product,
-    );
-  }
-
-  // Decrement item quantity using centralized service
-  async function decrementCount(e: MouseEvent | KeyboardEvent) {
-    e.stopPropagation();
-    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await CartInteractionService.decrementItem(
-      cartService,
-      groupHashBase64,
-      productIndex,
-      currentAmount,
-      product,
-    );
-  }
 
 </script>
 
 <div
   class="product-card fade-in"
-  role="button"
-  tabindex="0"
-  on:click={handleCardClick}
-  on:keydown={handleCardKeydown}
+  use:clickable={handleCardClick}
 >
   <button
     class="add-btn btn {displayAmount > 0
@@ -256,31 +235,21 @@
     {#if displayAmount > 0}
       <span
         class="minus counter-btn"
-        role="button"
-        tabindex="0"
         aria-label="Decrease quantity"
-        on:click|stopPropagation={decrementCount}
-        on:keydown={(e) => handleCounterKeydown(e, "decrement")}
+        use:clickable={{ handler: handleDecrementClick, stopPropagation: true }}
       >
         <Minus size={16} color="white" />
       </span>
       <span
         class="count counter-value"
-        role="button"
-        tabindex="0"
         aria-label="Current quantity"
-        on:click|stopPropagation={() => {}}
-        on:keydown={() => {}}
       >
         {formatQuantityDisplay(displayAmount, product)}
       </span>
       <span
         class="plus counter-btn"
-        role="button"
-        tabindex="0"
         aria-label="Increase quantity"
-        on:click|stopPropagation={incrementCount}
-        on:keydown={(e) => handleCounterKeydown(e, "increment")}
+        use:clickable={{ handler: handleIncrementClick, stopPropagation: true }}
       >
         <Plus size={16} color="white" />
       </span>

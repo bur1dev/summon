@@ -1,6 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { StockService } from "../../../services/StockService";
+    import { clickable } from "../../../actions/clickable";
     
     const dispatch = createEventDispatcher();
     
@@ -31,12 +32,6 @@
         dispatch("close");
     }
 
-    function handleShopAllKeydown(event: KeyboardEvent) {
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            handleShopAllClick();
-        }
-    }
 </script>
 
 <div class="product-info">
@@ -50,10 +45,7 @@
     
     <div
         class="shop-all btn btn-text"
-        role="button"
-        tabindex="0"
-        on:click|stopPropagation={handleShopAllClick}
-        on:keydown={handleShopAllKeydown}
+        use:clickable={{ handler: handleShopAllClick, stopPropagation: true }}
     >
         Shop all {selectedSubcategory || product.subcategory
             ? (selectedSubcategory || product.subcategory) + "/"

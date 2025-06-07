@@ -4,6 +4,7 @@
     import { Plus, Minus } from "lucide-svelte";
     import { CartInteractionService } from "../../../services/CartInteractionService";
     import { getIncrementValue, formatQuantityDisplay } from "../../../utils/cartHelpers";
+    import { clickable } from "../../../actions/clickable";
     
     export let cartServiceStore: Writable<CartBusinessService | null>;
     export let product: any;
@@ -64,16 +65,6 @@
         }
     }
 
-    function handleCounterKeydown(event: KeyboardEvent, action: string) {
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            if (action === "increment") {
-                incrementQuantity();
-            } else if (action === "decrement") {
-                decrementQuantity();
-            }
-        }
-    }
 </script>
 
 <div class="quantity-control-container">
@@ -122,15 +113,8 @@
         <div class="counter-btn-group">
             <span
                 class="counter-btn minus"
-                role="button"
-                tabindex="0"
                 aria-label="Decrease quantity"
-                on:click|stopPropagation={decrementQuantity}
-                on:keydown={(e) =>
-                    handleCounterKeydown(
-                        e,
-                        "decrement",
-                    )}
+                use:clickable={{ handler: decrementQuantity, stopPropagation: true }}
             >
                 <Minus size={20} />
             </span>
@@ -139,15 +123,8 @@
             >
             <span
                 class="counter-btn plus"
-                role="button"
-                tabindex="0"
                 aria-label="Increase quantity"
-                on:click|stopPropagation={incrementQuantity}
-                on:keydown={(e) =>
-                    handleCounterKeydown(
-                        e,
-                        "increment",
-                    )}
+                use:clickable={{ handler: incrementQuantity, stopPropagation: true }}
             >
                 <Plus size={20} />
             </span>

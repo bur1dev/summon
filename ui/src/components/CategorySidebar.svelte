@@ -9,6 +9,9 @@
   
   // Import the BrowserNavigationService
   import { browserNavigationService } from "../services/BrowserNavigationService";
+  
+  // Import clickable action
+  import { clickable } from "../actions/clickable";
 
 
 
@@ -95,12 +98,7 @@
   <div class="sidebar-header" bind:this={headerElement}>
     <div
       class="store-logo-container btn btn-toggle active"
-      role="button"
-      tabindex="0"
-      on:click={goToHome}
-      on:keydown={(e) => {
-        if (e.key === "Enter" || e.key === " ") goToHome();
-      }}
+      use:clickable={goToHome}
     >
       <div class="store-name">Ralphs Store</div>
     </div>
@@ -112,12 +110,7 @@
         class="category-item btn btn-toggle {selectedCategory === category.name
           ? 'active'
           : ''}"
-        role="button"
-        tabindex="0"
-        on:click={() => selectCategory(category.name)}
-        on:keydown={(e) => {
-          if (e.key === "Enter" || e.key === " ") selectCategory(category.name);
-        }}
+        use:clickable={() => selectCategory(category.name)}
       >
         {category.name}
       </div>
@@ -129,13 +122,7 @@
             subcategory.name
               ? 'active'
               : ''}"
-            role="button"
-            tabindex="0"
-            on:click|stopPropagation={() => selectSubcategory(subcategory.name)}
-            on:keydown|stopPropagation={(e) => {
-              if (e.key === "Enter" || e.key === " ")
-                selectSubcategory(subcategory.name);
-            }}
+            use:clickable={{ handler: () => selectSubcategory(subcategory.name), stopPropagation: true }}
           >
             {subcategory.name}
           </div>

@@ -2,6 +2,7 @@
     import { createEventDispatcher, onMount } from "svelte";
     import type { DeliveryTimeSlot } from "../services/CartBusinessService";
     import { ChevronLeft, ChevronRight } from "lucide-svelte";
+    import { clickable } from "../actions/clickable";
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
@@ -123,13 +124,7 @@
                     day.date.getTime() === selectedDate.getTime()
                         ? 'selected'
                         : ''}"
-                    role="button"
-                    tabindex="0"
-                    on:click={() => selectDate(day.date)}
-                    on:keydown={(e) => {
-                        if (e.key === "Enter" || e.key === " ")
-                            selectDate(day.date);
-                    }}
+                    use:clickable={() => selectDate(day.date)}
                 >
                     <div class="date-card-day">{day.dayOfWeek}</div>
                     <div class="date-card-date">{day.dateFormatted}</div>
@@ -159,13 +154,7 @@
                             : selectedTimeSlot.id === timeSlot.id)
                             ? 'selected'
                             : ''}"
-                        role="button"
-                        tabindex="0"
-                        on:click={() => selectTimeSlot(timeSlot)}
-                        on:keydown={(e) => {
-                            if (e.key === "Enter" || e.key === " ")
-                                selectTimeSlot(timeSlot);
-                        }}
+                        use:clickable={() => selectTimeSlot(timeSlot)}
                     >
                         <div class="time-slot-time">{timeSlot.display}</div>
                     </div>

@@ -3,6 +3,7 @@
     import { mainCategories } from "../../utils/categoryData";
     import { X } from "lucide-svelte";
     import { lastCategorySelection } from "../../stores/categorySelectionStore";
+    import { clickable } from "../../actions/clickable";
 
     const dispatch = createEventDispatcher();
 
@@ -225,12 +226,6 @@
         reportType = type;
     }
 
-    function handleKeydown(event: KeyboardEvent, type: string) {
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setReportType(type);
-        }
-    }
 
     function handleOverlayKeydown(event: KeyboardEvent) {
         if (event.key === "Escape") {
@@ -364,11 +359,7 @@
                             class="report-option {reportType === 'incorrect'
                                 ? 'selected'
                                 : ''}"
-                            role="button"
-                            tabindex="0"
-                            on:click={() => setReportType("incorrect")}
-                            on:keydown={(event) =>
-                                handleKeydown(event, "incorrect")}
+                            use:clickable={() => setReportType("incorrect")}
                         >
                             <div class="report-option-heading">
                                 Just flag as incorrect
@@ -383,11 +374,7 @@
                             class="report-option {reportType === 'suggestion'
                                 ? 'selected'
                                 : ''}"
-                            role="button"
-                            tabindex="0"
-                            on:click={() => setReportType("suggestion")}
-                            on:keydown={(event) =>
-                                handleKeydown(event, "suggestion")}
+                            use:clickable={() => setReportType("suggestion")}
                         >
                             <div class="report-option-heading">
                                 Suggest correct category

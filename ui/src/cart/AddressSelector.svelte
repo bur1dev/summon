@@ -3,6 +3,7 @@
     import { AddressService, type Address } from "../services/AddressService";
     import AddressForm from "./AddressForm.svelte";
     import { MapPin, NotebookPen } from "lucide-svelte";
+    import { clickable } from "../actions/clickable";
 
     // Props
     export let client: any;
@@ -136,13 +137,7 @@
                             class="address-card {selectedAddressHash === hash
                                 ? 'selected'
                                 : ''}"
-                            role="button"
-                            tabindex="0"
-                            on:click={() => selectAddress(hash)}
-                            on:keydown={(e) => {
-                                if (e.key === "Enter" || e.key === " ")
-                                    selectAddress(hash);
-                            }}
+                            use:clickable={() => selectAddress(hash)}
                         >
                             <div class="address-icon">
                                 <MapPin size={18} />

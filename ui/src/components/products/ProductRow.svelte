@@ -5,6 +5,7 @@
     import { ChevronRight } from "lucide-svelte";
     import type { DataManager } from "../../services/DataManager";
     import { browserNavigationService } from "../../services/BrowserNavigationService";
+    import { clickable } from "../../actions/clickable";
 
     // Required props
     export let title: string;
@@ -46,12 +47,7 @@
         </div>
         <span
             class="view-all-link btn btn-text"
-            role="button"
-            tabindex="0"
-            on:click|stopPropagation={handleViewMore}
-            on:keydown|stopPropagation={(e) => {
-                if (e.key === "Enter" || e.key === " ") handleViewMore();
-            }}
+            use:clickable={{ handler: handleViewMore, stopPropagation: true }}
         >
             View More
             <ChevronRight size={20} class="chevron-icon" />

@@ -8,6 +8,7 @@
   import CheckoutFlow from "./CheckoutFlow.svelte";
   import { X } from "lucide-svelte";
   import { PriceService } from "../services/PriceService";
+  import { clickable } from "../actions/clickable";
 
   // Props
   export let isOpen = false;
@@ -185,14 +186,7 @@
 <div
   class="overlay {isOpen ? (isClosing ? 'fade-out' : 'fade-in') : ''}"
   class:visible={isOpen}
-  role="button"
-  tabindex="0"
-  on:click={closeCart}
-  on:keydown={(e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      closeCart();
-    }
-  }}
+  use:clickable={closeCart}
 >
   <div
     class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"

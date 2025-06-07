@@ -4,6 +4,7 @@
     import ProfileEditor from "./ProfileEditor.svelte";
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
     import { X, Tag, AlertTriangle } from "lucide-svelte";
+    import { clickable } from "../actions/clickable";
 
     export let myAgentPubKeyB64: string | undefined;
     export let avatarLoaded: boolean;
@@ -36,12 +37,7 @@
     <!-- Overlay -->
     <div
         class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
-        role="button"
-        tabindex="0"
-        on:click={closeMenu}
-        on:keydown={(e) => {
-            if (e.key === "Enter" || e.key === " ") closeMenu();
-        }}
+        use:clickable={closeMenu}
     />
 
     <!-- Sidebar Panel -->
@@ -61,13 +57,7 @@
                 <div class="profile-section">
                     <div
                         class="avatar-container"
-                        role="button"
-                        tabindex="0"
-                        on:click={handleAvatarClick}
-                        on:keydown={(e) => {
-                            if (e.key === "Enter" || e.key === " ")
-                                handleAvatarClick();
-                        }}
+                        use:clickable={handleAvatarClick}
                         title="Edit Your Profile"
                     >
                         <agent-avatar

@@ -11,6 +11,7 @@
         SearchMethod,
         SearchResult,
     } from "./search-types";
+    import { clickable } from "../actions/clickable";
 
     // Type for products coming from cache, which might have category as null and embedding in a raw format
     type ProductFromCache = Omit<Product, "category" | "embedding"> & {
@@ -794,12 +795,7 @@
     {#if showDropdown}
         <div
             class="search-overlay"
-            role="button"
-            tabindex="0"
-            on:click={() => (showDropdown = false)}
-            on:keydown={(e) => {
-                if (e.key === "Enter" || e.key === " ") showDropdown = false;
-            }}
+            use:clickable={() => (showDropdown = false)}
             use:portal
         ></div>
 
@@ -825,13 +821,7 @@
                         {#if result.isType && "type" in result && "sample" in result}
                             <div
                                 class="dropdown-item type-item"
-                                role="button"
-                                tabindex="0"
-                                on:click={() => handleClickType(result)}
-                                on:keydown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ")
-                                        handleClickType(result);
-                                }}
+                                use:clickable={() => handleClickType(result)}
                             >
                                 <div class="product-image">
                                     {#if result.sample && "image_url" in result.sample && result.sample.image_url}
@@ -851,13 +841,7 @@
                         {:else if !result.isType && "name" in result && "price" in result}
                             <div
                                 class="dropdown-item"
-                                role="button"
-                                tabindex="0"
-                                on:click={() => handleClickProduct(result)}
-                                on:keydown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ")
-                                        handleClickProduct(result);
-                                }}
+                                use:clickable={() => handleClickProduct(result)}
                             >
                                 <div class="product-image">
                                     {#if "image_url" in result && result.image_url}
@@ -880,13 +864,7 @@
             </div>
             <div
                 class="view-all"
-                role="button"
-                tabindex="0"
-                on:click={handleViewAllResults}
-                on:keydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ")
-                        handleViewAllResults();
-                }}
+                use:clickable={handleViewAllResults}
             >
                 View all results
             </div>

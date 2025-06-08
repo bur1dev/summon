@@ -4,8 +4,8 @@
   import type { CartBusinessService } from "../services/CartBusinessService";
   import type { ProductDataService } from "../../products/services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
-  import ProductCartItem from "./ProductCartItem.svelte";
-  import CheckoutFlow from "./CheckoutFlow.svelte";
+  import ProductCartItem from "./items/ProductCartItem.svelte";
+  import CheckoutFlow from "./checkout/CheckoutFlow.svelte";
   import { X } from "lucide-svelte";
   import { PriceService } from "../../services/PriceService";
   import { clickable } from "../../shared/actions/clickable";
@@ -214,10 +214,7 @@
             <div class="cart-title" id="cart-title">
               Cart ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})
             </div>
-            <button
-              class="clear-cart-btn btn btn-text"
-              on:click={clearCart}
-            >
+            <button class="clear-cart-btn btn btn-text" on:click={clearCart}>
               Clear this cart
             </button>
           </div>

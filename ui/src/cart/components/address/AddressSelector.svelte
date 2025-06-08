@@ -1,9 +1,12 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from "svelte";
-    import { AddressService, type Address } from "../services/AddressService";
+    import {
+        AddressService,
+        type Address,
+    } from "../../services/AddressService";
     import AddressForm from "./AddressForm.svelte";
     import { MapPin, NotebookPen } from "lucide-svelte";
-    import { clickable } from "../../shared/actions/clickable";
+    import { clickable } from "../../../shared/actions/clickable";
 
     // Props
     export let client: any;

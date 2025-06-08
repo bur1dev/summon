@@ -1,20 +1,20 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
     import { PencilLine, Plus, Minus, X, Save } from "lucide-svelte";
-    import type { Address } from "../services/AddressService";
+    import type { Address } from "../../services/AddressService";
     import type {
         CartBusinessService,
         DeliveryTimeSlot,
-    } from "../services/CartBusinessService";
-    import { PriceService } from "../../services/PriceService";
-    import { CartInteractionService } from "../services/CartInteractionService";
-    import { PreferencesService } from "../../products/services/PreferencesService";
+    } from "../../services/CartBusinessService";
+    import { PriceService } from "../../../services/PriceService";
+    import { CartInteractionService } from "../../services/CartInteractionService";
+    import { PreferencesService } from "../../../products/services/PreferencesService";
     import {
         getIncrementValue,
         getDisplayUnit,
         isSoldByWeight,
         getCartItemKey,
-    } from "../utils/cartHelpers";
+    } from "../../utils/cartHelpers";
 
     // Props
     export let cartItems: any[] = [];
@@ -70,9 +70,13 @@
     let loadingPreference = false;
 
     // Get preference store for currently editing item
-    $: editingPreferenceStore = editingNoteForItem ? 
-        PreferencesService.getPreferenceStore(editingNoteForItem.groupHash, editingNoteForItem.productIndex) : null;
-    
+    $: editingPreferenceStore = editingNoteForItem
+        ? PreferencesService.getPreferenceStore(
+              editingNoteForItem.groupHash,
+              editingNoteForItem.productIndex,
+          )
+        : null;
+
     // Derive preference state from service store
     $: if (editingPreferenceStore && $editingPreferenceStore) {
         loadingPreference = $editingPreferenceStore.loading;
@@ -259,7 +263,11 @@
 
         // Load existing preference data using the service
         if (cartService) {
-            await PreferencesService.loadPreference(cartService, item.groupHash, item.productIndex);
+            await PreferencesService.loadPreference(
+                cartService,
+                item.groupHash,
+                item.productIndex,
+            );
         }
     }
 
@@ -305,14 +313,14 @@
                     cartService!,
                     editingNoteForItem.groupHash,
                     editingNoteForItem.productIndex,
-                    currentNote.trim()
+                    currentNote.trim(),
                 );
             } else if (!savePreference && existingPreference) {
                 await PreferencesService.deletePreference(
                     cartService!,
                     existingPreference.hash,
                     editingNoteForItem.groupHash,
-                    editingNoteForItem.productIndex
+                    editingNoteForItem.productIndex,
                 );
             }
 
@@ -336,7 +344,7 @@
             PreferencesService.updateSavePreference(
                 editingNoteForItem.groupHash,
                 editingNoteForItem.productIndex,
-                savePreference
+                savePreference,
             );
         }
 
@@ -455,7 +463,7 @@
                                         <label class="toggle-container">
                                             <input
                                                 type="checkbox"
-                                                bind:checked={savePreference}
+                                                checked={savePreference}
                                                 on:change={handleSavePreferenceToggle}
                                                 disabled={loadingPreference}
                                             />
@@ -844,13 +852,6 @@
         background-color: var(--surface);
         padding: 4px;
         border-radius: var(--card-border-radius);
-    }
-
-    .item-content {
-        flex: 1;
-        display: flex;
-        justify-content: space-between;
-        overflow: hidden;
     }
 
     .item-left {
@@ -1250,24 +1251,35 @@
         position: relative;
         flex: 1;
         display: flex;
+        margin: 0;
+        padding: 0;
     }
 
-    .note-edit-section,
     .item-content {
-        position: absolute;
         width: 100%;
-        opacity: 0;
-        visibility: hidden;
-        transition:
-            opacity 0.3s ease,
-            visibility 0.3s ease;
+        height: 100%;
+        display: flex;
+        justify-content: space-between;
+        overflow: hidden;
+        box-sizing: border-box;
     }
 
-    .note-edit-section.active,
-    .item-content:not(.hidden) {
-        position: relative;
-        opacity: 1;
-        visibility: visible;
+    .note-edit-section {
+        flex: 1;
+        background: var(--surface);
+        border-radius: var(--card-border-radius);
+        padding: var(--spacing-md);
+        box-shadow: var(--shadow-subtle);
+        box-sizing: border-box;
+        display: none;
+    }
+
+    .note-edit-section.active {
+        display: block;
+    }
+
+    .item-content.hidden {
+        display: none;
     }
 
     .cancel-button,

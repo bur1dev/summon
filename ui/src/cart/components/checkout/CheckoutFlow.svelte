@@ -4,15 +4,15 @@
         encodeHashToBase64,
         decodeHashFromBase64,
     } from "@holochain/client";
-    import { AddressService } from "../services/AddressService";
-    import type { Address } from "../services/AddressService";
-    import type { CartBusinessService } from "../services/CartBusinessService";
+    import { AddressService } from "../../services/AddressService";
+    import type { Address } from "../../services/AddressService";
+    import type { CartBusinessService } from "../../services/CartBusinessService";
     import type {
         DeliveryTimeSlot,
         CheckoutDetails,
-    } from "../services/CartBusinessService";
-    import AddressSelector from "./AddressSelector.svelte";
-    import DeliveryTimeSelector from "./DeliveryTimeSelector.svelte";
+    } from "../../services/CartBusinessService";
+    import AddressSelector from "../address/AddressSelector.svelte";
+    import DeliveryTimeSelector from "../address/DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";
     import { decode } from "@msgpack/msgpack";
     import { ChevronLeft } from "lucide-svelte";
@@ -38,7 +38,8 @@
     // For now, I'll keep it as a local variable declaration.
 
     // Get the store for the client
-    const storeContext = getContext<import("../../store").StoreContext>("store");
+    const storeContext =
+        getContext<import("../../../store").StoreContext>("store");
     const store = storeContext.getStore();
 
     // Get profiles store from context

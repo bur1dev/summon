@@ -1,13 +1,17 @@
 <script lang="ts">
     import CartItem from "./CartItem.svelte";
-    import ProductDetailModal from "../../products/components/modal/ProductDetailModal.svelte";
+    import ProductDetailModal from "../../../products/components/modal/ProductDetailModal.svelte";
     import { getContext } from "svelte";
     import { PencilLine, Plus, Minus } from "lucide-svelte";
     import type { Writable } from "svelte/store";
-    import type { CartBusinessService } from "../services/CartBusinessService";
-    import { PriceService } from "../../services/PriceService";
-    import { CartInteractionService } from "../services/CartInteractionService";
-    import { getIncrementValue, getDisplayUnit, isSoldByWeight } from "../utils/cartHelpers";
+    import type { CartBusinessService } from "../../services/CartBusinessService";
+    import { PriceService } from "../../../services/PriceService";
+    import { CartInteractionService } from "../../services/CartInteractionService";
+    import {
+        getIncrementValue,
+        getDisplayUnit,
+        isSoldByWeight,
+    } from "../../utils/cartHelpers";
 
     // Props - UPDATED FOR NEW STRUCTURE
     export let product: any;
@@ -39,7 +43,14 @@
         isUpdating = true;
 
         try {
-            await CartInteractionService.decrementItem(cartServiceStore, groupHash, productIndex, quantity, product, note || undefined);
+            await CartInteractionService.decrementItem(
+                cartServiceStore,
+                groupHash,
+                productIndex,
+                quantity,
+                product,
+                note || undefined,
+            );
         } finally {
             isUpdating = false;
         }
@@ -50,14 +61,25 @@
         isUpdating = true;
 
         try {
-            await CartInteractionService.incrementItem(cartServiceStore, groupHash, productIndex, quantity, product, note || undefined);
+            await CartInteractionService.incrementItem(
+                cartServiceStore,
+                groupHash,
+                productIndex,
+                quantity,
+                product,
+                note || undefined,
+            );
         } finally {
             isUpdating = false;
         }
     };
 
     const handleRemove = async () => {
-        await CartInteractionService.removeItem(cartServiceStore, groupHash, productIndex);
+        await CartInteractionService.removeItem(
+            cartServiceStore,
+            groupHash,
+            productIndex,
+        );
     };
 
     const handleInstructionsClick = () => {

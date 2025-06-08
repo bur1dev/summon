@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy, createEventDispatcher } from "svelte";
+    import { onDestroy, onMount, createEventDispatcher } from "svelte";
     import type { DataManager } from "../../services/DataManager";
     import { tick } from "svelte";
     import { useResizeObserver } from "../../shared/utils/useResizeObserver";
@@ -43,6 +43,7 @@
     let mainGridContainer: HTMLElement;
     let allProductsTotal: number = 0;
     let hasMore: Record<string, boolean> = {};
+    let isLoadingProductType: boolean = false;
 
     let loadedSubcategoriesSet = new Set<string>();
     let visibleGroups = new Set();
@@ -93,6 +94,17 @@
 
     $: handleNavigationChange(navigationState);
 
+    // Initialize home view when component is mounted and ready
+    onMount(async () => {
+        // Wait for DOM to be ready
+        await tick();
+        
+        // If we're supposed to be in home view but haven't loaded it yet
+        if (currentNavigationState.isHomeView && featuredSubcategories.length > 0 && Object.keys(categoryProducts).length === 0) {
+            handleNavigation("home");
+        }
+    });
+
     // Handle navigation state changes with debouncing
     function handleNavigationChange(newState: typeof navigationState) {
         // Fast navigation state comparison using key concatenation
@@ -101,11 +113,12 @@
         const hasChanged = newStateKey !== currentStateKey;
 
         if (hasChanged) {
-            // Check if this is a major navigation change (category/home)
+            // Check if this is a major navigation change (category/home/productType)
             const isMajorChange =
                 newState.category !== currentNavigationState.category ||
                 newState.isHomeView !== currentNavigationState.isHomeView ||
-                newState.searchMode !== currentNavigationState.searchMode;
+                newState.searchMode !== currentNavigationState.searchMode ||
+                newState.productType !== currentNavigationState.productType;
 
             // Clear previous debounce
             if (navigationDebounceId) {
@@ -115,9 +128,10 @@
             // Only debounce minor changes (subcategory/productType within same category)
             const debounceMs = isMajorChange ? 0 : 10;
 
-            navigationDebounceId = setTimeout(() => {
-                currentNavigationState = newState;
+            // Update navigation state immediately to prevent stale state issues
+            currentNavigationState = newState;
 
+            navigationDebounceId = setTimeout(() => {
                 // Handle navigation
                 if (newState.searchMode) {
                     resetState();
@@ -401,10 +415,10 @@
         )
             return;
 
-        allCategoryProducts = [];
-
         try {
             if (currentNavigationState.productType !== "All") {
+                isLoadingProductType = true;
+                
                 const result = await dataManager.loadProductTypeProducts(
                     currentNavigationState.category,
                     currentNavigationState.subcategory,
@@ -421,6 +435,7 @@
                         allCategoryProducts = [];
                         allProductsTotal = 0;
                     }
+                    isLoadingProductType = false;
                 }
             } else {
                 await loadProductsForCategory(navId);
@@ -434,6 +449,7 @@
             if (navId === navigationId) {
                 allCategoryProducts = [];
                 allProductsTotal = 0;
+                isLoadingProductType = false;
             }
         }
     }
@@ -720,6 +736,7 @@
         hasMore = {};
         rowCapacities = {};
         allProductsTotal = 0;
+        isLoadingProductType = false;
         visibleGroups.clear();
         loadedSubcategoriesSet.clear();
 
@@ -811,6 +828,7 @@
     {rowCapacities}
     {action}
     {gridContainer}
+    {isLoadingProductType}
     bind:mainGridContainer
     on:dataLoaded={handleDataLoaded}
     on:boundariesInitialized={handleBoundariesInitialized}

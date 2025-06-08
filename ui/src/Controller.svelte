@@ -9,13 +9,11 @@
     setContext,
     onMount,
     getContext,
-    createEventDispatcher,
   } from "svelte";
   import type { AppClient } from "@holochain/client";
   import { encodeHashToBase64 } from "@holochain/client";
   import type { Writable } from "svelte/store";
 
-  import { ProfilesStore } from "@holochain-open-dev/profiles";
   import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
   import SlideOutCart from "./cart/components/SlideOutCart.svelte";
   import CheckedOutCarts from "./cart/components/CheckedOutCartsView.svelte";
@@ -24,25 +22,7 @@
   import {
     currentViewStore,
     isCartOpenStore,
-    showReportDialogStore,
-    reportedProductStore,
-    productNameStore,
-    selectedProductHashStore,
-    searchResultsStore,
-    isViewAllStore,
-    searchMethodStore,
-    featuredSubcategories,
   } from "./stores/UiOnlyStore";
-
-  // Import from data trigger store
-  import {
-    searchModeStore,
-    searchQueryStore,
-    selectedCategoryStore,
-    selectedSubcategoryStore,
-    selectedProductTypeStore,
-    isHomeViewStore,
-  } from "./stores/DataTriggerStore";
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
   import type { CartBusinessService } from "./cart/services/CartBusinessService";
@@ -72,8 +52,6 @@
   const cartService =
     getContext<Writable<CartBusinessService | null>>("cartService");
 
-  // Get profiles store from context (passed down from profiles-context)
-  const profilesStore = getContext("profiles-store");
 
   // Cart total for header display
   let cartTotalValue = 0;
@@ -105,9 +83,6 @@
   }
 
   onMount(() => {
-    // Set default state to home view
-    $isHomeViewStore = true;
-
     store.setUIprops({ showMenu: false });
 
     // Inject ProductDataService into cart service

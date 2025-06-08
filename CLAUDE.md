@@ -149,8 +149,9 @@ navigateViewMore(category: string, subcategory: string): Promise<void>
 **Race Condition Prevention**:
 - Ultra-simple navigation ID pattern: `let navigationId = 0; const currentId = ++navigationId;`
 - Navigation cancellation (not blocking) for instant response
-- Debounced navigation: Category changes = 0ms, Subcategory/ProductType = 10ms
+- Debounced navigation: Major changes (category/productType) = 0ms, Minor changes = 10ms
 - Data updates only proceed if `navId === navigationId` (prevents stale operations)
+- Loading state management prevents UI mode switching before data is ready
 
 ### Component Integration Pattern
 **Files**: `CategorySidebar.svelte`, `ShopView.svelte`, `ProductRow.svelte`
@@ -357,9 +358,13 @@ UI renders Beverages subcategory rows
   const currentId = ++navigationId;
   if (navId === navigationId) { /* proceed with data update */ }
   
+  // Loading state management prevents empty grid flicker:
+  let isLoadingProductType = false;  // Controls UI mode switching timing
+  
   // Performance optimizations achieved:
   - Navigation cancellation (not blocking) for instant responsiveness
-  - Debounced navigation: Major changes (category) = 0ms, Minor changes = 10ms  
+  - Debounced navigation: Major changes (category/productType) = 0ms, Minor changes = 10ms  
+  - Loading state prevents UI switching before data ready (eliminates empty grids)
   - Memory efficient: Created sliceProducts() utility, unified processResults() function
   - Code reduction: ~50 lines eliminated while maintaining exact functionality
   - Batched loading: First 3 subcategories → remaining in batches of 5
@@ -545,5 +550,40 @@ if (navId === navigationId) { /* proceed */ }
 **After**: Direct store updates with navigation cancellation
 **Impact**: Components reduced from 20+ navigation lines to 1-3 lines each
 **Coverage**: Used by CategorySidebar, ShopView, ProductRow, ProductDetailModal
+
+### Product Type Navigation Timing Fix 🎯
+**Problem Solved**: Random empty grids during "View More → Product Type" navigation
+**Root Cause**: UI mode switching happened immediately when `selectedProductType` changed, but data loading was asynchronous
+
+**The Timing Issue**:
+1. User clicks Product Type button → `selectedProductType` updates immediately
+2. ProductBrowserView switches from ProductRow mode to AllProductsGrid mode instantly  
+3. AllProductsGrid renders with empty `allCategoryProducts = []` during API call
+4. Brief empty grid flicker until data arrives
+
+**Solution**: Loading State Control
+```typescript
+// ProductBrowserData.svelte
+let isLoadingProductType = false;
+
+async function loadProductsForProductType(navId: number) {
+    isLoadingProductType = true;
+    // ... API call ...
+    isLoadingProductType = false;
+}
+
+// ProductBrowserView.svelte  
+{#if isGridOnlySubcategory(...) || (selectedProductType !== "All" && !isLoadingProductType)}
+    <AllProductsGrid ... />
+{:else}
+    <!-- Stay in ProductRow mode during loading -->
+{/if}
+```
+
+**Benefits Achieved**:
+- ✅ **Zero empty grids** - UI waits for data before mode switching
+- ✅ **Responsive UX** - No artificial delays, just proper timing
+- ✅ **Simple implementation** - Explicit loading state, easy to debug
+- ✅ **Follows Svelte patterns** - Clean prop passing and conditional rendering
 
 This architecture demonstrates that complex problems often have simple, elegant solutions when proper separation of concerns is maintained.

@@ -110,7 +110,12 @@ export class BrowserNavigationService {
             return;
         }
 
-        // If category and subcategory are provided, update them too
+        // Reset sort and filter state (same as other navigation methods)
+        sortByStore.set("best");
+        selectedBrandsStore.set(new Set());
+        selectedOrganicStore.set("all");
+
+        // If category and subcategory are provided, update them atomically
         if (category && subcategory) {
             selectedCategoryStore.set(category);
             selectedSubcategoryStore.set(subcategory);
@@ -120,6 +125,9 @@ export class BrowserNavigationService {
 
         // Update product type
         selectedProductTypeStore.set(productType);
+
+        // Scroll to top (same as other navigation methods)
+        this.scrollToTop();
 
         this.notifyNavigationComplete();
         console.log(`BrowserNavigationService: Product type navigation completed: ${productType}`);

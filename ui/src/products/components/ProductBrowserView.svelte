@@ -25,6 +25,7 @@
     export let action: any;
     export let gridContainer: Record<string, any>;
     export let mainGridContainer: HTMLElement;
+    export let isLoadingProductType: boolean;
 
     const dispatch = createEventDispatcher();
 
@@ -123,7 +124,7 @@
             on:productTypeSelect={handleProductTypeSelect}
         />
     {:else if selectedCategory && selectedSubcategory}
-        {#if isGridOnlySubcategory(selectedCategory, selectedSubcategory) || selectedProductType !== "All"}
+        {#if isGridOnlySubcategory(selectedCategory, selectedSubcategory) || (selectedProductType !== "All" && !isLoadingProductType)}
             <AllProductsGrid
                 {selectedCategory}
                 {selectedSubcategory}

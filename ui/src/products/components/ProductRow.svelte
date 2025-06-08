@@ -31,7 +31,7 @@
             await browserNavigationService.navigateToProductType(identifier, selectedCategory, selectedSubcategory);
         } else {
             // Navigate to subcategory view
-            await browserNavigationService.navigateViewMore(selectedCategory, identifier);
+            await browserNavigationService.navigateViewMore(selectedCategory, selectedSubcategory);
         }
     }
 

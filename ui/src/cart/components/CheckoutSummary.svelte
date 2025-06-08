@@ -864,6 +864,10 @@
         font-weight: var(--font-weight-semibold);
         margin-bottom: 4px;
         color: var(--text-primary);
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        max-width: 100%;
     }
 
     /* UPDATED: Price display styling */
@@ -896,11 +900,10 @@
         margin-top: 4px;
         margin-bottom: 4px;
         max-width: 100%;
-        word-break: break-all;
+        word-wrap: break-word;
         overflow-wrap: break-word;
+        hyphens: auto;
         display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
         background-color: var(--surface);
         padding: 4px var(--spacing-xs);
         border-radius: 4px;

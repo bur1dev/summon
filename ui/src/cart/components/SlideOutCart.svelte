@@ -215,10 +215,10 @@
               Cart ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})
             </div>
             <button
-              class="delete-cart-btn btn btn-icon btn-icon-primary btn-icon-sm"
+              class="clear-cart-btn btn btn-text"
               on:click={clearCart}
             >
-              <X size={20} />
+              Clear this cart
             </button>
           </div>
 
@@ -398,9 +398,17 @@
     margin-top: 4px;
   }
 
-  :global(.delete-cart-btn svg) {
-    color: var(--button-text);
-    stroke: var(--button-text);
+  .clear-cart-btn {
+    color: var(--error);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .clear-cart-btn:hover {
+    background-color: rgba(211, 47, 47, 0.1);
+    color: var(--error);
+    text-decoration: underline;
   }
 
   .cart-items {

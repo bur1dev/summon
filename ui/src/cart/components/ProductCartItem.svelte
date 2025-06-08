@@ -200,6 +200,10 @@
         margin-bottom: var(--spacing-xs);
         font-size: var(--font-size-md);
         color: var(--text-primary);
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        max-width: 100%;
     }
 
     /* UPDATED: Price styling */

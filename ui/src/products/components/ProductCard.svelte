@@ -238,7 +238,7 @@
         aria-label="Decrease quantity"
         use:clickable={{ handler: handleDecrementClick, stopPropagation: true }}
       >
-        <Minus size={16} color="white" />
+        <Minus size={20} color="white" />
       </span>
       <span
         class="count counter-value"
@@ -251,7 +251,7 @@
         aria-label="Increase quantity"
         use:clickable={{ handler: handleIncrementClick, stopPropagation: true }}
       >
-        <Plus size={16} color="white" />
+        <Plus size={20} color="white" />
       </span>
     {:else}
       <span class="plus-icon">

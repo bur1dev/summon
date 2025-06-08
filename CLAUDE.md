@@ -4,50 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Environment
 
-**Required**: Enter nix shell first: `nix develop`
+**Required**: `nix develop` - All commands must run inside nix shell.
 
-All subsequent commands must be run from inside the nix shell environment.
-
-## Essential Commands
-
-### Core Development
+### Essential Commands
 ```bash
-# Solo development (single agent)
-npm run dev
+# Development
+npm run dev          # Solo development (single agent)
+npm start            # Multi-agent network (2 agents)
+AGENTS=3 npm run network  # Custom network with N agents
+npm test             # Run tests
 
-# Multi-agent network (2 agents) 
-npm start
+# Build & Package
+npm run build:zomes  # Build Rust zomes to WebAssembly
+npm run build:happ   # Package complete Holochain app
+npm run package      # Package web app for distribution
 
-# Custom network with N agents
-AGENTS=3 npm run network
-
-# Run tests
-npm test
-```
-
-### Build Commands
-```bash
-# Build Rust zomes to WebAssembly
-npm run build:zomes
-
-# Package complete Holochain app
-npm run build:happ
-
-# Package web app for distribution
-npm run package
-```
-
-### Component Development
-```bash
-# UI development (in ui/ directory)
-npm run start        # Vite dev server
-npm run check        # Svelte type checking
-
-# Backend development (in backend/ directory)  
-npm run dev          # Nodemon with auto-reload
-
-# Tests (in tests/ directory)
-npm run test         # Vitest integration tests
+# Component Development
+cd ui && npm run start    # Vite dev server
+cd ui && npm run check    # Svelte type checking
+cd backend && npm run dev # Nodemon with auto-reload
+cd tests && npm run test  # Vitest integration tests
 ```
 
 ## Architecture Overview
@@ -278,6 +254,14 @@ UI renders Beverages subcategory rows
   - Race Protection: Navigation ID pattern - only 3 lines instead of complex blocking logic
   - Coverage: Used by CategorySidebar, ShopView, ProductRow, and all navigation components
   - Architecture: Direct store updates with instant responsiveness and navigation cancellation
+
+  PreferencesService.ts - Product Preferences Authority
+  - Purpose: Centralized product preference management for "Remember my preferences" functionality
+  - Pattern: Static methods with reactive Svelte stores for state management
+  - Key Methods: loadPreference(), savePreference(), deletePreference(), getPreferenceStore()
+  - Backend: Saves/loads from Holochain via CartBusinessService delegation
+  - Coverage: Used by ProductDetailModal, PreferencesSection, CheckoutSummary
+  - Benefits: Eliminates 140+ lines of duplicated preference logic across components
 
   2. Utility Layer (/utils/) - Smart Helpers
 

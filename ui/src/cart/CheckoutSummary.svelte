@@ -8,6 +8,7 @@
     } from "../services/CartBusinessService";
     import { PriceService } from "../services/PriceService";
     import { CartInteractionService } from "../services/CartInteractionService";
+    import { PreferencesService } from "../services/PreferencesService";
     import {
         getIncrementValue,
         getDisplayUnit,
@@ -63,10 +64,21 @@
     let showNoteButtons = false;
     let noteChanged = false;
 
-    // New state for preference saving
+    // Preference state - derived from service store when editing
     let savePreference = false;
     let existingPreference: any = null;
     let loadingPreference = false;
+
+    // Get preference store for currently editing item
+    $: editingPreferenceStore = editingNoteForItem ? 
+        PreferencesService.getPreferenceStore(editingNoteForItem.groupHash, editingNoteForItem.productIndex) : null;
+    
+    // Derive preference state from service store
+    $: if (editingPreferenceStore && $editingPreferenceStore) {
+        loadingPreference = $editingPreferenceStore.loading;
+        existingPreference = $editingPreferenceStore.preference;
+        savePreference = $editingPreferenceStore.savePreference;
+    }
 
     // To detect new cart items
     let previousCartItems: any[] = [...cartItems];
@@ -247,27 +259,7 @@
 
         // Load existing preference data using the service
         if (cartService) {
-            loadingPreference = true;
-            try {
-                const result = await cartService.getProductPreference(
-                    item.groupHash,
-                    item.productIndex,
-                );
-
-                if (result && result.success && result.data) {
-                    existingPreference = result.data;
-                    savePreference = true;
-                } else {
-                    existingPreference = null;
-                    savePreference = false;
-                }
-            } catch (error) {
-                console.error("Error loading product preference:", error);
-                existingPreference = null;
-                savePreference = false;
-            } finally {
-                loadingPreference = false;
-            }
+            await PreferencesService.loadPreference(cartService, item.groupHash, item.productIndex);
         }
     }
 
@@ -276,8 +268,7 @@
         currentNote = "";
         showNoteButtons = false;
         noteChanged = false;
-        savePreference = false;
-        existingPreference = null;
+        // Note: preference state is automatically cleaned up when editingPreferenceStore becomes null
     }
 
     function handleNoteInput() {
@@ -310,15 +301,18 @@
 
             // Save or delete preference based on toggle state using service
             if (savePreference && currentNote && currentNote.trim()) {
-                await cartService!.saveProductPreference({
-                    groupHash: editingNoteForItem.groupHash,
-                    productIndex: editingNoteForItem.productIndex,
-                    note: currentNote.trim(),
-                    is_default: true,
-                });
+                await PreferencesService.savePreference(
+                    cartService!,
+                    editingNoteForItem.groupHash,
+                    editingNoteForItem.productIndex,
+                    currentNote.trim()
+                );
             } else if (!savePreference && existingPreference) {
-                await cartService!.deleteProductPreference(
+                await PreferencesService.deletePreference(
+                    cartService!,
                     existingPreference.hash,
+                    editingNoteForItem.groupHash,
+                    editingNoteForItem.productIndex
                 );
             }
 
@@ -336,6 +330,15 @@
     function handleSavePreferenceToggle(e: Event) {
         const target = e.target as HTMLInputElement;
         savePreference = target.checked;
+
+        // Update service state
+        if (editingNoteForItem) {
+            PreferencesService.updateSavePreference(
+                editingNoteForItem.groupHash,
+                editingNoteForItem.productIndex,
+                savePreference
+            );
+        }
 
         // If toggle turned off and there's an existing preference, show delete button
         showNoteButtons =

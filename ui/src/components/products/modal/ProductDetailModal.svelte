@@ -8,6 +8,7 @@
     import { get, type Writable } from "svelte/store"; // Import get
     import type { CartBusinessService } from "../../../services/CartBusinessService";
     import { CartInteractionService } from "../../../services/CartInteractionService";
+    import { PreferencesService } from "../../../services/PreferencesService";
     import ProductModalHeader from "./ProductModalHeader.svelte";
     import ProductImage from "./ProductImage.svelte";
     import ProductInfo from "./ProductInfo.svelte";
@@ -38,10 +39,15 @@
     let showButtons: boolean = false;
     let noteChanged: boolean = false;
     let isClosing: boolean = false;
-    let savePreference: boolean = false; // For the "remember preferences" toggle
-    let existingPreference: any = null; // To store existing preference if found
-    let loadingPreference: boolean = false; // Loading state while fetching preferences
     let isTransitioning: boolean = false; // Flag to track button state transitions
+
+    // Get preference store from service - reactive state management
+    $: preferenceStore = PreferencesService.getPreferenceStore(groupHashBase64, productIndex);
+    
+    // Derive preference state from service store (maintains exact same variable names)
+    $: savePreference = $preferenceStore.savePreference;
+    $: existingPreference = $preferenceStore.preference;
+    $: loadingPreference = $preferenceStore.loading;
 
 
     function closeModal() {
@@ -130,43 +136,19 @@
         }
     }
 
-    // New function to load product preferences
+    // Load product preferences using service
     async function loadProductPreference() {
         const serviceInstance = get(cartServiceStore);
-        if (
-            !serviceInstance ||
-            !groupHashBase64 ||
-            productIndex === undefined
-        ) {
-            // console.log("ProductDetailModal: loadProductPreference prerequisites not met.");
+        if (!serviceInstance || !groupHashBase64 || productIndex === undefined) {
             return;
         }
 
-        loadingPreference = true;
-        try {
-            const result = await serviceInstance.getProductPreference(
-                groupHashBase64,
-                productIndex,
-            );
-            if (result && result.success && result.data) {
-                existingPreference = result.data.preference;
-                savePreference = true;
-
-                // If not already in cart and there's a saved preference, pre-populate the note
-                if (!isInCart && existingPreference.note) {
-                    note = existingPreference.note;
-                    existingNote = existingPreference.note;
-                }
-            } else {
-                existingPreference = null;
-                savePreference = false;
-            }
-        } catch (error) {
-            console.error("Error loading product preference:", error);
-            existingPreference = null;
-            savePreference = false;
-        } finally {
-            loadingPreference = false;
+        await PreferencesService.loadPreference(serviceInstance, groupHashBase64, productIndex);
+        
+        // If not already in cart and there's a saved preference, pre-populate the note
+        if (!isInCart && existingPreference && existingPreference.note) {
+            note = existingPreference.note;
+            existingNote = existingPreference.note;
         }
     }
 
@@ -326,8 +308,8 @@
                     {showPreferences}
                     bind:showButtons
                     bind:noteChanged
-                    bind:savePreference
-                    bind:existingPreference
+                    {savePreference}
+                    {existingPreference}
                     {loadingPreference}
                     onNoteChange={(newNote) => { note = newNote; }}
                     onShowButtonsChange={(show) => { showButtons = show; }}

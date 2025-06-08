@@ -1,6 +1,7 @@
 <script lang="ts">
     import { get, type Writable } from "svelte/store";
     import type { CartBusinessService } from "../../../services/CartBusinessService";
+    import { PreferencesService } from "../../../services/PreferencesService";
     import { Save } from "lucide-svelte";
     
     export let cartServiceStore: Writable<CartBusinessService | null>;
@@ -24,20 +25,19 @@
         const serviceInstance = get(cartServiceStore);
         if (!serviceInstance || !note || !note.trim()) return;
 
-        try {
-            const result = await serviceInstance.saveProductPreference({
-                groupHash: groupHashBase64,
-                productIndex,
-                note: note.trim(),
-                is_default: true,
-            });
+        const success = await PreferencesService.savePreference(
+            serviceInstance,
+            groupHashBase64,
+            productIndex,
+            note.trim()
+        );
 
-            if (result && result.success) {
-                existingPreference = result.data;
-                console.log("Saved product preference:", existingPreference);
-            }
-        } catch (error) {
-            console.error("Error saving product preference:", error);
+        if (success) {
+            // Update local state to reflect the saved preference
+            const preferenceStore = PreferencesService.getPreferenceStore(groupHashBase64, productIndex);
+            preferenceStore.subscribe(state => {
+                existingPreference = state.preference;
+            });
         }
     }
 
@@ -45,17 +45,16 @@
         const serviceInstance = get(cartServiceStore);
         if (!serviceInstance || !existingPreference) return;
 
-        try {
-            const result = await serviceInstance.deleteProductPreference(
-                existingPreference.hash,
-            );
-            if (result && result.success) {
-                existingPreference = null;
-                savePreference = false;
-                console.log("Deleted product preference");
-            }
-        } catch (error) {
-            console.error("Error deleting product preference:", error);
+        const success = await PreferencesService.deletePreference(
+            serviceInstance,
+            existingPreference.hash,
+            groupHashBase64,
+            productIndex
+        );
+
+        if (success) {
+            existingPreference = null;
+            savePreference = false;
         }
     }
 
@@ -103,11 +102,14 @@
 
     function handleSavePreferenceToggle(e: Event) {
         const target = e.target as HTMLInputElement;
-        savePreference = target.checked;
+        const checked = target.checked;
+
+        // Update service state
+        PreferencesService.updateSavePreference(groupHashBase64, productIndex, checked);
 
         // If toggle turned off and there's an existing preference, show delete button
         onShowButtonsChange(
-            savePreference !== (existingPreference !== null) || noteChanged
+            checked !== (existingPreference !== null) || noteChanged
         );
     }
 </script>
@@ -138,7 +140,7 @@
                 <label class="toggle-container">
                     <input
                         type="checkbox"
-                        bind:checked={savePreference}
+                        checked={savePreference}
                         on:change={handleSavePreferenceToggle}
                         disabled={loadingPreference}
                     />

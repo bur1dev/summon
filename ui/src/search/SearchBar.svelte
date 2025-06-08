@@ -11,7 +11,7 @@
         SearchMethod,
         SearchResult,
     } from "./search-types";
-    import { clickable } from "../actions/clickable";
+    import { clickable } from "../shared/actions/clickable";
 
     // Type for products coming from cache, which might have category as null and embedding in a raw format
     type ProductFromCache = Omit<Product, "category" | "embedding"> & {
@@ -862,10 +862,7 @@
                     {/each}
                 {/if}
             </div>
-            <div
-                class="view-all"
-                use:clickable={handleViewAllResults}
-            >
+            <div class="view-all" use:clickable={handleViewAllResults}>
                 View all results
             </div>
         </div>

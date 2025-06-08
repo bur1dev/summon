@@ -1,4 +1,4 @@
-import type { ProductDataService, NavigationParams, NavigationResult } from './ProductDataService';
+import type { ProductDataService, NavigationParams, NavigationResult } from '../products/services/ProductDataService';
 
 /**
  * Centralized Data Manager - Single gateway for all data operations

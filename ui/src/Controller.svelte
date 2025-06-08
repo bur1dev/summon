@@ -1,9 +1,9 @@
 <script lang="ts">
-  import ShopView from "./components/ShopView.svelte";
-  import HeaderContainer from "./components/HeaderContainer.svelte";
+  import ShopView from "./navigation/components/ShopView.svelte";
+  import HeaderContainer from "./navigation/components/HeaderContainer.svelte";
   import { ShopStore } from "./store";
-  import { ProductDataService } from "./services/ProductDataService";
-  import { ProductRowCacheService } from "./services/ProductRowCacheService";
+  import { ProductDataService } from "./products/services/ProductDataService";
+  import { ProductRowCacheService } from "./products/services/ProductRowCacheService";
   import { DataManager } from "./services/DataManager";
   import {
     setContext,
@@ -16,9 +16,9 @@
   import type { Writable } from "svelte/store";
 
   import { ProfilesStore } from "@holochain-open-dev/profiles";
-  import CategorySidebar from "./components/CategorySidebar.svelte";
-  import SlideOutCart from "./cart/SlideOutCart.svelte";
-  import CheckedOutCarts from "./cart/CheckedOutCartsView.svelte";
+  import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
+  import SlideOutCart from "./cart/components/SlideOutCart.svelte";
+  import CheckedOutCarts from "./cart/components/CheckedOutCartsView.svelte";
 
   // Import from UI-only store
   import {
@@ -44,8 +44,8 @@
     isHomeViewStore,
   } from "./stores/DataTriggerStore";
 
-  import SidebarMenu from "./components/SidebarMenu.svelte";
-  import type { CartBusinessService } from "./services/CartBusinessService";
+  import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
+  import type { CartBusinessService } from "./cart/services/CartBusinessService";
 
   export let roleName = "";
   export let client: AppClient;

@@ -375,16 +375,4 @@
     :global(*) {
         outline: none !important;
     }
-
-    /* Disable card entrance animations for virtual grid performance */
-    :global(.products-grid .product-card) {
-        opacity: 1 !important;
-        animation: none !important;
-    }
-
-    /* Allow button animations to work */
-    :global(.products-grid .add-btn) {
-        animation: unset !important;
-        transition: var(--btn-transition) !important;
-    }
 </style>

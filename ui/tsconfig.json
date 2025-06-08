@@ -9,6 +9,7 @@
     "checkJs": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "allowArbitraryExtensions": true,
     "lib": [
       "ESNext",
       "DOM",

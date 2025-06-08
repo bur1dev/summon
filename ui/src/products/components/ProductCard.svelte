@@ -174,10 +174,7 @@
     // So we only need to check for add-btn and report-btn
     if (e && e.target) {
       const target = e.target as Element;
-      if (
-        target.closest(".add-btn") ||
-        target.closest(".report-btn")
-      ) {
+      if (target.closest(".add-btn") || target.closest(".report-btn")) {
         return;
       }
     }
@@ -215,14 +212,9 @@
       productIndex,
     );
   }
-
-
 </script>
 
-<div
-  class="product-card fade-in"
-  use:clickable={handleCardClick}
->
+<div class="product-card fade-in" use:clickable={handleCardClick}>
   <ProductCardActions
     {product}
     {displayAmount}
@@ -234,12 +226,8 @@
     onDecrement={handleDecrementClick}
     onReport={handleReportClick}
   />
-  
-  <ProductCardDisplay
-    {product}
-    {displayPrices}
-    {stockInfo}
-  />
+
+  <ProductCardDisplay {product} {displayPrices} {stockInfo} />
 </div>
 
 <!-- Add the ReportCategoryDialog component -->
@@ -276,14 +264,5 @@
     border: none;
     border-radius: var(--card-border-radius);
     box-sizing: border-box;
-  }
-
-  /* Disable transitions during scroll */
-  :global(.products-grid .product-card) {
-    transition: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    opacity: 1 !important;
-    animation: none !important;
   }
 </style>

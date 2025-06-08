@@ -5,24 +5,17 @@
   import { ProductDataService } from "./products/services/ProductDataService";
   import { ProductRowCacheService } from "./products/services/ProductRowCacheService";
   import { DataManager } from "./services/DataManager";
-  import {
-    setContext,
-    onMount,
-    getContext,
-  } from "svelte";
+  import { setContext, onMount, getContext } from "svelte";
   import type { AppClient } from "@holochain/client";
   import { encodeHashToBase64 } from "@holochain/client";
   import type { Writable } from "svelte/store";
 
   import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
   import SlideOutCart from "./cart/components/SlideOutCart.svelte";
-  import CheckedOutCarts from "./cart/components/CheckedOutCartsView.svelte";
+  import CheckedOutCarts from "./orders/components/CheckedOutCartsView.svelte";
 
   // Import from UI-only store
-  import {
-    currentViewStore,
-    isCartOpenStore,
-  } from "./stores/UiOnlyStore";
+  import { currentViewStore, isCartOpenStore } from "./stores/UiOnlyStore";
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
   import type { CartBusinessService } from "./cart/services/CartBusinessService";
@@ -51,7 +44,6 @@
   // Get cart service from context
   const cartService =
     getContext<Writable<CartBusinessService | null>>("cartService");
-
 
   // Cart total for header display
   let cartTotalValue = 0;

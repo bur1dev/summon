@@ -1,6 +1,6 @@
 // Cart feature exports
 export { CartBusinessService } from './services/CartBusinessService';
-export { CartCalculationService } from './services/CartCalculationService'; 
+export { CartCalculationService } from './services/CartCalculationService';
 export { CartInteractionService } from './services/CartInteractionService';
 export { CartPersistenceService } from './services/CartPersistenceService';
 export { AddressService } from './services/AddressService';
@@ -16,4 +16,4 @@ export { default as CheckoutSummary } from './components/CheckoutSummary.svelte'
 export { default as AddressForm } from './components/AddressForm.svelte';
 export { default as AddressSelector } from './components/AddressSelector.svelte';
 export { default as DeliveryTimeSelector } from './components/DeliveryTimeSelector.svelte';
-export { default as CheckedOutCartsView } from './components/CheckedOutCartsView.svelte';
+export { default as CheckedOutCartsView } from '../orders/components/CheckedOutCartsView.svelte';

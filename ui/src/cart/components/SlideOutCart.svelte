@@ -183,14 +183,13 @@
   $: totalSavings = PriceService.calculateSavings(cartTotal, cartPromoTotal);
 </script>
 
+{#if isOpen}
 <div
-  class="overlay {isOpen ? (isClosing ? 'fade-out' : 'fade-in') : ''}"
-  class:visible={isOpen}
+  class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
   use:clickable={closeCart}
 >
   <div
     class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"
-    class:open={isOpen}
     role="dialog"
     aria-modal="true"
     aria-labelledby="cart-title"
@@ -278,6 +277,7 @@
     {/if}
   </div>
 </div>
+{/if}
 
 <style>
   .overlay {
@@ -287,14 +287,7 @@
     width: 100%;
     height: 100%;
     background: var(--overlay-dark);
-    opacity: 0;
-    pointer-events: none;
     z-index: var(--z-index-highest);
-  }
-
-  .overlay.visible {
-    opacity: 1;
-    pointer-events: auto;
   }
 
   .overlay.fade-in {

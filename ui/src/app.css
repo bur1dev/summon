@@ -475,96 +475,56 @@ body {
 
 /* Animation classes */
 .fade-in {
-  animation: fadeIn var(--fade-in-duration) ease forwards;
+  animation: fadeIn var(--transition-normal) ease forwards;
+}
+
+.fade-out {
+  animation: fadeOut var(--transition-normal) ease forwards;
 }
 
 .slide-in-right {
-  animation: slideInRight 0.4s ease forwards;
+  animation: slideInRight var(--transition-normal) ease forwards;
+}
+
+.slide-out-right {
+  animation: slideOutRight var(--transition-normal) ease forwards;
 }
 
 .slide-in-left {
-  animation: slideInLeft 0.4s ease forwards;
+  animation: slideInLeft var(--transition-normal) ease forwards;
 }
 
+.slide-out-left {
+  animation: slideOutLeft var(--transition-normal) ease forwards;
+}
+
+/* Keyframe animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
   }
-
   to {
     opacity: 1;
   }
 }
 
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(var(--card-slide-distance));
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(calc(-1 * var(--card-slide-distance)));
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Add these keyframe animations to app.css */
-
-/* Existing keyframes in app.css */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(var(--card-slide-distance));
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(calc(-1 * var(--card-slide-distance)));
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* New keyframes to add */
 @keyframes fadeOut {
   from {
     opacity: 1;
   }
-
   to {
     opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--card-slide-distance)));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -573,10 +533,20 @@ body {
     transform: translateX(0);
     opacity: 1;
   }
-
   to {
     transform: translateX(calc(-1 * var(--card-slide-distance)));
     opacity: 0;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(var(--card-slide-distance));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -585,7 +555,6 @@ body {
     transform: translateX(0);
     opacity: 1;
   }
-
   to {
     transform: translateX(var(--card-slide-distance));
     opacity: 0;

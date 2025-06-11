@@ -4,7 +4,6 @@
 
     // Props
     export let cartItems: any[] = [];
-    export let isCheckingOut = false;
     export let isEntering = true;
     export let isExiting = false;
 
@@ -92,10 +91,10 @@
     <button
         class="place-order-btn"
         on:click={handlePlaceOrder}
-        disabled={isCheckingOut}
+        disabled={isExiting}
     >
-        {#if isCheckingOut}
-            Processing Order...
+        {#if isExiting}
+            Placing Order...
         {:else}
             Place Order
         {/if}

@@ -171,9 +171,17 @@
     closeCart();
   }
 
-  // Close checkout flow
+  // Close checkout flow with coordinated animations
   function closeCheckoutFlow() {
-    isShowingCheckoutFlow = false;
+    // First trigger CheckoutFlow exit animations
+    isClosing = true;
+
+    // Wait for CheckoutFlow exit animations to complete, then close everything
+    setTimeout(() => {
+      isShowingCheckoutFlow = false;
+      onClose();
+      isClosing = false;
+    }, AnimationService.getAnimationDuration("smooth"));
   }
 
   // Get the client for checkout component
@@ -212,6 +220,7 @@
           cartService={$cartServiceStore}
           cartItems={enrichedCartItems}
           onClose={closeCheckoutFlow}
+          isClosingCart={isClosing}
           on:checkout-success={handleCheckoutSuccess}
         />
       {:else}

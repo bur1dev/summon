@@ -10,7 +10,6 @@
     export let address: Address;
     export let deliveryInstructions: string = "";
     export let deliveryTime: { date: Date; display: string };
-    export let isCheckingOut = false;
     export let isEntering = true;
     export let isExiting = false;
 
@@ -145,7 +144,6 @@
 
         <CheckoutPriceSummary
             {cartItems}
-            {isCheckingOut}
             {isEntering}
             {isExiting}
             on:placeOrder={handlePlaceOrder}

@@ -18,6 +18,7 @@
     export let cartService: CartBusinessService;
     export let cartItems: any[] = [];
     export let onClose: () => void;
+    export let isClosingCart = false;
 
     // Get the store for the client
     const storeContext =
@@ -35,10 +36,15 @@
     let currentStep = 1;
     let checkoutDetails: CheckoutDetails = {};
     let deliveryTimeSlots: any[] = [];
-    let isCheckingOut = false;
     let checkoutError = "";
     let isEntering = true;
     let isExiting = false;
+
+    // When cart is closing, trigger exit animations on all elements
+    $: if (isClosingCart) {
+        isEntering = false;
+        isExiting = true;
+    }
 
     // Derive selected address from addressHash
     $: selectedAddress =
@@ -175,41 +181,46 @@
         }, AnimationService.getAnimationDuration("smooth"));
     }
 
-    // Place the order
+    // Place the order with smooth exit animations
     async function placeOrder() {
         if (!checkoutDetails.addressHash || !checkoutDetails.deliveryTime) {
             checkoutError = "Please complete all required information";
             return;
         }
 
-        isCheckingOut = true;
-        checkoutError = "";
+        // Immediately trigger exit animations (smooth UX)
+        isEntering = false;
+        isExiting = true;
 
-        try {
-            console.log("Placing order with details:", checkoutDetails);
+        // Start Holochain operation in background (don't block animations)
+        cartService.checkoutCart(checkoutDetails)
+            .then((result) => {
+                if (result.success) {
+                    console.log("Order placed successfully");
+                    // Dispatch success event
+                    dispatch("checkout-success", {
+                        cartHash: encodeHashToBase64(result.data),
+                        details: checkoutDetails,
+                    });
+                } else {
+                    console.error("Checkout failed:", result.message);
+                    // TODO: Show toast notification for error
+                    // For now, log the error - cart is already closed
+                }
+            })
+            .catch((error) => {
+                console.error("Error during checkout:", error);
+                // TODO: Show toast notification for error
+                // For now, log the error - cart is already closed
+            });
 
-            const result = await cartService.checkoutCart(checkoutDetails);
-
-            if (result.success) {
-                // Dispatch success event
-                dispatch("checkout-success", {
-                    cartHash: encodeHashToBase64(result.data),
-                    details: checkoutDetails,
-                });
-
-                // Close the checkout flow
-                onClose();
-            } else {
-                console.error("Checkout failed:", result.message);
-                checkoutError =
-                    result.message || "Checkout failed. Please try again.";
-            }
-        } catch (error: unknown) {
-            console.error("Error during checkout:", error);
-            checkoutError = (error as Error).toString();
-        } finally {
-            isCheckingOut = false;
-        }
+        // Close cart smoothly after exit animations complete
+        setTimeout(() => {
+            onClose();
+            // Reset animation states for next time
+            isEntering = true;
+            isExiting = false;
+        }, AnimationService.getAnimationDuration("smooth"));
     }
 </script>
 
@@ -365,7 +376,6 @@
                     deliveryInstructions={checkoutDetails.deliveryInstructions ||
                         ""}
                     deliveryTime={formattedDeliveryTime}
-                    {isCheckingOut}
                     {isEntering}
                     {isExiting}
                     on:placeOrder={placeOrder}

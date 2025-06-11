@@ -11,7 +11,6 @@
     export let deliveryInstructions: string = "";
     export let deliveryTime: { date: Date; display: string };
     export let isCheckingOut = false;
-    export let cartService: CartBusinessService | null = null;
     export let isEntering = true;
     export let isExiting = false;
 
@@ -141,7 +140,7 @@
                 </div>
             </div>
 
-            <CheckoutOrderList {cartItems} {cartService} />
+            <CheckoutOrderList {cartItems} />
         </div>
 
         <CheckoutPriceSummary

@@ -146,9 +146,9 @@
         await PreferencesService.loadPreference(serviceInstance, groupHashBase64, productIndex);
         
         // If not already in cart and there's a saved preference, pre-populate the note
-        if (!isInCart && existingPreference && existingPreference.note) {
-            note = existingPreference.note;
-            existingNote = existingPreference.note;
+        if (!isInCart && existingPreference && existingPreference.preference?.note) {
+            note = existingPreference.preference.note;
+            existingNote = existingPreference.preference.note;
         }
     }
 
@@ -315,6 +315,7 @@
                     onShowButtonsChange={(show) => { showButtons = show; }}
                     onNoteChangedChange={(changed) => { noteChanged = changed; }}
                     onExistingNoteChange={(newNote) => { existingNote = newNote; }}
+                    onSave={closeModal}
                 />
             </div>
         </div>

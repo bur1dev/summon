@@ -1,27 +1,14 @@
 <script lang="ts">
     import { createEventDispatcher, onMount, getContext } from "svelte";
-    import {
-        encodeHashToBase64,
-        decodeHashFromBase64,
-    } from "@holochain/client";
-    import { AddressService } from "../../services/AddressService";
-    import type { Address } from "../../services/AddressService";
+    import { encodeHashToBase64 } from "@holochain/client";
+    import type { AddressService } from "../../services/AddressService";
     import type { CartBusinessService } from "../../services/CartBusinessService";
-    import type {
-        DeliveryTimeSlot,
-        CheckoutDetails,
-    } from "../../services/CartBusinessService";
+    import type { CheckoutDetails } from "../../services/CartBusinessService";
     import AddressSelector from "../address/AddressSelector.svelte";
     import DeliveryTimeSelector from "../address/DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";
-    import { decode } from "@msgpack/msgpack";
     import { ChevronLeft } from "lucide-svelte";
     import { AnimationService } from "../../../services/AnimationService";
-
-    // Define an interface for the decoded product group
-    interface ProductGroup {
-        products: any[];
-    }
 
     // Import agent-avatar component
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
@@ -32,194 +19,39 @@
     export let cartItems: any[] = [];
     export let onClose: () => void;
 
-    let cartTotal = 0; // This was an export, now a local variable if needed internally, or remove if not.
-    // Based on the previous error, it's not used by CheckoutSummary.
-    // If it's used elsewhere in THIS component, it can remain as `let cartTotal = 0;`
-    // If not used at all, it can be removed entirely.
-    // For now, I'll keep it as a local variable declaration.
-
     // Get the store for the client
     const storeContext =
         getContext<import("../../../store").StoreContext>("store");
     const store = storeContext.getStore();
 
-    // Get profiles store from context
-    const profilesStore = getContext("profiles-store");
-
     // Event dispatcher
     const dispatch = createEventDispatcher();
+
+    // Get AddressService from context
+    const addressService =
+        getContext<Writable<AddressService | null>>("addressService");
 
     // State
     let currentStep = 1;
     let checkoutDetails: CheckoutDetails = {};
     let deliveryTimeSlots: any[] = [];
     let formattedDeliveryTime: { date: Date; display: string } | null = null;
-    let address: Address | null = null;
     let isCheckingOut = false;
     let checkoutError = "";
-    let addressService: AddressService | null = null;
-    let localCartItems: any[] = [];
-    let unsubscribe: (() => void) | null = null;
-    let enrichedCartItems: any[] = []; // New state for cart items with product details
     let isEntering = true;
     let isExiting = false;
 
-    // Subscribe to cart service for real-time updates
-    onMount(() => {
-        if (cartService && typeof cartService.subscribe === "function") {
-            unsubscribe = cartService.subscribe(async (items: any[]) => {
-                localCartItems = items || [];
-                console.log(
-                    "Cart items updated in CheckoutFlow:",
-                    localCartItems.length,
-                );
-
-                // Enrich cart items with product details
-                enrichedCartItems = await enrichCartItems(localCartItems);
-            });
-        } else {
-            localCartItems = cartItems;
-            // Enrich initial cart items
-            enrichCartItems(localCartItems).then((items: any[]) => {
-                enrichedCartItems = items;
-            });
-        }
-
-        return () => {
-            if (unsubscribe) unsubscribe();
-        };
-    });
-
-    // Helper function to enrich cart items with product details
-    async function enrichCartItems(items: any[]): Promise<any[]> {
-        console.log("Enriching cart items with product details:", items.length);
-
-        if (!items || !items.length) return [];
-
-        const enrichedItems = await Promise.all(
-            items.map(async (item: any) => {
-                try {
-                    if (!item.groupHash) {
-                        console.error("Item missing groupHash:", item);
-                        return {
-                            ...item,
-                            productDetails: null,
-                        };
-                    }
-
-                    // Convert groupHash if needed
-                    let groupHashBase64 = item.groupHash;
-                    if (
-                        typeof item.groupHash === "string" &&
-                        item.groupHash.includes(",")
-                    ) {
-                        const byteArray = new Uint8Array(
-                            item.groupHash.split(",").map(Number),
-                        );
-                        groupHashBase64 = encodeHashToBase64(byteArray);
-                    }
-
-                    // Fetch product group
-                    const groupHash = decodeHashFromBase64(groupHashBase64);
-                    const result = await store!.client.callZome({
-                        role_name: "grocery",
-                        zome_name: "products",
-                        fn_name: "get_product_group",
-                        payload: groupHash,
-                    });
-
-                    if (
-                        result &&
-                        result.entry &&
-                        result.entry.Present &&
-                        result.entry.Present.entry
-                    ) {
-                        const group = decode(
-                            result.entry.Present.entry,
-                        ) as ProductGroup;
-
-                        // Get specific product by index
-                        if (
-                            group &&
-                            group.products &&
-                            item.productIndex < group.products.length && // Add bounds check
-                            group.products[item.productIndex]
-                        ) {
-                            return {
-                                ...item,
-                                productDetails:
-                                    group.products[item.productIndex],
-                            };
-                        }
-                    }
-
-                    return {
-                        ...item,
-                        productDetails: null,
-                    };
-                } catch (error) {
-                    console.error("Error enriching cart item:", error);
-                    return {
-                        ...item,
-                        productDetails: null,
-                    };
-                }
-            }),
-        );
-
-        console.log("Enriched cart items:", enrichedItems);
-        return enrichedItems;
-    }
-
-    // Computed properties for items with details
-    $: effectiveCartItems =
-        enrichedCartItems.length > 0
-            ? enrichedCartItems
-            : localCartItems.length > 0
-              ? localCartItems
-              : cartItems;
-
-    // Load address from hash
-    async function loadAddress(addressHash: any): Promise<Address | null> {
-        if (!addressService || !addressHash) return null;
-
-        console.log("Loading address from hash:", addressHash);
-        try {
-            // Get addresses from the service
-            const addresses = addressService.getAddresses();
-            // Subscribe to the store to get the latest value
-            return new Promise((resolve) => {
-                const unsubscribe = addresses.subscribe(
-                    (addressMap: Map<string, Address>) => {
-                        if (addressMap.has(addressHash)) {
-                            unsubscribe();
-                            resolve(addressMap.get(addressHash) || null);
-                        }
-                    },
-                );
-
-                // Add a timeout to prevent hanging
-                setTimeout(() => {
-                    unsubscribe();
-                    resolve(null);
-                }, 2000);
-            });
-        } catch (error) {
-            console.error("Error loading address:", error);
-            return null;
-        }
-    }
+    // Derive selected address from addressHash
+    $: selectedAddress =
+        checkoutDetails.addressHash && $addressService
+            ? $addressService.getAddress(checkoutDetails.addressHash)
+            : null;
 
     // Initialize with saved data and delivery time slots
     onMount(async () => {
         if (cartService) {
             // Generate delivery time slots
             deliveryTimeSlots = cartService.generateDeliveryTimeSlots();
-
-            // Initialize address service
-            if (client) {
-                addressService = new AddressService(client);
-            }
 
             // Load saved delivery details if available
             const savedDetails = cartService.getSavedDeliveryDetails();
@@ -229,23 +61,18 @@
                 // Set checkout details from saved data
                 checkoutDetails = { ...savedDetails };
 
-                // If we have a saved delivery time, format it for display
-                if (savedDetails.deliveryTime) {
-                    const dateObj = new Date(savedDetails.deliveryTime.date);
-                    formattedDeliveryTime = {
-                        date: dateObj,
-                        display: savedDetails.deliveryTime.time_slot,
-                    };
+                // Restore saved step
+                if (savedDetails.currentStep) {
+                    currentStep = savedDetails.currentStep;
+                }
+
+                // Use saved formatted delivery time directly
+                if (savedDetails.formattedDeliveryTime) {
+                    formattedDeliveryTime = savedDetails.formattedDeliveryTime;
                     console.log(
                         "Restored delivery time:",
                         formattedDeliveryTime,
                     );
-                }
-
-                // If we have a saved address hash, load the address details
-                if (savedDetails.addressHash && addressService) {
-                    address = await loadAddress(savedDetails.addressHash);
-                    console.log("Loaded address:", address);
                 }
             }
         }
@@ -254,13 +81,14 @@
     // Handle address selection
     function handleAddressSelect({ detail }: { detail: any }) {
         checkoutDetails.addressHash = detail.addressHash;
-        address = detail.address;
+        checkoutDetails.currentStep = currentStep;
         cartService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Handle delivery instructions change
     function handleInstructionsChange({ detail }: { detail: any }) {
         checkoutDetails.deliveryInstructions = detail.instructions;
+        checkoutDetails.currentStep = currentStep;
         cartService.setSavedDeliveryDetails(checkoutDetails);
     }
 
@@ -274,13 +102,15 @@
             date: dateObj,
             display: detail.deliveryTime.time_slot,
         };
+        checkoutDetails.formattedDeliveryTime = formattedDeliveryTime;
+        checkoutDetails.currentStep = currentStep;
         cartService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Validate the current state before proceeding to the next step
     function validateStep(currentStep: number): boolean {
         if (currentStep === 1) {
-            return !!checkoutDetails.addressHash && !!address;
+            return !!checkoutDetails.addressHash && !!selectedAddress;
         }
 
         if (currentStep === 2) {
@@ -314,6 +144,10 @@
             currentStep++;
             isExiting = false;
             isEntering = true;
+
+            // Save the new step
+            checkoutDetails.currentStep = currentStep;
+            cartService.setSavedDeliveryDetails(checkoutDetails);
         }, AnimationService.getAnimationDuration("smooth"));
     }
 
@@ -328,11 +162,19 @@
             currentStep--;
             isExiting = false;
             isEntering = true;
+
+            // Save the new step
+            checkoutDetails.currentStep = currentStep;
+            cartService.setSavedDeliveryDetails(checkoutDetails);
         }, AnimationService.getAnimationDuration("smooth"));
     }
 
     // Handle back to cart with exit animations
     function handleBackToCart() {
+        // Save current state before closing
+        checkoutDetails.currentStep = currentStep;
+        cartService.setSavedDeliveryDetails(checkoutDetails);
+
         isEntering = false;
         isExiting = true;
 
@@ -440,7 +282,6 @@
             </div>
 
             <AddressSelector
-                {client}
                 selectedAddressHash={checkoutDetails.addressHash}
                 deliveryInstructions={checkoutDetails.deliveryInstructions ||
                     ""}
@@ -511,7 +352,7 @@
                 </button>
             </div>
         {:else if currentStep === 3}
-            {#if address && formattedDeliveryTime}
+            {#if selectedAddress && formattedDeliveryTime}
                 <div
                     class="avatar-overlay {isEntering
                         ? 'slide-in-right'
@@ -530,8 +371,8 @@
                 </div>
 
                 <CheckoutSummary
-                    cartItems={effectiveCartItems}
-                    {address}
+                    {cartItems}
+                    address={selectedAddress}
                     deliveryInstructions={checkoutDetails.deliveryInstructions ||
                         ""}
                     deliveryTime={formattedDeliveryTime}

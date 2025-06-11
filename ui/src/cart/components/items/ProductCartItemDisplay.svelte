@@ -79,6 +79,8 @@
     .cart-item-left {
         flex: 1;
         margin-right: var(--spacing-lg);
+        min-width: 0;
+        overflow-wrap: break-word;
     }
 
     .cart-item-name {
@@ -114,10 +116,17 @@
         font-size: var(--font-size-sm);
         color: var(--text-secondary);
         margin-bottom: 4px;
+        width: 100%;
+        max-width: 100%;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+        hyphens: auto;
         background-color: var(--surface);
         padding: 4px var(--spacing-xs);
         border-radius: 4px;
         border-left: var(--border-width) solid var(--primary);
+        box-sizing: border-box;
     }
 
     .instructions-link {

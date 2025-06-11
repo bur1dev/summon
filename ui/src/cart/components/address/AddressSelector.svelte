@@ -1,25 +1,21 @@
 <script lang="ts">
-    import { onMount, createEventDispatcher } from "svelte";
-    import {
-        AddressService,
-        type Address,
-    } from "../../services/AddressService";
+    import { onMount, createEventDispatcher, getContext } from "svelte";
+    import { type Address, type AddressService } from "../../services/AddressService";
+    import type { Writable } from "svelte/store";
     import AddressForm from "./AddressForm.svelte";
     import { MapPin, NotebookPen } from "lucide-svelte";
     import { clickable } from "../../../shared/actions/clickable";
 
     // Props
-    export let client: any;
     export let selectedAddressHash: string | null = null;
     export let deliveryInstructions: string = "";
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
 
-    // Services
-    let addressService: AddressService;
+    // Get preloaded AddressService from context
+    const addressService = getContext<Writable<AddressService | null>>("addressService");
     let addresses = new Map<string, Address>();
-    let loading = true;
 
     // UI state
     let showNewAddressForm = false;
@@ -29,17 +25,18 @@
     export let isExiting = false;
 
     onMount(() => {
-        addressService = new AddressService(client);
+        if ($addressService) {
+            // Subscribe to preloaded addresses (instant)
+            const unsubscribe = $addressService.getAddresses().subscribe((value: Map<string, Address>) => {
+                addresses = value;
+            });
 
-        // Subscribe to addresses
-        const unsubscribe = addressService.getAddresses().subscribe((value) => {
-            addresses = value;
-            loading = false;
-        });
-
-        return () => {
-            unsubscribe();
-        };
+            return () => {
+                unsubscribe();
+            };
+        } else {
+            console.warn("AddressService not available from context");
+        }
     });
 
     // Handle address selection
@@ -53,13 +50,18 @@
 
     // Add new address
     async function handleAddAddress(event: CustomEvent) {
+        if (!$addressService) {
+            validationError = "Address service not available";
+            return;
+        }
+
         isValidating = true;
         validationError = "";
 
         const newAddress = event.detail.address;
 
         // Validate the address using OpenStreetMap
-        const validation = await addressService.validateAddress(newAddress);
+        const validation = await $addressService.validateAddress(newAddress);
 
         if (validation.valid) {
             // Update with coordinates
@@ -67,7 +69,7 @@
             newAddress.lng = validation.lng;
 
             // Save the address
-            const result = await addressService.createAddress(newAddress);
+            const result = await $addressService.createAddress(newAddress);
 
             if (result.success && result.hash) {
                 // Select the new address
@@ -110,9 +112,7 @@
         </h2>
     </div>
 
-    {#if loading}
-        <div class="loading">Loading addresses...</div>
-    {:else if showNewAddressForm}
+    {#if showNewAddressForm}
         <AddressForm
             on:submit={handleAddAddress}
             on:cancel={handleCancelAddAddress}
@@ -247,11 +247,6 @@
         color: var(--text-primary);
     }
 
-    .loading {
-        padding: var(--spacing-xxl);
-        text-align: center;
-        color: var(--text-secondary);
-    }
 
     .addresses-container {
         padding: var(--spacing-md);

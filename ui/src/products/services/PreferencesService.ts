@@ -60,7 +60,7 @@ export class PreferencesService {
                 store.update(state => ({
                     ...state,
                     loading: false,
-                    preference: result.data.preference,
+                    preference: result.data,
                     savePreference: true
                 }));
             } else {

@@ -29,7 +29,7 @@
 
   // State
   let cartItems: any[] = [];
-  let productDetails: Record<string, any> = {};
+  let enrichedCartItems: any[] = [];
   let isLoading = true;
   let isCheckingOut = false;
   let isShowingCheckoutFlow = false;
@@ -53,29 +53,32 @@
         // Filter out any invalid items - ones with no groupHash
         cartItems = (items || []).filter((item) => item && item.groupHash);
 
-        // Fetch product details for each item if not already loaded
-        for (const item of cartItems) {
-          if (!item || !item.groupHash) continue;
-
-          const detailsKey = `${item.groupHash}_${item.productIndex}`;
-          if (!productDetails[detailsKey]) {
+        // Create enriched cart items with product details
+        enrichedCartItems = await Promise.all(
+          cartItems.map(async (item) => {
             try {
               const product = await fetchProductDetails(
                 item.groupHash,
                 item.productIndex,
               );
-              productDetails[detailsKey] = product;
+              return {
+                ...item,
+                productDetails: product,
+              };
             } catch (e) {
-              console.error(`Failed to load product ${detailsKey}:`, e);
-              productDetails[detailsKey] = {
-                name: "Unknown Product",
-                price: 0,
-                size: "N/A",
-                image_url: "",
+              console.error(`Failed to load product ${item.groupHash}_${item.productIndex}:`, e);
+              return {
+                ...item,
+                productDetails: {
+                  name: "Unknown Product",
+                  price: 0,
+                  size: "N/A",
+                  image_url: "",
+                },
               };
             }
-          }
-        }
+          })
+        );
 
         isLoading = false;
       });
@@ -208,7 +211,7 @@
         <CheckoutFlow
           {client}
           cartService={$cartServiceStore}
-          {cartItems}
+          cartItems={enrichedCartItems}
           onClose={closeCheckoutFlow}
           on:checkout-success={handleCheckoutSuccess}
         />
@@ -229,7 +232,7 @@
                     : 'slide-in-left'}"
                 id="cart-title"
               >
-                Cart ({cartItems.length} item{cartItems.length !== 1
+                Cart ({enrichedCartItems.length} item{enrichedCartItems.length !== 1
                   ? "s"
                   : ""})
               </div>
@@ -273,23 +276,20 @@
             <div class="cart-items">
               {#if isLoading}
                 <div class="loading">Loading cart items...</div>
-              {:else if cartItems.length === 0}
+              {:else if enrichedCartItems.length === 0}
                 <div class="empty-cart">Your cart is empty</div>
               {:else}
-                {#each [...cartItems]
-                  .filter((item) => item && item.groupHash)
+                {#each [...enrichedCartItems]
+                  .filter((item) => item && item.groupHash && item.productDetails)
                   .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
-                  {@const detailsKey = `${item.groupHash}_${item.productIndex}`}
-                  {#if productDetails[detailsKey]}
-                    <ProductCartItem
-                      product={productDetails[detailsKey]}
-                      quantity={item.quantity}
-                      groupHash={item.groupHash}
-                      productIndex={item.productIndex}
-                      note={item.note}
-                      isUpdating={false}
-                    />
-                  {/if}
+                  <ProductCartItem
+                    product={item.productDetails}
+                    quantity={item.quantity}
+                    groupHash={item.groupHash}
+                    productIndex={item.productIndex}
+                    note={item.note}
+                    isUpdating={false}
+                  />
                 {/each}
               {/if}
 
@@ -307,7 +307,7 @@
                   : isTransitioningToCheckout
                     ? 'slide-out-down'
                     : 'slide-in-up'}"
-                disabled={cartItems.length === 0}
+                disabled={enrichedCartItems.length === 0}
                 on:click={startCheckout}
               >
                 Proceed to Checkout

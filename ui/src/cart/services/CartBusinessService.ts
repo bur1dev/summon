@@ -15,6 +15,9 @@ export interface CheckoutDetails {
     addressHash?: string;
     deliveryInstructions?: string | null;
     deliveryTime?: DeliveryTimeSlot;
+    currentStep?: number;
+    address?: any; // Full address object
+    formattedDeliveryTime?: { date: Date; display: string }; // Formatted time
 }
 
 // Type alias for base64-encoded action hash

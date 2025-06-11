@@ -20,6 +20,7 @@
     export let onShowButtonsChange: (show: boolean) => void;
     export let onNoteChangedChange: (changed: boolean) => void;
     export let onExistingNoteChange: (note: string) => void;
+    export let onSave: (() => void) | null = null;
 
     async function saveProductPreference() {
         const serviceInstance = get(cartServiceStore);
@@ -43,7 +44,7 @@
 
     async function deleteProductPreference() {
         const serviceInstance = get(cartServiceStore);
-        if (!serviceInstance || !existingPreference) return;
+        if (!serviceInstance || !existingPreference || !existingPreference.hash) return;
 
         const success = await PreferencesService.deletePreference(
             serviceInstance,
@@ -88,6 +89,11 @@
             } else if (!savePreference && existingPreference) {
                 // If toggle is off but preference exists, delete it
                 await deleteProductPreference();
+            }
+
+            // Close modal after successful save
+            if (onSave) {
+                onSave();
             }
         } catch (error) {
             console.error("Error saving instructions:", error);

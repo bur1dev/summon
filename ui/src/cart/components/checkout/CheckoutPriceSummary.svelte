@@ -5,6 +5,8 @@
     // Props
     export let cartItems: any[] = [];
     export let isCheckingOut = false;
+    export let isEntering = true;
+    export let isExiting = false;
 
     // Calculate totals with tax using PriceService
     $: {
@@ -86,7 +88,7 @@
     </div>
 </div>
 
-<div class="checkout-actions">
+<div class="checkout-actions {isEntering ? 'slide-in-up' : isExiting ? 'slide-out-down' : ''}">
     <button
         class="place-order-btn"
         on:click={handlePlaceOrder}

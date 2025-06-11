@@ -1,9 +1,12 @@
 <script lang="ts">
     import { X } from "lucide-svelte";
     export let onClose: () => void;
+    export let isClosing: boolean = false;
 </script>
 
-<div class="cart-header">
+<div 
+    class="cart-header {isClosing ? 'slide-out-up' : 'slide-in-down'}"
+>
     <button class="close-btn" on:click={onClose}>
         <X size={20} />
     </button>

@@ -9,6 +9,7 @@
   import { X } from "lucide-svelte";
   import { PriceService } from "../../services/PriceService";
   import { clickable } from "../../shared/actions/clickable";
+  import { AnimationService } from "../../services/AnimationService";
 
   // Props
   export let isOpen = false;
@@ -34,6 +35,7 @@
   let isShowingCheckoutFlow = false;
   let checkoutError = "";
   let isClosing = false;
+  let isTransitioningToCheckout = false;
   let cartTotalUnsubscribe: (() => void) | null = null;
   let cartPromoTotalUnsubscribe: (() => void) | null = null;
   let cartTotal = 0;
@@ -143,16 +145,22 @@
   // Close cart with animation
   function closeCart() {
     isClosing = true;
+
+    // Wait for animation to complete, then close
     setTimeout(() => {
-      isOpen = false;
-      isClosing = false;
       onClose();
-    }, 300); // Match animation duration
+      isClosing = false;
+    }, AnimationService.getAnimationDuration("smooth"));
   }
 
   // Start checkout flow
   function startCheckout() {
-    isShowingCheckoutFlow = true;
+    isTransitioningToCheckout = true;
+
+    setTimeout(() => {
+      isShowingCheckoutFlow = true;
+      isTransitioningToCheckout = false;
+    }, AnimationService.getAnimationDuration("smooth"));
   }
 
   // Handle checkout success
@@ -184,99 +192,132 @@
 </script>
 
 {#if isOpen}
-<div
-  class="overlay {isClosing ? 'fade-out' : 'fade-in'}"
-  use:clickable={closeCart}
->
   <div
-    class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="cart-title"
-    on:click|stopPropagation
-    on:keydown|stopPropagation
+    class="overlay {isClosing ? 'fade-out pointer-events-none' : 'fade-in'}"
+    use:clickable={closeCart}
   >
-    {#if isShowingCheckoutFlow && $cartServiceStore}
-      <CheckoutFlow
-        {client}
-        cartService={$cartServiceStore}
-        {cartItems}
-        onClose={closeCheckoutFlow}
-        on:checkout-success={handleCheckoutSuccess}
-      />
-    {:else}
-      <CartHeader onClose={closeCart} />
+    <div
+      class="cart-container {isClosing ? 'slide-out-right' : 'slide-in-right'}"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cart-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
+      {#if isShowingCheckoutFlow && $cartServiceStore}
+        <CheckoutFlow
+          {client}
+          cartService={$cartServiceStore}
+          {cartItems}
+          onClose={closeCheckoutFlow}
+          on:checkout-success={handleCheckoutSuccess}
+        />
+      {:else}
+        <CartHeader
+          onClose={closeCart}
+          isClosing={isClosing || isTransitioningToCheckout}
+        />
 
-      <div class="cart-content">
-        <div class="cart-main">
-          <div class="cart-main-header">
-            <div class="cart-title" id="cart-title">
-              Cart ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})
-            </div>
-            <button class="clear-cart-btn btn btn-text" on:click={clearCart}>
-              Clear this cart
-            </button>
-          </div>
-
-          <!-- UPDATED: Price display using PriceService -->
-          <div class="cart-totals-section">
-            <div class="cart-total-regular">
-              Total: {PriceService.formatTotal(cartTotal)}
-            </div>
-            <div class="cart-total-promo">
-              With loyalty card: {PriceService.formatTotal(cartPromoTotal)}
-            </div>
-            {#if totalSavings > 0}
-              <div class="savings-amount">
-                You save: {PriceService.formatSavings(totalSavings)}
+        <div class="cart-content">
+          <div class="cart-main">
+            <div class="cart-main-header">
+              <div
+                class="cart-title {isClosing
+                  ? 'slide-out-left'
+                  : isTransitioningToCheckout
+                    ? 'slide-out-left'
+                    : 'slide-in-left'}"
+                id="cart-title"
+              >
+                Cart ({cartItems.length} item{cartItems.length !== 1
+                  ? "s"
+                  : ""})
               </div>
-            {/if}
-          </div>
-
-          <div class="cart-items">
-            {#if isLoading}
-              <div class="loading">Loading cart items...</div>
-            {:else if cartItems.length === 0}
-              <div class="empty-cart">Your cart is empty</div>
-            {:else}
-              {#each [...cartItems]
-                .filter((item) => item && item.groupHash)
-                .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
-                {@const detailsKey = `${item.groupHash}_${item.productIndex}`}
-                {#if productDetails[detailsKey]}
-                  <ProductCartItem
-                    product={productDetails[detailsKey]}
-                    quantity={item.quantity}
-                    groupHash={item.groupHash}
-                    productIndex={item.productIndex}
-                    note={item.note}
-                    isUpdating={false}
-                  />
-                {/if}
-              {/each}
-            {/if}
-
-            {#if checkoutError}
-              <div class="error-message">
-                {checkoutError}
+              <div
+                class="clear-cart-btn-wrapper {isClosing
+                  ? 'slide-out-right'
+                  : isTransitioningToCheckout
+                    ? 'slide-out-right'
+                    : 'slide-in-right'}"
+              >
+                <button
+                  class="clear-cart-btn btn btn-text"
+                  on:click={clearCart}
+                >
+                  Clear this cart
+                </button>
               </div>
-            {/if}
-          </div>
+            </div>
 
-          <div class="checkout-button-container">
-            <button
-              class="checkout-button btn btn-primary btn-lg"
-              disabled={cartItems.length === 0}
-              on:click={startCheckout}
+            <!-- UPDATED: Price display using PriceService -->
+            <div
+              class="cart-totals-section {isClosing
+                ? 'slide-out-left'
+                : isTransitioningToCheckout
+                  ? 'slide-out-left'
+                  : 'slide-in-left'}"
             >
-              Proceed to Checkout
-            </button>
+              <div class="cart-total-regular">
+                Total: {PriceService.formatTotal(cartTotal)}
+              </div>
+              <div class="cart-total-promo">
+                With loyalty card: {PriceService.formatTotal(cartPromoTotal)}
+              </div>
+              {#if totalSavings > 0}
+                <div class="savings-amount">
+                  You save: {PriceService.formatSavings(totalSavings)}
+                </div>
+              {/if}
+            </div>
+
+            <div class="cart-items">
+              {#if isLoading}
+                <div class="loading">Loading cart items...</div>
+              {:else if cartItems.length === 0}
+                <div class="empty-cart">Your cart is empty</div>
+              {:else}
+                {#each [...cartItems]
+                  .filter((item) => item && item.groupHash)
+                  .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
+                  {@const detailsKey = `${item.groupHash}_${item.productIndex}`}
+                  {#if productDetails[detailsKey]}
+                    <ProductCartItem
+                      product={productDetails[detailsKey]}
+                      quantity={item.quantity}
+                      groupHash={item.groupHash}
+                      productIndex={item.productIndex}
+                      note={item.note}
+                      isUpdating={false}
+                    />
+                  {/if}
+                {/each}
+              {/if}
+
+              {#if checkoutError}
+                <div class="error-message">
+                  {checkoutError}
+                </div>
+              {/if}
+            </div>
+
+            <div class="checkout-button-container">
+              <button
+                class="checkout-button btn btn-primary btn-lg {isClosing
+                  ? 'slide-out-down'
+                  : isTransitioningToCheckout
+                    ? 'slide-out-down'
+                    : 'slide-in-up'}"
+                disabled={cartItems.length === 0}
+                on:click={startCheckout}
+              >
+                Proceed to Checkout
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
-</div>
 {/if}
 
 <style>
@@ -291,11 +332,11 @@
   }
 
   .overlay.fade-in {
-    animation: fadeIn var(--transition-fast) ease forwards;
+    animation: fadeIn var(--transition-smooth) ease-out forwards;
   }
 
   .overlay.fade-out {
-    animation: fadeOut var(--transition-fast) ease forwards;
+    animation: fadeOut var(--transition-smooth) ease-in forwards;
   }
 
   .cart-container {
@@ -312,11 +353,11 @@
   }
 
   .cart-container.slide-in-right {
-    animation: slideInRight var(--transition-normal) ease forwards;
+    animation: slideInRight var(--transition-normal) ease-out forwards;
   }
 
   .cart-container.slide-out-right {
-    animation: slideOutRight var(--transition-normal) ease forwards;
+    animation: slideOutRight var(--transition-normal) ease-in forwards;
   }
 
   .cart-content {
@@ -450,5 +491,9 @@
     opacity: 0.7;
     box-shadow: none;
     transform: none;
+  }
+
+  .pointer-events-none {
+    pointer-events: none;
   }
 </style>

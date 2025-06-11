@@ -25,6 +25,8 @@
     let showNewAddressForm = false;
     let isValidating = false;
     let validationError = "";
+    export let isEntering = true;
+    export let isExiting = false;
 
     onMount(() => {
         addressService = new AddressService(client);
@@ -33,18 +35,6 @@
         const unsubscribe = addressService.getAddresses().subscribe((value) => {
             addresses = value;
             loading = false;
-
-            // If no address is selected but we have addresses, select the default
-            if (!selectedAddressHash && addresses.size > 0) {
-                const defaultAddress = addressService.getDefaultAddress();
-                if (defaultAddress) {
-                    selectedAddressHash = defaultAddress.hash;
-                    dispatch("select", {
-                        addressHash: defaultAddress.hash,
-                        address: defaultAddress.address,
-                    });
-                }
-            }
         });
 
         return () => {
@@ -109,7 +99,15 @@
 
 <div class="address-selector">
     <div class="address-selector-header">
-        <h2>Select Delivery Address</h2>
+        <h2
+            class={isEntering
+                ? "slide-in-left"
+                : isExiting
+                  ? "slide-out-left"
+                  : ""}
+        >
+            Select Delivery Address
+        </h2>
     </div>
 
     {#if loading}
@@ -139,7 +137,11 @@
                         <div
                             class="address-card {selectedAddressHash === hash
                                 ? 'selected'
-                                : ''}"
+                                : ''} {isEntering
+                                ? 'slide-in-left'
+                                : isExiting
+                                  ? 'slide-out-left'
+                                  : ''}"
                             use:clickable={() => selectAddress(hash)}
                         >
                             <div class="address-icon">
@@ -177,7 +179,11 @@
                     {/each}
 
                     <button
-                        class="add-address-btn"
+                        class="add-address-btn {isEntering
+                            ? 'slide-in-right'
+                            : isExiting
+                              ? 'slide-out-right'
+                              : ''}"
                         on:click={() => (showNewAddressForm = true)}
                     >
                         + Add New Address
@@ -185,7 +191,13 @@
                 </div>
 
                 {#if selectedAddressHash}
-                    <div class="instructions-container">
+                    <div
+                        class="instructions-container {isEntering
+                            ? 'slide-in-left'
+                            : isExiting
+                              ? 'slide-out-left'
+                              : ''}"
+                    >
                         <h3>Delivery Instructions</h3>
                         <textarea
                             bind:value={deliveryInstructions}

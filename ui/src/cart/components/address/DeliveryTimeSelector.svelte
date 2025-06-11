@@ -11,6 +11,8 @@
     export let timeSlots: any[];
     export let selectedDate: Date | null = null;
     export let selectedTimeSlot: any = null;
+    export let isEntering = true;
+    export let isExiting = false;
 
     // State
     let visibleStartIndex = 0;
@@ -105,10 +107,10 @@
 
 <div class="delivery-time-selector">
     <div class="delivery-time-header">
-        <h2>Choose Delivery Time</h2>
+        <h2 class="{isEntering ? 'slide-in-left' : isExiting ? 'slide-out-left' : ''}">Choose Delivery Time</h2>
     </div>
 
-    <div class="date-selector">
+    <div class="date-selector {isEntering ? 'slide-in-left' : isExiting ? 'slide-out-left' : ''}">
         <button
             class="scroll-button left {canScrollLeft ? '' : 'disabled'}"
             on:click={() => scrollDates("left")}
@@ -142,7 +144,7 @@
     </div>
 
     {#if selectedDate}
-        <div class="time-slots-container">
+        <div class="time-slots-container {isEntering ? 'slide-in-up' : isExiting ? 'slide-out-down' : ''}">
             <div class="time-slots-header">Select a delivery time</div>
 
             <div class="time-slots-grid">

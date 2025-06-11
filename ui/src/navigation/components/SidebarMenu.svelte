@@ -5,6 +5,7 @@
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
     import { X, Tag, AlertTriangle } from "lucide-svelte";
     import { clickable } from "../../shared/actions/clickable";
+    import { AnimationService } from "../../services/AnimationService";
 
     export let myAgentPubKeyB64: string | undefined;
     export let avatarLoaded: boolean;
@@ -14,12 +15,17 @@
     let profileEditorComponent: ProfileEditor | undefined;
     let isClosing = false;
 
-    function closeMenu() {
+    async function closeMenu() {
         isClosing = true;
-        setTimeout(() => {
-            $showMenuStore = false;
-            isClosing = false;
-        }, 300); // Match animation duration
+        
+        // Get the sidebar panel element for animation
+        const sidebarElement = document.querySelector('.sidebar-panel') as HTMLElement;
+        
+        // Use AnimationService for consistent timing
+        await AnimationService.slideOutPanel(sidebarElement, 'left');
+        
+        $showMenuStore = false;
+        isClosing = false;
     }
 
     function handleProfileUpdated(event: CustomEvent) {
@@ -132,11 +138,11 @@
     }
 
     .overlay.fade-in {
-        animation: fadeIn var(--transition-fast) ease forwards;
+        animation: fadeIn var(--transition-smooth) ease-out forwards;
     }
 
     .overlay.fade-out {
-        animation: fadeOut var(--transition-fast) ease forwards;
+        animation: fadeOut var(--transition-smooth) ease-in forwards;
     }
 
     .sidebar-panel {
@@ -153,11 +159,11 @@
     }
 
     .sidebar-panel.slide-in-left {
-        animation: slideInLeft var(--transition-normal) ease forwards;
+        animation: slideInLeft var(--transition-normal) ease-out forwards;
     }
 
     .sidebar-panel.slide-out-left {
-        animation: slideOutLeft var(--transition-normal) ease forwards;
+        animation: slideOutLeft var(--transition-normal) ease-in forwards;
     }
 
     .sidebar-header {

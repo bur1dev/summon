@@ -16,6 +16,7 @@
     import CheckoutSummary from "./CheckoutSummary.svelte";
     import { decode } from "@msgpack/msgpack";
     import { ChevronLeft } from "lucide-svelte";
+    import { AnimationService } from "../../../services/AnimationService";
 
     // Define an interface for the decoded product group
     interface ProductGroup {
@@ -60,6 +61,8 @@
     let localCartItems: any[] = [];
     let unsubscribe: (() => void) | null = null;
     let enrichedCartItems: any[] = []; // New state for cart items with product details
+    let isEntering = true;
+    let isExiting = false;
 
     // Subscribe to cart service for real-time updates
     onMount(() => {
@@ -252,11 +255,13 @@
     function handleAddressSelect({ detail }: { detail: any }) {
         checkoutDetails.addressHash = detail.addressHash;
         address = detail.address;
+        cartService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Handle delivery instructions change
     function handleInstructionsChange({ detail }: { detail: any }) {
         checkoutDetails.deliveryInstructions = detail.instructions;
+        cartService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Handle delivery time selection
@@ -269,6 +274,7 @@
             date: dateObj,
             display: detail.deliveryTime.time_slot,
         };
+        cartService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Validate the current state before proceeding to the next step
@@ -299,12 +305,43 @@
 
     // Continue to next step
     function continueToNextStep() {
-        goToStep(currentStep + 1);
+        // Exit current step (same pattern as SlideOutCart)
+        isEntering = false;
+        isExiting = true;
+
+        // Switch step and enter after exit completes
+        setTimeout(() => {
+            currentStep++;
+            isExiting = false;
+            isEntering = true;
+        }, AnimationService.getAnimationDuration("smooth"));
     }
 
     // Go back to previous step
     function goBack() {
-        goToStep(currentStep - 1);
+        // Exit current step (same pattern as SlideOutCart)
+        isEntering = false;
+        isExiting = true;
+
+        // Switch step and enter after exit completes
+        setTimeout(() => {
+            currentStep--;
+            isExiting = false;
+            isEntering = true;
+        }, AnimationService.getAnimationDuration("smooth"));
+    }
+
+    // Handle back to cart with exit animations
+    function handleBackToCart() {
+        isEntering = false;
+        isExiting = true;
+
+        setTimeout(() => {
+            onClose();
+            // Reset animation states
+            isEntering = true;
+            isExiting = false;
+        }, AnimationService.getAnimationDuration("smooth"));
     }
 
     // Place the order
@@ -346,14 +383,26 @@
 </script>
 
 <div class="checkout-flow">
-    <div class="checkout-header">
+    <div
+        class="checkout-header {isEntering
+            ? 'slide-in-down'
+            : isExiting
+              ? 'slide-out-up'
+              : ''}"
+    >
         <button
             class="back-button"
-            on:click={currentStep > 1 ? goBack : onClose}
+            on:click={currentStep > 1 ? goBack : handleBackToCart}
         >
             <ChevronLeft size={20} />
         </button>
-        <h2>
+        <h2
+            class={isEntering
+                ? "slide-in-down"
+                : isExiting
+                  ? "slide-out-up"
+                  : ""}
+        >
             {#if currentStep === 1}
                 Delivery Address
             {:else if currentStep === 2}
@@ -367,9 +416,19 @@
         </div>
     </div>
 
-    <div class="checkout-content">
+    <div
+        class="checkout-content {currentStep === 3
+            ? 'allow-scroll'
+            : 'prevent-scroll'}"
+    >
         {#if currentStep === 1}
-            <div class="avatar-overlay">
+            <div
+                class="avatar-overlay {isEntering
+                    ? 'slide-in-right'
+                    : isExiting
+                      ? 'slide-out-right'
+                      : ''}"
+            >
                 <div class="avatar-container">
                     <agent-avatar
                         size="40"
@@ -385,11 +444,19 @@
                 selectedAddressHash={checkoutDetails.addressHash}
                 deliveryInstructions={checkoutDetails.deliveryInstructions ||
                     ""}
+                {isEntering}
+                {isExiting}
                 on:select={handleAddressSelect}
                 on:instructionsChange={handleInstructionsChange}
             />
 
-            <div class="nav-buttons">
+            <div
+                class="nav-buttons {isEntering
+                    ? 'slide-in-up'
+                    : isExiting
+                      ? 'slide-out-down'
+                      : ''}"
+            >
                 <button
                     class="continue-btn"
                     on:click={continueToNextStep}
@@ -399,7 +466,13 @@
                 </button>
             </div>
         {:else if currentStep === 2}
-            <div class="avatar-overlay">
+            <div
+                class="avatar-overlay {isEntering
+                    ? 'slide-in-right'
+                    : isExiting
+                      ? 'slide-out-right'
+                      : ''}"
+            >
                 <div class="avatar-container">
                     <agent-avatar
                         size="40"
@@ -417,10 +490,18 @@
                     : null}
                 selectedTimeSlot={checkoutDetails.deliveryTime?.time_slot ||
                     null}
+                {isEntering}
+                {isExiting}
                 on:select={handleTimeSelect}
             />
 
-            <div class="nav-buttons">
+            <div
+                class="nav-buttons {isEntering
+                    ? 'slide-in-up'
+                    : isExiting
+                      ? 'slide-out-down'
+                      : ''}"
+            >
                 <button
                     class="continue-btn"
                     on:click={continueToNextStep}
@@ -431,7 +512,13 @@
             </div>
         {:else if currentStep === 3}
             {#if address && formattedDeliveryTime}
-                <div class="avatar-overlay">
+                <div
+                    class="avatar-overlay {isEntering
+                        ? 'slide-in-right'
+                        : isExiting
+                          ? 'slide-out-right'
+                          : ''}"
+                >
                     <div class="avatar-container">
                         <agent-avatar
                             size="40"
@@ -450,6 +537,8 @@
                     deliveryTime={formattedDeliveryTime}
                     {isCheckingOut}
                     {cartService}
+                    {isEntering}
+                    {isExiting}
                     on:placeOrder={placeOrder}
                     on:editAddress={() => goToStep(1)}
                     on:editTime={() => goToStep(2)}
@@ -559,11 +648,19 @@
 
     .checkout-content {
         flex: 1;
-        overflow-y: auto;
         padding: 0;
         display: flex;
         flex-direction: column;
         position: relative;
+    }
+
+    .checkout-content.allow-scroll {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .checkout-content.prevent-scroll {
+        overflow: hidden;
     }
 
     .nav-buttons {

@@ -110,6 +110,7 @@
   --card-slide-distance: 20px;
   --transition-fast: 200ms;
   --transition-normal: 300ms;
+  --transition-smooth: 500ms;
 }
 
 html,
@@ -483,19 +484,35 @@ body {
 }
 
 .slide-in-right {
-  animation: slideInRight var(--transition-normal) ease forwards;
+  animation: slideInRight var(--transition-smooth) ease-out forwards;
 }
 
 .slide-out-right {
-  animation: slideOutRight var(--transition-normal) ease forwards;
+  animation: slideOutRight var(--transition-smooth) ease-in forwards;
 }
 
 .slide-in-left {
-  animation: slideInLeft var(--transition-normal) ease forwards;
+  animation: slideInLeft var(--transition-smooth) ease-out forwards;
 }
 
 .slide-out-left {
-  animation: slideOutLeft var(--transition-normal) ease forwards;
+  animation: slideOutLeft var(--transition-smooth) ease-in forwards;
+}
+
+.slide-in-down {
+  animation: slideInDown var(--transition-smooth) ease-out forwards;
+}
+
+.slide-out-up {
+  animation: slideOutUp var(--transition-smooth) ease-in forwards;
+}
+
+.slide-in-up {
+  animation: slideInUp var(--transition-smooth) ease-out forwards;
+}
+
+.slide-out-down {
+  animation: slideOutDown var(--transition-smooth) ease-in forwards;
 }
 
 /* Keyframe animations */
@@ -606,6 +623,30 @@ body {
   to {
     opacity: 0;
     transform: translateY(var(--card-slide-distance));
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--card-slide-distance)));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--card-slide-distance)));
   }
 }
 

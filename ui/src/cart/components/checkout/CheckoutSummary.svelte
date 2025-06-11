@@ -12,7 +12,8 @@
     export let deliveryTime: { date: Date; display: string };
     export let isCheckingOut = false;
     export let cartService: CartBusinessService | null = null;
-
+    export let isEntering = true;
+    export let isExiting = false;
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
@@ -30,24 +31,54 @@
     function editDeliveryTime() {
         dispatch("editTime");
     }
-
 </script>
 
 <div class="checkout-summary">
     <div class="checkout-summary-header">
-        <h2>Order Summary</h2>
+        <h2
+            class={isEntering
+                ? "slide-in-left"
+                : isExiting
+                  ? "slide-out-left"
+                  : ""}
+        >
+            Order Summary
+        </h2>
     </div>
 
     <div class="summary-content">
         <div class="summary-sections">
             <div class="summary-section">
                 <div class="section-header">
-                    <h3>Delivery Address</h3>
-                    <button class="edit-button" on:click={editDeliveryAddress}
-                        >Edit</button
+                    <h3
+                        class={isEntering
+                            ? "slide-in-left"
+                            : isExiting
+                              ? "slide-out-left"
+                              : ""}
                     >
+                        Delivery Address
+                    </h3>
+                    <div
+                        class="edit-button-wrapper {isEntering
+                            ? 'slide-in-right'
+                            : isExiting
+                              ? 'slide-out-right'
+                              : ''}"
+                    >
+                        <button
+                            class="edit-button"
+                            on:click={editDeliveryAddress}>Edit</button
+                        >
+                    </div>
                 </div>
-                <div class="address-details">
+                <div
+                    class="address-details {isEntering
+                        ? 'slide-in-left'
+                        : isExiting
+                          ? 'slide-out-left'
+                          : ''}"
+                >
                     <div class="address-line">
                         {address.street}
                         {#if address.unit}
@@ -70,12 +101,34 @@
 
             <div class="summary-section">
                 <div class="section-header">
-                    <h3>Delivery Time</h3>
-                    <button class="edit-button" on:click={editDeliveryTime}
-                        >Edit</button
+                    <h3
+                        class={isEntering
+                            ? "slide-in-left"
+                            : isExiting
+                              ? "slide-out-left"
+                              : ""}
                     >
+                        Delivery Time
+                    </h3>
+                    <div
+                        class="edit-button-wrapper {isEntering
+                            ? 'slide-in-right'
+                            : isExiting
+                              ? 'slide-out-right'
+                              : ''}"
+                    >
+                        <button class="edit-button" on:click={editDeliveryTime}
+                            >Edit</button
+                        >
+                    </div>
                 </div>
-                <div class="time-details">
+                <div
+                    class="time-details {isEntering
+                        ? 'slide-in-left'
+                        : isExiting
+                          ? 'slide-out-left'
+                          : ''}"
+                >
                     <div class="time-date">
                         {deliveryTime.date.toLocaleDateString("en-US", {
                             weekday: "long",
@@ -88,15 +141,14 @@
                 </div>
             </div>
 
-            <CheckoutOrderList
-                {cartItems}
-                {cartService}
-            />
+            <CheckoutOrderList {cartItems} {cartService} />
         </div>
 
         <CheckoutPriceSummary
             {cartItems}
             {isCheckingOut}
+            {isEntering}
+            {isExiting}
             on:placeOrder={handlePlaceOrder}
         />
     </div>

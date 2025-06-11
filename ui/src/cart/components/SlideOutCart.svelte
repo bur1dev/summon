@@ -209,7 +209,6 @@
     >
       {#if isShowingCheckoutFlow && $cartServiceStore}
         <CheckoutFlow
-          {client}
           cartService={$cartServiceStore}
           cartItems={enrichedCartItems}
           onClose={closeCheckoutFlow}

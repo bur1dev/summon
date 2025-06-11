@@ -1,5 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount, getContext } from "svelte";
+    import type { Writable } from "svelte/store";
     import { encodeHashToBase64 } from "@holochain/client";
     import type { AddressService } from "../../services/AddressService";
     import type { CartBusinessService } from "../../services/CartBusinessService";
@@ -14,7 +15,6 @@
     import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
 
     // Props
-    export let client: any;
     export let cartService: CartBusinessService;
     export let cartItems: any[] = [];
     export let onClose: () => void;
@@ -35,7 +35,6 @@
     let currentStep = 1;
     let checkoutDetails: CheckoutDetails = {};
     let deliveryTimeSlots: any[] = [];
-    let formattedDeliveryTime: { date: Date; display: string } | null = null;
     let isCheckingOut = false;
     let checkoutError = "";
     let isEntering = true;
@@ -46,6 +45,12 @@
         checkoutDetails.addressHash && $addressService
             ? $addressService.getAddress(checkoutDetails.addressHash)
             : null;
+
+    // Derive formatted delivery time from saved checkout details
+    $: formattedDeliveryTime = checkoutDetails.deliveryTime ? {
+        date: new Date(checkoutDetails.deliveryTime.date),
+        display: checkoutDetails.deliveryTime.time_slot
+    } : null;
 
     // Initialize with saved data and delivery time slots
     onMount(async () => {
@@ -66,14 +71,6 @@
                     currentStep = savedDetails.currentStep;
                 }
 
-                // Use saved formatted delivery time directly
-                if (savedDetails.formattedDeliveryTime) {
-                    formattedDeliveryTime = savedDetails.formattedDeliveryTime;
-                    console.log(
-                        "Restored delivery time:",
-                        formattedDeliveryTime,
-                    );
-                }
             }
         }
     });
@@ -95,14 +92,6 @@
     // Handle delivery time selection
     function handleTimeSelect({ detail }: { detail: any }) {
         checkoutDetails.deliveryTime = detail.deliveryTime;
-
-        // Format for display
-        const dateObj = new Date(detail.deliveryTime.date);
-        formattedDeliveryTime = {
-            date: dateObj,
-            display: detail.deliveryTime.time_slot,
-        };
-        checkoutDetails.formattedDeliveryTime = formattedDeliveryTime;
         checkoutDetails.currentStep = currentStep;
         cartService.setSavedDeliveryDetails(checkoutDetails);
     }
@@ -114,7 +103,7 @@
         }
 
         if (currentStep === 2) {
-            return !!checkoutDetails.deliveryTime && !!formattedDeliveryTime;
+            return !!checkoutDetails.deliveryTime;
         }
 
         return true;
@@ -377,7 +366,6 @@
                         ""}
                     deliveryTime={formattedDeliveryTime}
                     {isCheckingOut}
-                    {cartService}
                     {isEntering}
                     {isExiting}
                     on:placeOrder={placeOrder}

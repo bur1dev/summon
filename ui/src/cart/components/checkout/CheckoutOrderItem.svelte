@@ -10,7 +10,6 @@
 
     // Props - simplified to match ProductCartItem pattern
     export let item: any;
-    export let updatingProducts: Map<string, number>;
 
     // Get cart service from context like ProductCartItem
     const cartServiceStore =
@@ -19,16 +18,9 @@
     // State for modal
     let showModal = false;
 
-    // Use cart helper for item key creation
-    function getItemKey(item: any): string {
-        return getCartItemKey(item.groupHash, item.productIndex);
-    }
 
-    // Use CartInteractionService for consistent behavior with ProductCartItem
+    // Use CartInteractionService for consistent behavior with ProductCartItem - optimistic UI
     async function handleDecrementItem(item: any) {
-        const itemKey = getItemKey(item);
-        if (updatingProducts.has(itemKey)) return;
-
         await CartInteractionService.decrementItem(
             cartServiceStore,
             item.groupHash,
@@ -40,9 +32,6 @@
     }
 
     async function handleIncrementItem(item: any) {
-        const itemKey = getItemKey(item);
-        if (updatingProducts.has(itemKey)) return;
-
         await CartInteractionService.incrementItem(
             cartServiceStore,
             item.groupHash,
@@ -61,11 +50,6 @@
         );
     }
 
-    // Returns true if a product is currently updating
-    function isUpdating(groupHash: any, productIndex: any): boolean {
-        const itemKey = getCartItemKey(groupHash, productIndex);
-        return updatingProducts.has(itemKey);
-    }
 
     // Use cart helper for display unit
     function getItemDisplayUnit(item: any): string {
@@ -137,21 +121,17 @@
                         class="quantity-btn minus-btn"
                         on:click|stopPropagation={() =>
                             handleDecrementItem(item)}
-                        disabled={isUpdating(item.groupHash, item.productIndex)}
                     >
                         <Minus size={14} />
                     </button>
                     <span class="quantity-display">
-                        {isUpdating(item.groupHash, item.productIndex)
-                            ? "..."
-                            : item.quantity}
+                        {item.quantity}
                         {getItemDisplayUnit(item)}
                     </span>
                     <button
                         class="quantity-btn plus-btn"
                         on:click|stopPropagation={() =>
                             handleIncrementItem(item)}
-                        disabled={isUpdating(item.groupHash, item.productIndex)}
                     >
                         <Plus size={14} />
                     </button>
@@ -191,7 +171,6 @@
                 <button
                     class="btn btn-text remove-item"
                     on:click|stopPropagation={() => handleRemove(item)}
-                    disabled={isUpdating(item.groupHash, item.productIndex)}
                 >
                     Remove
                 </button>

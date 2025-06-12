@@ -86,6 +86,7 @@
                 productIndex,
                 quantity,
                 existingNote || undefined,
+                product
             );
 
             if (!success) {

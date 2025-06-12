@@ -210,6 +210,8 @@
       cartService,
       groupHashBase64,
       productIndex,
+      undefined, // note
+      product
     );
   }
 </script>

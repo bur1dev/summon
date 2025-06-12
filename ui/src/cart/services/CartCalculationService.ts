@@ -89,25 +89,34 @@ export class CartCalculationService {
     }
 
     // Calculate price delta for a single item change
-    async calculateItemDelta(groupHashBase64: string, productIndex: number, quantityDelta: number): Promise<CartTotals> {
-        if (quantityDelta === 0 || !this.productDataService) {
+    async calculateItemDelta(groupHashBase64: string, productIndex: number, quantityDelta: number, product?: any): Promise<CartTotals> {
+        if (quantityDelta === 0) {
             return { regular: 0, promo: 0 };
         }
 
         try {
-            // Use ProductDataService to get product details
-            const rawProduct = await this.productDataService.getProductByReference(groupHashBase64, productIndex);
+            let productData: any = null;
 
-            if (rawProduct && typeof rawProduct.price === 'number') {
+            // Use provided product data if available (synchronous path)
+            if (product && typeof product.price === 'number') {
+                productData = product;
+            } else if (this.productDataService) {
+                // Fallback to fetching from ProductDataService (async path)
+                productData = await this.productDataService.getProductByReference(groupHashBase64, productIndex);
+            } else {
+                return { regular: 0, promo: 0 };
+            }
+
+            if (productData && typeof productData.price === 'number') {
                 // Convert to Product type for PriceService
-                const product: Product = {
-                    price: rawProduct.price,
-                    promo_price: rawProduct.promo_price,
-                    sold_by: rawProduct.sold_by
+                const productForCalculation: Product = {
+                    price: productData.price,
+                    promo_price: productData.promo_price,
+                    sold_by: productData.sold_by
                 };
 
                 // Use PriceService for calculations
-                const itemTotals = PriceService.calculateItemTotal(product, Math.abs(quantityDelta));
+                const itemTotals = PriceService.calculateItemTotal(productForCalculation, Math.abs(quantityDelta));
 
                 // Apply sign for delta
                 const sign = quantityDelta > 0 ? 1 : -1;

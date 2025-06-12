@@ -6,7 +6,6 @@
   import CartHeader from "./CartHeader.svelte";
   import ProductCartItem from "./items/ProductCartItem.svelte";
   import CheckoutFlow from "./checkout/CheckoutFlow.svelte";
-  import { X } from "lucide-svelte";
   import { PriceService } from "../../services/PriceService";
   import { clickable } from "../../shared/actions/clickable";
   import { AnimationService } from "../../services/AnimationService";
@@ -24,9 +23,6 @@
   const cartServiceStore =
     getContext<Writable<CartBusinessService | null>>("cartService");
 
-  // Get the store for product info
-  const storeContext = getContext<import("../../store").StoreContext>("store");
-  const store = storeContext.getStore();
 
   // Get ProductDataService from context (must be at top level)
   const productDataService =
@@ -36,7 +32,9 @@
   let cartItems: any[] = [];
   let enrichedCartItems: any[] = [];
   let isLoading = true;
-  let isCheckingOut = false;
+  
+  // Smart enrichment cache - Map of itemKey -> enrichedItem
+  let enrichmentCache = new Map<string, any>();
   let isShowingCheckoutFlow = false;
   let checkoutError = "";
   let isClosing = false;
@@ -53,6 +51,71 @@
   // Subscribe to cart changes
   let unsubscribe: (() => void) | null = null;
 
+  // Helper function to create unique key for cart items
+  function getItemKey(item: any): string {
+    return `${item.groupHash}_${item.productIndex}`;
+  }
+
+  // Smart enrichment function - only fetches new items
+  async function updateEnrichedItems(newCartItems: any[]) {
+    const newEnrichedItems: any[] = [];
+    
+    for (const item of newCartItems) {
+      const itemKey = getItemKey(item);
+      
+      // Check if we already have this item enriched
+      if (enrichmentCache.has(itemKey)) {
+        // Update existing enriched item with new quantity/note
+        const cachedItem = enrichmentCache.get(itemKey)!;
+        const updatedItem = {
+          ...cachedItem,
+          quantity: item.quantity,
+          note: item.note,
+          timestamp: item.timestamp
+        };
+        enrichmentCache.set(itemKey, updatedItem);
+        newEnrichedItems.push(updatedItem);
+      } else {
+        // New item - fetch product details
+        try {
+          const product = await fetchProductDetails(
+            item.groupHash,
+            item.productIndex,
+          );
+          const enrichedItem = {
+            ...item,
+            productDetails: product,
+          };
+          enrichmentCache.set(itemKey, enrichedItem);
+          newEnrichedItems.push(enrichedItem);
+        } catch (e) {
+          console.error(`Failed to load product ${item.groupHash}_${item.productIndex}:`, e);
+          const enrichedItem = {
+            ...item,
+            productDetails: {
+              name: "Unknown Product",
+              price: 0,
+              size: "N/A",
+              image_url: "",
+            },
+          };
+          enrichmentCache.set(itemKey, enrichedItem);
+          newEnrichedItems.push(enrichedItem);
+        }
+      }
+    }
+    
+    // Clean up cache for items no longer in cart
+    const currentKeys = new Set(newCartItems.map(getItemKey));
+    for (const cachedKey of enrichmentCache.keys()) {
+      if (!currentKeys.has(cachedKey)) {
+        enrichmentCache.delete(cachedKey);
+      }
+    }
+    
+    enrichedCartItems = newEnrichedItems;
+  }
+
   onMount(() => {
     if (
       $cartServiceStore &&
@@ -62,32 +125,8 @@
         // Filter out any invalid items - ones with no groupHash
         cartItems = (items || []).filter((item) => item && item.groupHash);
 
-        // Create enriched cart items with product details
-        enrichedCartItems = await Promise.all(
-          cartItems.map(async (item) => {
-            try {
-              const product = await fetchProductDetails(
-                item.groupHash,
-                item.productIndex,
-              );
-              return {
-                ...item,
-                productDetails: product,
-              };
-            } catch (e) {
-              console.error(`Failed to load product ${item.groupHash}_${item.productIndex}:`, e);
-              return {
-                ...item,
-                productDetails: {
-                  name: "Unknown Product",
-                  price: 0,
-                  size: "N/A",
-                  image_url: "",
-                },
-              };
-            }
-          })
-        );
+        // Use smart enrichment - only fetch new items
+        await updateEnrichedItems(cartItems);
 
         isLoading = false;
       });
@@ -178,7 +217,7 @@
   }
 
   // Handle checkout success
-  function handleCheckoutSuccess(event: CustomEvent) {
+  function handleCheckoutSuccess() {
     closeCart();
   }
 
@@ -190,8 +229,6 @@
     hasTriggeredInitialZipper = false;
   }
 
-  // Get the client for checkout component
-  $: client = $cartServiceStore ? $cartServiceStore.client : null;
 
   // Safe compare function for sorting
   function safeCompare(a: any, b: any) {
@@ -308,7 +345,6 @@
                     groupHash={item.groupHash}
                     productIndex={item.productIndex}
                     note={item.note}
-                    isUpdating={false}
                   />
                 {/each}
               {/if}

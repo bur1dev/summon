@@ -19,7 +19,6 @@
     export let groupHash: string; // Changed from productHash
     export let productIndex: number; // Added
     export let note: string | null = null; // Added for note support
-    export let isUpdating = false;
 
     // Get cart service directly from the context
     const cartServiceStore =
@@ -33,41 +32,27 @@
     const displayUnit = getDisplayUnit(product);
     const incrementValue = getIncrementValue(product);
 
-    // Cart interactions using centralized service
+    // Cart interactions using centralized service - optimistic UI
     const handleDecrementItem = async () => {
-        if (isUpdating) return;
-        isUpdating = true;
-
-        try {
-            await CartInteractionService.decrementItem(
-                cartServiceStore,
-                groupHash,
-                productIndex,
-                quantity,
-                product,
-                note || undefined,
-            );
-        } finally {
-            isUpdating = false;
-        }
+        await CartInteractionService.decrementItem(
+            cartServiceStore,
+            groupHash,
+            productIndex,
+            quantity,
+            product,
+            note || undefined,
+        );
     };
 
     const handleIncrementItem = async () => {
-        if (isUpdating) return;
-        isUpdating = true;
-
-        try {
-            await CartInteractionService.incrementItem(
-                cartServiceStore,
-                groupHash,
-                productIndex,
-                quantity,
-                product,
-                note || undefined,
-            );
-        } finally {
-            isUpdating = false;
-        }
+        await CartInteractionService.incrementItem(
+            cartServiceStore,
+            groupHash,
+            productIndex,
+            quantity,
+            product,
+            note || undefined,
+        );
     };
 
     const handleRemove = async () => {
@@ -93,7 +78,6 @@
         <ProductCartItemActions 
             {quantity} 
             {displayUnit} 
-            {isUpdating}
             {product}
             onIncrement={handleIncrementItem}
             onDecrement={handleDecrementItem}

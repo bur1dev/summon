@@ -28,13 +28,14 @@ export class CartInteractionService {
         cartServiceStore: Writable<CartBusinessService | null>,
         groupHash: string,
         productIndex: number,
-        note?: string
+        note?: string,
+        product?: any
     ): Promise<boolean> {
         const service = this.getCartService(cartServiceStore);
         if (!service) return false;
 
         try {
-            await service.addToCart(groupHash, productIndex, 1, note);
+            await service.addToCart(groupHash, productIndex, 1, note, product);
             return true;
         } catch (error) {
             console.error("Error adding to cart:", error);
@@ -59,7 +60,7 @@ export class CartInteractionService {
         try {
             const incrementValue = getIncrementValue(product);
             const newQuantity = currentQuantity + incrementValue;
-            await service.addToCart(groupHash, productIndex, newQuantity, note);
+            await service.addToCart(groupHash, productIndex, newQuantity, note, product);
             return true;
         } catch (error) {
             console.error("Error incrementing item:", error);
@@ -87,10 +88,10 @@ export class CartInteractionService {
             const newQuantity = currentQuantity - incrementValue;
             
             if (newQuantity > 0) {
-                await service.addToCart(groupHash, productIndex, newQuantity, note);
+                await service.addToCart(groupHash, productIndex, newQuantity, note, product);
             } else {
                 // Remove item by setting quantity to 0
-                await service.addToCart(groupHash, productIndex, 0);
+                await service.addToCart(groupHash, productIndex, 0, undefined, product);
             }
             return true;
         } catch (error) {
@@ -105,13 +106,14 @@ export class CartInteractionService {
     static async removeItem(
         cartServiceStore: Writable<CartBusinessService | null>,
         groupHash: string,
-        productIndex: number
+        productIndex: number,
+        product?: any
     ): Promise<boolean> {
         const service = this.getCartService(cartServiceStore);
         if (!service) return false;
 
         try {
-            await service.addToCart(groupHash, productIndex, 0);
+            await service.addToCart(groupHash, productIndex, 0, undefined, product);
             return true;
         } catch (error) {
             console.error("Error removing item:", error);
@@ -127,13 +129,14 @@ export class CartInteractionService {
         groupHash: string,
         productIndex: number,
         newQuantity: number,
-        note?: string
+        note?: string,
+        product?: any
     ): Promise<boolean> {
         const service = this.getCartService(cartServiceStore);
         if (!service) return false;
 
         try {
-            await service.addToCart(groupHash, productIndex, newQuantity, note);
+            await service.addToCart(groupHash, productIndex, newQuantity, note, product);
             return true;
         } catch (error) {
             console.error("Error updating quantity:", error);

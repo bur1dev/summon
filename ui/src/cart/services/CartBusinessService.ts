@@ -1,5 +1,5 @@
 import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
-import { writable, derived, get, type Writable, type Readable } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { ProductDataService } from "../../products/services/ProductDataService";
 import { CartPersistenceService } from "./CartPersistenceService";
 import { CartCalculationService } from "./CartCalculationService";
@@ -57,7 +57,6 @@ export class CartBusinessService {
 
     // Local cart management
     private localCartItems: CartItem[] = [];
-    private isInitialized = false;
 
     // Store for saved delivery details
     private savedDeliveryDetails = writable<CheckoutDetails>({});
@@ -127,7 +126,6 @@ export class CartBusinessService {
 
             // Signal service is ready
             this.loading.set(false);
-            this.isInitialized = true;
             this.ready.set(true);
         } catch (error) {
             console.error("Cart service initialization failed:", error);
@@ -175,7 +173,7 @@ export class CartBusinessService {
     }
 
     // Add product to cart (or update quantity)
-    public async addToCart(groupHash: ActionHashB64, productIndex: number, quantity: number = 1, note?: string) {
+    public async addToCart(groupHash: ActionHashB64, productIndex: number, quantity: number = 1, note?: string, product?: any) {
         try {
             if (!groupHash) {
                 console.error("Cannot add item to cart: missing groupHash");
@@ -203,7 +201,7 @@ export class CartBusinessService {
             this.updateLocalCart(standardizedHash, productIndex, quantity, note);
 
             // Calculate price delta instead of full recalculation
-            await this.updateCartTotalDelta(standardizedHash, productIndex, quantityDelta);
+            await this.updateCartTotalDelta(standardizedHash, productIndex, quantityDelta, product);
 
             // Schedule sync to Holochain
             this.persistenceService.scheduleSyncToHolochain(this.localCartItems);
@@ -216,11 +214,11 @@ export class CartBusinessService {
     }
 
     // Update cart total with delta calculation
-    private async updateCartTotalDelta(groupHash: ActionHashB64, productIndex: number, quantityDelta: number): Promise<void> {
+    private async updateCartTotalDelta(groupHash: ActionHashB64, productIndex: number, quantityDelta: number, product?: any): Promise<void> {
         if (quantityDelta === 0) return;
 
         try {
-            const delta = await this.calculationService.calculateItemDelta(groupHash, productIndex, quantityDelta);
+            const delta = await this.calculationService.calculateItemDelta(groupHash, productIndex, quantityDelta, product);
 
             this.cartTotal.update(current => {
                 const newTotal = current + delta.regular;

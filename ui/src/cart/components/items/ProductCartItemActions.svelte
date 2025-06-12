@@ -5,7 +5,6 @@
     // Props
     export let quantity: number;
     export let displayUnit: string;
-    export let isUpdating: boolean;
     export let onIncrement: () => Promise<void>;
     export let onDecrement: () => Promise<void>;
     export let onRemove: () => Promise<void>;
@@ -22,7 +21,7 @@
         <button
             class="quantity-btn minus-btn"
             on:click|stopPropagation={onDecrement}
-            disabled={isUpdating || !cartServiceAvailable}
+            disabled={!cartServiceAvailable}
         >
             <Minus size={16} />
         </button>
@@ -30,7 +29,7 @@
         <button
             class="quantity-btn plus-btn"
             on:click|stopPropagation={onIncrement}
-            disabled={isUpdating || !cartServiceAvailable}
+            disabled={!cartServiceAvailable}
         >
             <Plus size={16} />
         </button>

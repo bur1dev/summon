@@ -36,6 +36,7 @@
                 productIndex,
                 newQuantity,
                 existingNote || undefined,
+                product
             );
         }
     }
@@ -61,6 +62,7 @@
                 productIndex,
                 newQuantity,
                 existingNote || undefined,
+                product
             );
         }
     }

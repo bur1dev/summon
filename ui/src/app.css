@@ -532,6 +532,24 @@ body {
   animation: slideOutRight var(--transition-smooth) ease-in forwards;
 }
 
+/* Time slot stagger animations - target wrapper, leave inner element for hover */
+.time-slots-grid .time-slot-wrapper {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.stagger-enter .time-slot-wrapper {
+  animation: slideInDown var(--transition-smooth) ease-out forwards;
+  animation-delay: calc(var(--stagger-index, 0) * 100ms);
+}
+
+.stagger-exit .time-slot-wrapper {
+  opacity: 1;
+  transform: translateY(0);
+  animation: slideOutDown var(--transition-smooth) ease-in forwards;
+  animation-delay: calc(var(--stagger-index, 0) * 50ms);
+}
+
 /* Keyframe animations */
 @keyframes fadeIn {
   from {

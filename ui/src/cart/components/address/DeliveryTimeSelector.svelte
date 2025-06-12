@@ -3,6 +3,7 @@
     import type { DeliveryTimeSlot } from "../../services/CartBusinessService";
     import { ChevronLeft, ChevronRight } from "lucide-svelte";
     import { clickable } from "../../../shared/actions/clickable";
+    import { AnimationService } from "../../../services/AnimationService";
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
@@ -19,6 +20,9 @@
     let visibleDays: any[] = [];
     let canScrollLeft = false;
     let canScrollRight = true;
+
+    // Animation container
+    let timeSlotContainer: HTMLElement | undefined;
 
     onMount(() => {
         updateVisibleDays();
@@ -97,6 +101,16 @@
                 selectedDate && d.date.getTime() === selectedDate.getTime(),
         )?.timeSlots || [];
 
+    // Simple animation logic
+    $: if (timeSlotContainer) {
+        if (isExiting) {
+            AnimationService.stopTimeSlotStagger(timeSlotContainer);
+        } else if (selectedDate && currentDateTimeSlots.length > 0) {
+            timeSlotContainer.classList.remove("stagger-enter", "stagger-exit");
+            AnimationService.startTimeSlotStagger(timeSlotContainer);
+        }
+    }
+
     // Update visible days when slots change
     $: {
         if (timeSlots) {
@@ -107,10 +121,24 @@
 
 <div class="delivery-time-selector">
     <div class="delivery-time-header">
-        <h2 class="{isEntering ? 'slide-in-left' : isExiting ? 'slide-out-left' : ''}">Choose Delivery Time</h2>
+        <h2
+            class={isEntering
+                ? "slide-in-left"
+                : isExiting
+                  ? "slide-out-left"
+                  : ""}
+        >
+            Choose Delivery Time
+        </h2>
     </div>
 
-    <div class="date-selector {isEntering ? 'slide-in-left' : isExiting ? 'slide-out-left' : ''}">
+    <div
+        class="date-selector {isEntering
+            ? 'slide-in-left'
+            : isExiting
+              ? 'slide-out-left'
+              : ''}"
+    >
         <button
             class="scroll-button left {canScrollLeft ? '' : 'disabled'}"
             on:click={() => scrollDates("left")}
@@ -144,21 +172,29 @@
     </div>
 
     {#if selectedDate}
-        <div class="time-slots-container {isEntering ? 'slide-in-up' : isExiting ? 'slide-out-down' : ''}">
+        <div
+            class="time-slots-container {isEntering
+                ? 'slide-in-down'
+                : isExiting
+                  ? 'slide-out-down'
+                  : ''}"
+        >
             <div class="time-slots-header">Select a delivery time</div>
 
-            <div class="time-slots-grid">
+            <div class="time-slots-grid" bind:this={timeSlotContainer}>
                 {#each currentDateTimeSlots as timeSlot}
-                    <div
-                        class="time-slot {selectedTimeSlot &&
-                        (typeof selectedTimeSlot === 'string'
-                            ? selectedTimeSlot === timeSlot.slot
-                            : selectedTimeSlot.id === timeSlot.id)
-                            ? 'selected'
-                            : ''}"
-                        use:clickable={() => selectTimeSlot(timeSlot)}
-                    >
-                        <div class="time-slot-time">{timeSlot.display}</div>
+                    <div class="time-slot-wrapper">
+                        <div
+                            class="time-slot {selectedTimeSlot &&
+                            (typeof selectedTimeSlot === 'string'
+                                ? selectedTimeSlot === timeSlot.slot
+                                : selectedTimeSlot.id === timeSlot.id)
+                                ? 'selected'
+                                : ''}"
+                            use:clickable={() => selectTimeSlot(timeSlot)}
+                        >
+                            <div class="time-slot-time">{timeSlot.display}</div>
+                        </div>
                     </div>
                 {/each}
             </div>
@@ -321,6 +357,10 @@
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: var(--spacing-sm);
+    }
+
+    .time-slot-wrapper {
+        /* Wrapper for animation targeting */
     }
 
     .time-slot {

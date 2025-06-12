@@ -65,4 +65,31 @@ export class AnimationService {
       container.classList.add('zipper-exit');
     }
   }
+
+  /**
+   * Time slot stagger animation - dynamic infinite elements
+   */
+  static startTimeSlotStagger(container: HTMLElement): void {
+    if (container) {
+      // Set dynamic index for each time slot wrapper
+      const timeSlots = container.querySelectorAll('.time-slot-wrapper');
+      timeSlots.forEach((slot, index) => {
+        (slot as HTMLElement).style.setProperty('--stagger-index', index.toString());
+      });
+      container.classList.add('stagger-enter');
+    }
+  }
+
+  static stopTimeSlotStagger(container: HTMLElement): void {
+    if (container) {
+      // Set reverse index for exit animation
+      const timeSlots = container.querySelectorAll('.time-slot-wrapper');
+      const totalSlots = timeSlots.length;
+      timeSlots.forEach((slot, index) => {
+        const reverseIndex = totalSlots - 1 - index;
+        (slot as HTMLElement).style.setProperty('--stagger-index', reverseIndex.toString());
+      });
+      container.classList.add('stagger-exit');
+    }
+  }
 }

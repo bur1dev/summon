@@ -81,7 +81,6 @@
 
 <style>
     .summary-section {
-        border-bottom: var(--border-width-thin) solid var(--border);
         padding-bottom: var(--spacing-md);
     }
 

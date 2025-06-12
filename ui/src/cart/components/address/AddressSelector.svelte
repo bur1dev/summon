@@ -178,16 +178,26 @@
                         </div>
                     {/each}
 
-                    <button
-                        class="add-address-btn {isEntering
+                    {#if addresses.size < 3}
+                        <button
+                            class="add-address-btn {isEntering
+                                ? 'slide-in-right'
+                                : isExiting
+                                  ? 'slide-out-right'
+                                  : ''}"
+                            on:click={() => (showNewAddressForm = true)}
+                        >
+                            + Add New Address
+                        </button>
+                    {:else}
+                        <div class="address-limit-message {isEntering
                             ? 'slide-in-right'
                             : isExiting
                               ? 'slide-out-right'
-                              : ''}"
-                        on:click={() => (showNewAddressForm = true)}
-                    >
-                        + Add New Address
-                    </button>
+                              : ''}">
+                            Maximum of 3 addresses allowed
+                        </div>
+                    {/if}
                 </div>
 
                 {#if selectedAddressHash}
@@ -389,6 +399,21 @@
         background-color: rgba(86, 98, 189, 0.1);
         transform: translateY(var(--hover-lift));
         box-shadow: var(--shadow-subtle);
+    }
+
+    .address-limit-message {
+        display: block;
+        width: 100%;
+        height: var(--btn-height-md);
+        margin-top: var(--spacing-sm);
+        background-color: var(--surface);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--btn-border-radius);
+        color: var(--text-secondary);
+        font-weight: var(--font-weight-semibold);
+        text-align: center;
+        line-height: var(--btn-height-md);
+        font-size: var(--font-size-sm);
     }
 
     .instructions-container {

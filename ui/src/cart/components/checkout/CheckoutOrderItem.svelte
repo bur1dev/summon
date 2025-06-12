@@ -3,10 +3,7 @@
     import type { CartBusinessService } from "../../services/CartBusinessService";
     import { PriceService } from "../../../services/PriceService";
     import { CartInteractionService } from "../../services/CartInteractionService";
-    import {
-        getDisplayUnit,
-        getCartItemKey,
-    } from "../../utils/cartHelpers";
+    import { getDisplayUnit, getCartItemKey } from "../../utils/cartHelpers";
     import ProductDetailModal from "../../../products/components/modal/ProductDetailModal.svelte";
     import { getContext } from "svelte";
     import type { Writable } from "svelte/store";
@@ -16,7 +13,8 @@
     export let updatingProducts: Map<string, number>;
 
     // Get cart service from context like ProductCartItem
-    const cartServiceStore = getContext<Writable<CartBusinessService | null>>("cartService");
+    const cartServiceStore =
+        getContext<Writable<CartBusinessService | null>>("cartService");
 
     // State for modal
     let showModal = false;
@@ -37,7 +35,7 @@
             item.productIndex,
             item.quantity,
             item.productDetails,
-            item.note || undefined
+            item.note || undefined,
         );
     }
 
@@ -51,7 +49,7 @@
             item.productIndex,
             item.quantity,
             item.productDetails,
-            item.note || undefined
+            item.note || undefined,
         );
     }
 
@@ -59,7 +57,7 @@
         await CartInteractionService.removeItem(
             cartServiceStore,
             item.groupHash,
-            item.productIndex
+            item.productIndex,
         );
     }
 
@@ -80,7 +78,7 @@
     }
 </script>
 
-<div class="order-item">
+<div class="order-item cart-item">
     <div class="item-image">
         {#if item.productDetails?.image_url}
             <img
@@ -139,10 +137,7 @@
                         class="quantity-btn minus-btn"
                         on:click|stopPropagation={() =>
                             handleDecrementItem(item)}
-                        disabled={isUpdating(
-                            item.groupHash,
-                            item.productIndex,
-                        )}
+                        disabled={isUpdating(item.groupHash, item.productIndex)}
                     >
                         <Minus size={14} />
                     </button>
@@ -156,10 +151,7 @@
                         class="quantity-btn plus-btn"
                         on:click|stopPropagation={() =>
                             handleIncrementItem(item)}
-                        disabled={isUpdating(
-                            item.groupHash,
-                            item.productIndex,
-                        )}
+                        disabled={isUpdating(item.groupHash, item.productIndex)}
                     >
                         <Plus size={14} />
                     </button>
@@ -178,15 +170,11 @@
                     )}
 
                     <span class="price-amount"
-                        >{PriceService.formatTotal(
-                            itemTotals.regular,
-                        )}</span
+                        >{PriceService.formatTotal(itemTotals.regular)}</span
                     >
                     {#if hasPromo}
                         <span class="promo-amount"
-                            >{PriceService.formatTotal(
-                                itemTotals.promo,
-                            )}</span
+                            >{PriceService.formatTotal(itemTotals.promo)}</span
                         >
                         {#if itemTotals.savings > 0}
                             <span class="item-savings"
@@ -201,9 +189,8 @@
 
             {#if $cartServiceStore}
                 <button
-                    class="remove-item"
-                    on:click|stopPropagation={() =>
-                        handleRemove(item)}
+                    class="btn btn-text remove-item"
+                    on:click|stopPropagation={() => handleRemove(item)}
                     disabled={isUpdating(item.groupHash, item.productIndex)}
                 >
                     Remove
@@ -349,19 +336,17 @@
     }
 
     .remove-item {
-        background: transparent;
-        border: none;
         color: var(--error);
-        cursor: pointer;
         font-size: var(--font-size-sm);
         padding: 4px var(--spacing-xs);
-        border-radius: var(--btn-border-radius);
-        transition: var(--btn-transition);
     }
 
     .remove-item:hover {
         background-color: rgba(211, 47, 47, 0.1);
         text-decoration: underline;
+        color: var(
+            --error
+        ); /* Override btn-text:hover which changes to primary-dark */
     }
 
     /* Use the same quantity control style as ProductCartItem */

@@ -139,7 +139,12 @@
                 </div>
             </div>
 
-            <CheckoutOrderList {cartItems} />
+            <CheckoutOrderList
+                {cartItems}
+                {isEntering}
+                {isExiting}
+                on:containerBound
+            />
         </div>
 
         <CheckoutPriceSummary
@@ -148,6 +153,26 @@
             {isExiting}
             on:placeOrder={handlePlaceOrder}
         />
+    </div>
+
+    <div
+        class="checkout-actions {isEntering
+            ? 'slide-in-up'
+            : isExiting
+              ? 'slide-out-down'
+              : ''}"
+    >
+        <button
+            class="place-order-btn"
+            on:click={handlePlaceOrder}
+            disabled={isExiting}
+        >
+            {#if isExiting}
+                Placing Order...
+            {:else}
+                Place Order
+            {/if}
+        </button>
     </div>
 </div>
 
@@ -179,6 +204,9 @@
 
     .summary-content {
         padding: var(--spacing-md);
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden; /* Add this line */
     }
 
     .summary-sections {
@@ -255,5 +283,89 @@
     .time-date {
         font-weight: var(--font-weight-semibold);
         margin-bottom: 4px;
+    }
+
+    .checkout-summary {
+        background: var(--background);
+        border-radius: var(--card-border-radius);
+        width: 100%;
+        box-shadow: var(--shadow-subtle);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .summary-content {
+        padding: var(--spacing-md);
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .checkout-actions {
+        padding: var(--spacing-lg);
+        background: var(--background);
+        border-top: var(--border-width-thin) solid var(--border);
+        margin-top: auto;
+    }
+
+    .place-order-btn {
+        width: 100%;
+        height: var(--btn-height-lg);
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border: none;
+        color: var(--button-text);
+        border-radius: var(--btn-border-radius);
+        font-size: var(--btn-font-size-md);
+        font-weight: var(--font-weight-semibold);
+        cursor: pointer;
+        text-align: center;
+        transition: var(--btn-transition);
+        box-shadow: var(--shadow-button);
+    }
+
+    .place-order-btn:hover:not(:disabled) {
+        background: linear-gradient(
+            135deg,
+            var(--primary-dark),
+            var(--secondary)
+        );
+        transform: translateY(var(--hover-lift));
+        box-shadow: var(--shadow-medium);
+    }
+
+    .place-order-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        background: var(--surface);
+        color: var(--text-secondary);
+        border: var(--border-width-thin) solid var(--border);
+        box-shadow: none;
+    }
+
+    /* Thin scrollbar styling */
+    .summary-content::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .summary-content::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+    }
+
+    .summary-content::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 3px;
+    }
+
+    .summary-content::-webkit-scrollbar-thumb:hover {
+        background: var(--scrollbar-thumb-hover);
+    }
+
+    /* For Firefox */
+    .summary-content {
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
     }
 </style>

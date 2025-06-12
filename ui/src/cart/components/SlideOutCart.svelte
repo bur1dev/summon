@@ -15,6 +15,11 @@
   export let isOpen = false;
   export let onClose = () => {};
 
+  // Reset animation flag when cart opens
+  $: if (isOpen) {
+    hasTriggeredInitialZipper = false;
+  }
+
   // Get cart service directly from the context
   const cartServiceStore =
     getContext<Writable<CartBusinessService | null>>("cartService");
@@ -40,6 +45,10 @@
   let cartPromoTotalUnsubscribe: (() => void) | null = null;
   let cartTotal = 0;
   let cartPromoTotal = 0;
+
+  // Animation
+  let cartContainer: HTMLElement;
+  let hasTriggeredInitialZipper = false;
 
   // Subscribe to cart changes
   let unsubscribe: (() => void) | null = null;
@@ -148,6 +157,7 @@
   // Close cart with animation
   function closeCart() {
     isClosing = true;
+    if (cartContainer) AnimationService.stopCartZipper(cartContainer);
 
     // Wait for animation to complete, then close
     setTimeout(() => {
@@ -159,6 +169,7 @@
   // Start checkout flow
   function startCheckout() {
     isTransitioningToCheckout = true;
+    if (cartContainer) AnimationService.stopCartZipper(cartContainer);
 
     setTimeout(() => {
       isShowingCheckoutFlow = true;
@@ -171,17 +182,12 @@
     closeCart();
   }
 
-  // Close checkout flow with coordinated animations
+  // Close checkout flow - simple switch back to cart
   function closeCheckoutFlow() {
-    // First trigger CheckoutFlow exit animations
-    isClosing = true;
-
-    // Wait for CheckoutFlow exit animations to complete, then close everything
-    setTimeout(() => {
-      isShowingCheckoutFlow = false;
-      onClose();
-      isClosing = false;
-    }, AnimationService.getAnimationDuration("smooth"));
+    // Simple immediate switch - CheckoutFlow handles its own exit animation
+    isShowingCheckoutFlow = false;
+    // Reset flag so zipper animation can trigger when returning to cart
+    hasTriggeredInitialZipper = false;
   }
 
   // Get the client for checkout component
@@ -200,6 +206,12 @@
 
   // Use PriceService for savings calculation
   $: totalSavings = PriceService.calculateSavings(cartTotal, cartPromoTotal);
+
+  // Trigger zipper animation ONLY on initial cart load
+  $: if (!isLoading && enrichedCartItems.length > 0 && cartContainer && !hasTriggeredInitialZipper) {
+    AnimationService.startCartZipper(cartContainer);
+    hasTriggeredInitialZipper = true;
+  }
 </script>
 
 {#if isOpen}
@@ -281,7 +293,7 @@
               {/if}
             </div>
 
-            <div class="cart-items">
+            <div class="cart-items" bind:this={cartContainer}>
               {#if isLoading}
                 <div class="loading">Loading cart items...</div>
               {:else if enrichedCartItems.length === 0}
@@ -308,13 +320,13 @@
               {/if}
             </div>
 
-            <div class="checkout-button-container">
+            <div class="checkout-button-container {isClosing
+              ? 'slide-out-down'
+              : isTransitioningToCheckout
+                ? 'slide-out-down'
+                : 'slide-in-up'}">
               <button
-                class="checkout-button btn btn-primary btn-lg {isClosing
-                  ? 'slide-out-down'
-                  : isTransitioningToCheckout
-                    ? 'slide-out-down'
-                    : 'slide-in-up'}"
+                class="checkout-button btn btn-primary btn-lg"
                 disabled={enrichedCartItems.length === 0}
                 on:click={startCheckout}
               >
@@ -358,6 +370,7 @@
     display: flex;
     flex-direction: column;
     z-index: var(--z-index-highest);
+    overflow: hidden;
   }
 
   .cart-container.slide-in-right {
@@ -370,7 +383,7 @@
 
   .cart-content {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
     padding: 0;
   }
 
@@ -453,7 +466,8 @@
   .cart-items {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: var(--spacing-sm) var(--spacing-lg);
+    overflow-x: hidden;
+    padding: var(--spacing-sm) var(--spacing-lg) 0 var(--spacing-lg);
     min-height: 0;
   }
 
@@ -484,7 +498,7 @@
     padding: var(--spacing-lg);
     background: var(--background);
     border-top: var(--border-width-thin) solid var(--border);
-    margin-top: auto;
+    margin-top: calc(-1 * var(--border-width-thin));
   }
 
   .checkout-button {

@@ -39,6 +39,19 @@
     let checkoutError = "";
     let isEntering = true;
     let isExiting = false;
+    
+    // Animation (EXACT SlideOutCart pattern)
+    let checkoutContainer: HTMLElement | undefined;
+    let hasTriggeredCheckoutZipper = false;
+
+    // Reset flag when entering step 3 (EXACT SlideOutCart pattern)
+    $: if (currentStep === 3) {
+        hasTriggeredCheckoutZipper = false;
+        // Clean up any leftover animation classes when entering step 3
+        if (checkoutContainer) {
+            checkoutContainer.classList.remove('zipper-enter', 'zipper-exit');
+        }
+    }
 
     // When cart is closing, trigger exit animations on all elements
     $: if (isClosingCart) {
@@ -57,6 +70,12 @@
         date: new Date(checkoutDetails.deliveryTime.date),
         display: checkoutDetails.deliveryTime.time_slot
     } : null;
+
+    // Trigger zipper animation when step 3 loads (EXACT SlideOutCart pattern)
+    $: if (currentStep === 3 && cartItems.length > 0 && checkoutContainer && !hasTriggeredCheckoutZipper) {
+        AnimationService.startCartZipper(checkoutContainer);
+        hasTriggeredCheckoutZipper = true;
+    }
 
     // Initialize with saved data and delivery time slots
     onMount(async () => {
@@ -148,9 +167,13 @@
 
     // Go back to previous step
     function goBack() {
-        // Exit current step (same pattern as SlideOutCart)
         isEntering = false;
         isExiting = true;
+        
+        // If leaving step 3, trigger zipper exit (EXACT SlideOutCart pattern)
+        if (currentStep === 3 && checkoutContainer) {
+            AnimationService.stopCartZipper(checkoutContainer);
+        }
 
         // Switch step and enter after exit completes
         setTimeout(() => {
@@ -172,6 +195,11 @@
 
         isEntering = false;
         isExiting = true;
+        
+        // If leaving step 3, trigger zipper exit (EXACT SlideOutCart pattern)
+        if (currentStep === 3 && checkoutContainer) {
+            AnimationService.stopCartZipper(checkoutContainer);
+        }
 
         setTimeout(() => {
             onClose();
@@ -381,6 +409,9 @@
                     on:placeOrder={placeOrder}
                     on:editAddress={() => goToStep(1)}
                     on:editTime={() => goToStep(2)}
+                    on:containerBound={(e) => { 
+                        checkoutContainer = e.detail; 
+                    }}
                 />
 
                 {#if checkoutError}

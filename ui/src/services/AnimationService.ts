@@ -49,4 +49,20 @@ export class AnimationService {
       }, this.TRANSITION_SMOOTH);
     });
   }
+
+  /**
+   * Professional zipper animation - pure CSS approach
+   * Add class to container, CSS handles the rest
+   */
+  static startCartZipper(container: HTMLElement): void {
+    if (container) {
+      container.classList.add('zipper-enter');
+    }
+  }
+
+  static stopCartZipper(container: HTMLElement): void {
+    if (container) {
+      container.classList.add('zipper-exit');
+    }
+  }
 }

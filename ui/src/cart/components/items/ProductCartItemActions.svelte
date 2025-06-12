@@ -49,7 +49,7 @@
     </div>
 
     <button
-        class="remove-item"
+        class="btn btn-text remove-item"
         on:click|stopPropagation={onRemove}
         disabled={!cartServiceAvailable}
     >
@@ -153,18 +153,16 @@
     }
 
     .remove-item {
-        background: transparent;
-        border: none;
         color: var(--error);
-        cursor: pointer;
         font-size: var(--font-size-sm);
         padding: 4px var(--spacing-xs);
-        border-radius: var(--btn-border-radius);
-        transition: var(--btn-transition);
     }
 
     .remove-item:hover {
         background-color: rgba(211, 47, 47, 0.1);
         text-decoration: underline;
+        color: var(
+            --error
+        ); /* Override btn-text:hover which changes to primary-dark */
     }
 </style>

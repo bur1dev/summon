@@ -48,7 +48,13 @@
 </script>
 
 <!-- UPDATED: Price summary using PriceService -->
-<div class="price-summary">
+<div
+    class="price-summary {isEntering
+        ? 'slide-in-left'
+        : isExiting
+          ? 'slide-out-left'
+          : ''}"
+>
     <div class="price-row">
         <div class="price-label">Items Subtotal</div>
         <div class="price-value">
@@ -85,20 +91,6 @@
             {PriceService.formatTotal(subtotal)}
         </div>
     </div>
-</div>
-
-<div class="checkout-actions {isEntering ? 'slide-in-up' : isExiting ? 'slide-out-down' : ''}">
-    <button
-        class="place-order-btn"
-        on:click={handlePlaceOrder}
-        disabled={isExiting}
-    >
-        {#if isExiting}
-            Placing Order...
-        {:else}
-            Place Order
-        {/if}
-    </button>
 </div>
 
 <style>
@@ -147,45 +139,5 @@
         font-weight: var(--font-weight-semibold);
         font-size: var(--font-size-md);
         color: var(--text-primary);
-    }
-
-    .checkout-actions {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .place-order-btn {
-        width: 100%;
-        height: var(--btn-height-lg);
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
-        border: none;
-        color: var(--button-text);
-        border-radius: var(--btn-border-radius);
-        font-size: var(--btn-font-size-md);
-        font-weight: var(--font-weight-semibold);
-        cursor: pointer;
-        text-align: center;
-        transition: var(--btn-transition);
-        box-shadow: var(--shadow-button);
-    }
-
-    .place-order-btn:hover:not(:disabled) {
-        background: linear-gradient(
-            135deg,
-            var(--primary-dark),
-            var(--secondary)
-        );
-        transform: translateY(var(--hover-lift));
-        box-shadow: var(--shadow-medium);
-    }
-
-    .place-order-btn:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-        background: var(--surface);
-        color: var(--text-secondary);
-        border: var(--border-width-thin) solid var(--border);
-        box-shadow: none;
     }
 </style>

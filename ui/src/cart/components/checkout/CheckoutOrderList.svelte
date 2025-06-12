@@ -5,8 +5,22 @@
     } from "../../utils/cartHelpers";
     import CheckoutOrderItem from "./CheckoutOrderItem.svelte";
 
+    import { createEventDispatcher } from "svelte";
+    
     // Props
     export let cartItems: any[] = [];
+    export let isEntering = true;
+    export let isExiting = false;
+    
+    // Local container for binding
+    let orderItemsContainer: HTMLElement | undefined;
+    
+    const dispatch = createEventDispatcher();
+    
+    // Update parent when container is bound
+    $: if (orderItemsContainer) {
+        dispatch('containerBound', orderItemsContainer);
+    }
 
     // Track which items are being updated - using composite key for groupHash_productIndex
     let updatingProducts = new Map<string, number>(); // Map to store timestamps
@@ -54,8 +68,8 @@
 </script>
 
 <div class="summary-section">
-    <h3>Order Details</h3>
-    <div class="order-items">
+    <h3 class={isEntering ? "slide-in-left" : isExiting ? "slide-out-left" : ""}>Order Details</h3>
+    <div class="order-items" bind:this={orderItemsContainer}>
         {#each [...cartItems].sort((a, b) => a.groupHash.localeCompare(b.groupHash) || a.productIndex - b.productIndex) as item}
             <CheckoutOrderItem
                 {item}

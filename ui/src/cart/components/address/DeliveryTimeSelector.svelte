@@ -171,7 +171,6 @@
         background: var(--background);
         border-radius: var(--card-border-radius);
         width: 100%;
-        box-shadow: var(--shadow-subtle);
     }
 
     .delivery-time-header {

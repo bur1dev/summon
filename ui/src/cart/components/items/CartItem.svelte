@@ -1,9 +1,8 @@
 <script lang="ts">
     export let id: string;
-    export let colorClass: string = "";
 </script>
 
-<div class="cart-item {colorClass}" {id}>
+<div class="cart-item" {id}>
     <slot />
 </div>
 

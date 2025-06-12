@@ -1,5 +1,5 @@
 <script lang="ts">
-    import CheckoutOrderItem from "./CheckoutOrderItem.svelte";
+    import UnifiedCartItem from "../UnifiedCartItem.svelte";
 
     import { createEventDispatcher } from "svelte";
     
@@ -25,8 +25,9 @@
     <h3 class={isEntering ? "slide-in-left" : isExiting ? "slide-out-left" : ""}>Order Details</h3>
     <div class="order-items" bind:this={orderItemsContainer}>
         {#each [...cartItems].sort((a, b) => a.groupHash.localeCompare(b.groupHash) || a.productIndex - b.productIndex) as item}
-            <CheckoutOrderItem
+            <UnifiedCartItem
                 {item}
+                variant="checkout"
             />
         {/each}
     </div>

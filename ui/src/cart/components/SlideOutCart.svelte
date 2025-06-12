@@ -4,7 +4,7 @@
   import type { CartBusinessService } from "../services/CartBusinessService";
   import type { ProductDataService } from "../../products/services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
-  import ProductCartItem from "./items/ProductCartItem.svelte";
+  import UnifiedCartItem from "./UnifiedCartItem.svelte";
   import CheckoutFlow from "./checkout/CheckoutFlow.svelte";
   import { PriceService } from "../../services/PriceService";
   import { clickable } from "../../shared/actions/clickable";
@@ -339,12 +339,13 @@
                 {#each [...enrichedCartItems]
                   .filter((item) => item && item.groupHash && item.productDetails)
                   .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
-                  <ProductCartItem
+                  <UnifiedCartItem
                     product={item.productDetails}
                     quantity={item.quantity}
                     groupHash={item.groupHash}
                     productIndex={item.productIndex}
                     note={item.note}
+                    variant="cart"
                   />
                 {/each}
               {/if}

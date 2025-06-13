@@ -38,7 +38,7 @@ cd tests && npm run test  # Vitest integration tests
 
 **Coordinator Zomes** (business logic):
 - `product_catalog`: Product storage, search, categorization with performance grouping
-- `cart`: Shopping cart, checkout, delivery scheduling, preferences  
+- `cart`: Shopping cart, checkout, delivery scheduling, preferences (accessed directly by PreferencesService)
 - `profiles`: Delegates to holochain-open-dev profiles
 
 ### Data Architecture Patterns
@@ -57,6 +57,7 @@ cd tests && npm run test  # Vitest integration tests
 - `ShopStore`: Main product/category data store
 - `CartBusinessService`: Shopping cart operations  
 - `AddressService`: Delivery address management
+- `PreferencesService`: Product preference management with direct Holochain access
 - `ProductDataService`: Product loading with caching
 - `EmbeddingService`: Local semantic search with transformers.js
 
@@ -224,7 +225,7 @@ UI renders Beverages subcategory rows
 
   CartBusinessService.ts - Main Cart Engine 
   - Purpose: Central cart state management and business logic
-  - Responsibilities: Cart CRUD, Holochain integration, checkout workflow, preferences
+  - Responsibilities: Cart CRUD, Holochain integration, checkout workflow
   - Pattern: Reactive store with derived properties (itemCount, hasItems, cartTotal)
   - Dependencies: Delegates to specialized services below
 
@@ -258,11 +259,12 @@ UI renders Beverages subcategory rows
 
   PreferencesService.ts - Product Preferences Authority
   - Purpose: Centralized product preference management for "Remember my preferences" functionality
-  - Pattern: Static methods with reactive Svelte stores for state management
-  - Key Methods: loadPreference(), savePreference(), deletePreference(), getPreferenceStore()
-  - Backend: Saves/loads from Holochain via CartBusinessService delegation
-  - Coverage: Used by ProductDetailModal, PreferencesSection, CheckoutSummary
-  - Benefits: Eliminates 140+ lines of duplicated preference logic across components
+  - Pattern: Static methods with reactive Svelte stores and direct Holochain client access
+  - Key Methods: loadPreference(), savePreference(), deletePreference(), getPreferenceStore(), setClient()
+  - Backend: Direct Holochain zome calls (cart zome) - completely independent from CartBusinessService
+  - Initialization: PreferencesService.setClient(client) called during app startup in App.svelte
+  - Coverage: Used by ProductDetailModal, PreferencesSection
+  - Benefits: Eliminates 140+ lines of duplicated preference logic and removes circular dependencies
 
   2. Utility Layer (/utils/) - Smart Helpers
 
@@ -300,7 +302,7 @@ UI renders Beverages subcategory rows
   // Centralized cart operations:
   await CartInteractionService.updateQuantity(cartServiceStore, groupHash, productIndex, quantity);
   - Before: 35+ lines of manual price formatting | After: Clean service calls
-  - Integration: Uses CartBusinessService directly for complex preference operations
+  - Integration: Uses PreferencesService directly for preference operations (independent from cart)
 
   Cart Components
 
@@ -375,8 +377,9 @@ UI renders Beverages subcategory rows
 
   1. Context-based: Components get CartBusinessService from Svelte context
   2. Prop-based: CheckoutSummary receives CartBusinessService as prop
-  3. Static utilities: CartInteractionService and PriceService used as static classes
+  3. Static utilities: CartInteractionService, PriceService, and PreferencesService used as static classes
   4. Singleton services: BrowserNavigationService accessed via browserNavigationService import
+  5. Direct client access: PreferencesService has its own Holochain client (initialized in App.svelte)
 
   State Management Flow
 
@@ -392,6 +395,13 @@ UI renders Beverages subcategory rows
   PriceService (static utility)
       ↓ (persists to)
   localStorage + Holochain DHT
+
+  Preference Operations:
+  UI Component (ProductDetailModal, PreferencesSection)
+      ↓ (direct calls)
+  PreferencesService (static methods)
+      ↓ (direct Holochain calls)
+  Holochain DHT (cart zome functions)
 
   Navigation Operations:
   UI Component (click/interaction)
@@ -438,6 +448,9 @@ UI renders Beverages subcategory rows
   // 3. Context-based service sharing
   const cartServiceStore = getContext<Writable<CartBusinessService | null>>("cartService");
 
+  // 4. Direct static service access (no context needed)
+  await PreferencesService.loadPreference(groupHash, productIndex);
+
   3. Consistent Hash Handling
 
   // Centralized in cartHelpers.ts:
@@ -448,11 +461,6 @@ UI renders Beverages subcategory rows
 
   1. DRY Elimination
 
-  - Price Logic: 200+ lines of duplicated formatting → PriceService
-  - Cart Logic: 150+ lines per component → CartInteractionService
-  - Navigation Logic: 100+ lines of event handling → BrowserNavigationService
-  - Hash Parsing: 60+ lines everywhere → parseProductHash()
-  - Quantity Logic: Manual increments → getIncrementValue()
 
   2. SOLID Compliance
 
@@ -467,6 +475,7 @@ UI renders Beverages subcategory rows
   - Price changes: Modify PriceService only
   - Cart behavior: Modify CartInteractionService only
   - Navigation changes: Modify BrowserNavigationService only
+  - Preference changes: Modify PreferencesService only
   - New products: Add to cartHelpers utility functions
   - UI changes: Components are pure presentation
 
@@ -587,3 +596,34 @@ async function loadProductsForProductType(navId: number) {
 - ✅ **Follows Svelte patterns** - Clean prop passing and conditional rendering
 
 This architecture demonstrates that complex problems often have simple, elegant solutions when proper separation of concerns is maintained.
+
+### Preferences Service Independence 🎯
+**Problem Solved**: Circular dependency between PreferencesService and CartBusinessService
+**Previous Architecture**: PreferencesService → CartBusinessService → Holochain
+**New Architecture**: PreferencesService → Direct Holochain client access
+
+**Key Changes**:
+- **Eliminated 102 lines** of duplicated Holochain calls from CartBusinessService
+- **Direct client access** via `PreferencesService.setClient(client)` initialization
+- **Independent operation** - preferences no longer depend on cart service
+- **Cleaner separation** - cart handles cart operations, preferences handle preferences
+
+**Implementation Details**:
+```typescript
+// App.svelte initialization
+PreferencesService.setClient(client);
+
+// Components call PreferencesService directly
+await PreferencesService.loadPreference(groupHash, productIndex);
+await PreferencesService.savePreference(groupHash, productIndex, note);
+await PreferencesService.deletePreference(preferenceHash, groupHash, productIndex);
+```
+
+**Benefits Achieved**:
+- ✅ **No circular dependencies** - Clean service layer separation
+- ✅ **Single responsibility** - Each service has one clear purpose
+- ✅ **Reduced coupling** - Preferences independent from cart operations
+- ✅ **Follows established patterns** - Similar to AddressService direct client access
+- ✅ **Maintains functionality** - Same reactive stores and UI patterns
+
+This refactoring exemplifies how proper service boundaries lead to cleaner, more maintainable architecture.

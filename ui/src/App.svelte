@@ -9,6 +9,7 @@
   import "@shoelace-style/shoelace/dist/themes/light.css";
   import { CartBusinessService } from "./cart/services/CartBusinessService";
   import { AddressService } from "./cart/services/AddressService";
+  import { PreferencesService } from "./products/services/PreferencesService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
   import { ShopStore, type StoreContext } from "./store";
@@ -91,6 +92,9 @@
     const addressServiceInstance = new AddressService(client);
     console.log("AddressService created with client:", !!client);
     addressServiceStore.set(addressServiceInstance); // Update the address service store
+
+    // Initialize PreferencesService with client
+    PreferencesService.setClient(client);
 
     // Initialize ProfilesStore
     profilesStore = new ProfilesStore(new ProfilesClient(client, "grocery"), {

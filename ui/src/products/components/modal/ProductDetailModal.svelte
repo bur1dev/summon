@@ -139,12 +139,11 @@
 
     // Load product preferences using service
     async function loadProductPreference() {
-        const serviceInstance = get(cartServiceStore);
-        if (!serviceInstance || !groupHashBase64 || productIndex === undefined) {
+        if (!groupHashBase64 || productIndex === undefined) {
             return;
         }
 
-        await PreferencesService.loadPreference(serviceInstance, groupHashBase64, productIndex);
+        await PreferencesService.loadPreference(groupHashBase64, productIndex);
         
         // If not already in cart and there's a saved preference, pre-populate the note
         if (!isInCart && existingPreference && existingPreference.preference?.note) {

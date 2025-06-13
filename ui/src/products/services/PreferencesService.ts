@@ -1,6 +1,6 @@
 import type { Writable } from 'svelte/store';
 import { writable } from 'svelte/store';
-import type { CartBusinessService } from '../../cart/services/CartBusinessService';
+import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
 
 interface PreferenceState {
     loading: boolean;
@@ -14,6 +14,15 @@ interface PreferenceState {
  */
 export class PreferencesService {
     private static stores = new Map<string, Writable<PreferenceState>>();
+    private static client: any = null;
+
+    /**
+     * Initialize the service with Holochain client
+     * Called during app initialization
+     */
+    static setClient(client: any): void {
+        this.client = client;
+    }
 
     /**
      * Gets or creates a reactive store for a specific product's preference
@@ -38,12 +47,11 @@ export class PreferencesService {
      * Updates the reactive store with loading state and result
      */
     static async loadPreference(
-        cartService: CartBusinessService | null,
         groupHash: string,
         productIndex: number
     ): Promise<boolean> {
-        if (!cartService) {
-            console.error("PreferencesService: Cart service not available");
+        if (!this.client) {
+            console.error("PreferencesService: No Holochain client available");
             return false;
         }
 
@@ -53,14 +61,33 @@ export class PreferencesService {
             // Set loading state
             store.update(state => ({ ...state, loading: true }));
 
-            const result = await cartService.getProductPreference(groupHash, productIndex);
-            
-            if (result && result.success && result.data) {
+            // Decode hash for Holochain call
+            const groupHashDecoded = decodeHashFromBase64(groupHash);
+
+            // Call the zome function directly
+            const result = await this.client.callZome({
+                role_name: 'grocery',
+                zome_name: 'cart',
+                fn_name: 'get_product_preference_by_product',
+                payload: {
+                    group_hash: groupHashDecoded,
+                    product_index: productIndex
+                }
+            });
+
+            if (result) {
+                // Result contains [hash, preference]
+                const [prefHash, preference] = result;
+                const preferenceData = {
+                    hash: encodeHashToBase64(prefHash),
+                    preference: preference
+                };
+
                 // Preference exists
                 store.update(state => ({
                     ...state,
                     loading: false,
-                    preference: result.data,
+                    preference: preferenceData,
                     savePreference: true
                 }));
             } else {
@@ -90,12 +117,11 @@ export class PreferencesService {
      * Updates the reactive store with the saved preference
      */
     static async savePreference(
-        cartService: CartBusinessService | null,
         groupHash: string,
         productIndex: number,
         note: string
     ): Promise<boolean> {
-        if (!cartService || !note?.trim()) {
+        if (!this.client || !note?.trim()) {
             console.error("PreferencesService: Invalid parameters for saving preference");
             return false;
         }
@@ -103,24 +129,36 @@ export class PreferencesService {
         const store = this.getPreferenceStore(groupHash, productIndex);
 
         try {
-            const result = await cartService.saveProductPreference({
-                groupHash,
-                productIndex,
+            // Convert to Holochain format
+            const holochainPreference = {
+                group_hash: decodeHashFromBase64(groupHash),
+                product_index: productIndex,
                 note: note.trim(),
-                is_default: true,
+                timestamp: Date.now(),
+                is_default: true
+            };
+
+            // Call the zome function directly
+            const hash = await this.client.callZome({
+                role_name: 'grocery',
+                zome_name: 'cart',
+                fn_name: 'save_product_preference',
+                payload: holochainPreference
             });
 
-            if (result && result.success) {
-                // Update store with saved preference
-                store.update(state => ({
-                    ...state,
-                    preference: result.data,
-                    savePreference: true
-                }));
-                console.log("Saved product preference:", result.data);
-                return true;
-            }
-            return false;
+            const savedData = {
+                hash: encodeHashToBase64(hash),
+                preference: holochainPreference
+            };
+
+            // Update store with saved preference
+            store.update(state => ({
+                ...state,
+                preference: savedData,
+                savePreference: true
+            }));
+            console.log("Saved product preference:", savedData);
+            return true;
         } catch (error) {
             console.error("Error saving product preference:", error);
             return false;
@@ -132,12 +170,11 @@ export class PreferencesService {
      * Updates the reactive store to reflect deletion
      */
     static async deletePreference(
-        cartService: CartBusinessService | null,
-        preferenceHash: any,
+        preferenceHash: string,
         groupHash: string,
         productIndex: number
     ): Promise<boolean> {
-        if (!cartService || !preferenceHash) {
+        if (!this.client || !preferenceHash) {
             console.error("PreferencesService: Invalid parameters for deleting preference");
             return false;
         }
@@ -145,19 +182,25 @@ export class PreferencesService {
         const store = this.getPreferenceStore(groupHash, productIndex);
 
         try {
-            const result = await cartService.deleteProductPreference(preferenceHash);
-            
-            if (result && result.success) {
-                // Update store to reflect deletion
-                store.update(state => ({
-                    ...state,
-                    preference: null,
-                    savePreference: false
-                }));
-                console.log("Deleted product preference");
-                return true;
-            }
-            return false;
+            // Decode hash for Holochain call
+            const prefHash = decodeHashFromBase64(preferenceHash);
+
+            // Call the zome function directly
+            await this.client.callZome({
+                role_name: 'grocery',
+                zome_name: 'cart',
+                fn_name: 'delete_product_preference',
+                payload: prefHash
+            });
+
+            // Update store to reflect deletion
+            store.update(state => ({
+                ...state,
+                preference: null,
+                savePreference: false
+            }));
+            console.log("Deleted product preference");
+            return true;
         } catch (error) {
             console.error("Error deleting product preference:", error);
             return false;

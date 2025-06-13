@@ -23,11 +23,9 @@
     export let onSave: (() => void) | null = null;
 
     async function saveProductPreference() {
-        const serviceInstance = get(cartServiceStore);
-        if (!serviceInstance || !note || !note.trim()) return;
+        if (!note || !note.trim()) return;
 
         const success = await PreferencesService.savePreference(
-            serviceInstance,
             groupHashBase64,
             productIndex,
             note.trim()
@@ -43,11 +41,9 @@
     }
 
     async function deleteProductPreference() {
-        const serviceInstance = get(cartServiceStore);
-        if (!serviceInstance || !existingPreference || !existingPreference.hash) return;
+        if (!existingPreference || !existingPreference.hash) return;
 
         const success = await PreferencesService.deletePreference(
-            serviceInstance,
             existingPreference.hash,
             groupHashBase64,
             productIndex

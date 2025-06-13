@@ -532,6 +532,24 @@ body {
   animation: slideOutRight var(--transition-smooth) ease-in forwards;
 }
 
+/* Item removal animation */
+.cart-item.item-removing {
+  animation: removeItem var(--transition-smooth) ease-out forwards;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Smooth transitions for all cart items */
+.cart-item {
+  transition: all var(--transition-normal) ease;
+  will-change: transform, opacity;
+}
+
+/* Smooth container transitions */
+.cart-items {
+  transition: all var(--transition-normal) ease;
+}
+
 /* Time slot stagger animations - target wrapper, leave inner element for hover */
 .time-slots-grid .time-slot-wrapper {
   opacity: 0;
@@ -688,6 +706,31 @@ body {
   to {
     opacity: 0;
     transform: translateY(calc(-1 * var(--card-slide-distance)));
+  }
+}
+
+@keyframes removeItem {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 200px;
+    padding: var(--spacing-sm) 0;
+    border-bottom-width: var(--border-width-thin);
+  }
+  50% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    max-height: 200px;
+    padding: var(--spacing-sm) 0;
+    border-bottom-width: var(--border-width-thin);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    max-height: 0;
+    padding: 0;
+    border-bottom-width: 0;
+    overflow: hidden;
   }
 }
 

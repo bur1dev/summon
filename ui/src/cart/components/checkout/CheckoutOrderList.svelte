@@ -24,7 +24,7 @@
 <div class="summary-section">
     <h3 class={isEntering ? "slide-in-left" : isExiting ? "slide-out-left" : ""}>Order Details</h3>
     <div class="order-items" bind:this={orderItemsContainer}>
-        {#each [...cartItems].sort((a, b) => a.groupHash.localeCompare(b.groupHash) || a.productIndex - b.productIndex) as item}
+        {#each [...cartItems].sort((a, b) => a.groupHash.localeCompare(b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
             <UnifiedCartItem
                 {item}
                 variant="checkout"
@@ -48,6 +48,12 @@
     .order-items {
         display: flex;
         flex-direction: column;
-        gap: var(--spacing-xs);
+        /* No gap - will use margin instead */
+        transition: all var(--transition-normal) ease;
+    }
+
+    /* Add spacing via margin on the items */
+    .order-items :global(.order-item:not(:last-child)) {
+        margin-bottom: var(--spacing-xs);
     }
 </style>

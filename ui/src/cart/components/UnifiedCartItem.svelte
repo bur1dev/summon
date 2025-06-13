@@ -5,11 +5,10 @@
     import type { CartBusinessService } from "../services/CartBusinessService";
     import { PriceService } from "../../services/PriceService";
     import { CartInteractionService } from "../services/CartInteractionService";
-    import {
-        getDisplayUnit,
-    } from "../utils/cartHelpers";
+    import { getDisplayUnit } from "../utils/cartHelpers";
     import ProductDetailModal from "../../products/components/modal/ProductDetailModal.svelte";
     import CartItem from "./items/CartItem.svelte";
+    import { AnimationService } from "../../services/AnimationService";
 
     // Props
     export let product: any = null;
@@ -29,23 +28,39 @@
     $: normalizedProductIndex = item?.productIndex || productIndex;
     $: normalizedNote = item?.note || note;
 
-
     // Get cart service from context
     const cartServiceStore =
         getContext<Writable<CartBusinessService | null>>("cartService");
 
-    // State for modal
+    // State for modal and animation
     let showModal = false;
+    let isRemoving = false;
+    let cartItemComponent: any;
+    let cartItemElement: HTMLElement | undefined;
+    let checkoutItemElement: HTMLElement;
 
     // Use cart helpers for product properties
     $: displayUnit = getDisplayUnit(normalizedProduct);
 
     // Use PriceService for calculations
-    $: itemTotals = PriceService.calculateItemTotal(normalizedProduct, normalizedQuantity);
+    $: itemTotals = PriceService.calculateItemTotal(
+        normalizedProduct,
+        normalizedQuantity,
+    );
     $: hasPromo = PriceService.hasPromoPrice(normalizedProduct);
 
     // Cart interactions using centralized service - optimistic UI
     const handleDecrementItem = async () => {
+        // If decrementing to 0, trigger removal animation
+        if (normalizedQuantity === 1) {
+            isRemoving = true;
+            const element =
+                variant === "cart" ? cartItemElement : checkoutItemElement;
+            if (element) {
+                await AnimationService.startItemRemoval(element);
+            }
+        }
+
         await CartInteractionService.decrementItem(
             cartServiceStore,
             normalizedGroupHash,
@@ -68,6 +83,16 @@
     };
 
     const handleRemove = async () => {
+        isRemoving = true;
+
+        // Use AnimationService instead of manual timeout
+        const element =
+            variant === "cart" ? cartItemElement : checkoutItemElement;
+        if (element) {
+            await AnimationService.startItemRemoval(element);
+        }
+
+        // Then remove from cart
         await CartInteractionService.removeItem(
             cartServiceStore,
             normalizedGroupHash,
@@ -82,12 +107,20 @@
 
 {#if variant === "cart"}
     <!-- Cart variant - uses existing CartItem wrapper and component structure -->
-    <CartItem id={`${normalizedGroupHash}_${normalizedProductIndex}`}>
+    <CartItem
+        bind:this={cartItemComponent}
+        bind:element={cartItemElement}
+        id={`${normalizedGroupHash}_${normalizedProductIndex}`}
+        class={isRemoving ? "item-removing" : ""}
+    >
         <div class="cart-item-content">
             <!-- Product Display Section -->
             <div class="cart-item-img">
                 {#if normalizedProduct?.image_url}
-                    <img src={normalizedProduct.image_url} alt={normalizedProduct.name || "Product"} />
+                    <img
+                        src={normalizedProduct.image_url}
+                        alt={normalizedProduct.name || "Product"}
+                    />
                 {/if}
             </div>
 
@@ -98,10 +131,12 @@
 
                 <!-- Price display using PriceService -->
                 <div class="cart-item-price">
-                    <span>{PriceService.formatPriceWithUnit(
-                        normalizedProduct?.price || 0,
-                        normalizedProduct?.sold_by,
-                    )}</span>
+                    <span
+                        >{PriceService.formatPriceWithUnit(
+                            normalizedProduct?.price || 0,
+                            normalizedProduct?.sold_by,
+                        )}</span
+                    >
                     {#if hasPromo}
                         <span class="price-separator">/</span>
                         <span class="promo-price">
@@ -123,9 +158,11 @@
                     on:click|stopPropagation={handleInstructionsClick}
                 >
                     <PencilLine size={16} />
-                    <span>{normalizedNote && normalizedNote.trim().length > 0
-                        ? "Edit instructions"
-                        : "Add instructions"}</span>
+                    <span
+                        >{normalizedNote && normalizedNote.trim().length > 0
+                            ? "Edit instructions"
+                            : "Add instructions"}</span
+                    >
                 </button>
             </div>
 
@@ -139,7 +176,9 @@
                     >
                         <Minus size={16} />
                     </button>
-                    <span class="quantity-display">{normalizedQuantity} {displayUnit}</span>
+                    <span class="quantity-display"
+                        >{normalizedQuantity} {displayUnit}</span
+                    >
                     <button
                         class="quantity-btn plus-btn"
                         on:click|stopPropagation={handleIncrementItem}
@@ -151,9 +190,13 @@
 
                 <!-- Total price using PriceService -->
                 <div class="cart-item-total">
-                    <span class="total-regular">{PriceService.formatTotal(itemTotals.regular)}</span>
+                    <span class="total-regular"
+                        >{PriceService.formatTotal(itemTotals.regular)}</span
+                    >
                     {#if hasPromo}
-                        <span class="total-promo">{PriceService.formatTotal(itemTotals.promo)}</span>
+                        <span class="total-promo"
+                            >{PriceService.formatTotal(itemTotals.promo)}</span
+                        >
                     {/if}
                 </div>
 
@@ -169,7 +212,10 @@
     </CartItem>
 {:else}
     <!-- Checkout variant - matches CheckoutOrderItem layout -->
-    <div class="order-item cart-item">
+    <div
+        bind:this={checkoutItemElement}
+        class="order-item cart-item {isRemoving ? 'item-removing' : ''}"
+    >
         <div class="item-image">
             {#if normalizedProduct?.image_url}
                 <img
@@ -214,9 +260,11 @@
                     on:click={handleInstructionsClick}
                 >
                     <PencilLine size={14} />
-                    <span>{normalizedNote
-                        ? "Edit instructions"
-                        : "Add instructions"}</span>
+                    <span
+                        >{normalizedNote
+                            ? "Edit instructions"
+                            : "Add instructions"}</span
+                    >
                 </button>
             </div>
             <div class="item-right">
@@ -229,7 +277,8 @@
                             <Minus size={14} />
                         </button>
                         <span class="quantity-display">
-                            {normalizedQuantity} {displayUnit}
+                            {normalizedQuantity}
+                            {displayUnit}
                         </span>
                         <button
                             class="quantity-btn plus-btn"
@@ -242,11 +291,19 @@
 
                 <!-- Item totals using PriceService -->
                 <div class="item-price">
-                    <span class="price-amount">{PriceService.formatTotal(itemTotals.regular)}</span>
+                    <span class="price-amount"
+                        >{PriceService.formatTotal(itemTotals.regular)}</span
+                    >
                     {#if hasPromo}
-                        <span class="promo-amount">{PriceService.formatTotal(itemTotals.promo)}</span>
+                        <span class="promo-amount"
+                            >{PriceService.formatTotal(itemTotals.promo)}</span
+                        >
                         {#if itemTotals.savings > 0}
-                            <span class="item-savings">You save {PriceService.formatSavings(itemTotals.savings)}</span>
+                            <span class="item-savings"
+                                >You save {PriceService.formatSavings(
+                                    itemTotals.savings,
+                                )}</span
+                            >
                         {/if}
                     {/if}
                 </div>

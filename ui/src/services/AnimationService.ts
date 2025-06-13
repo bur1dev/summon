@@ -62,6 +62,11 @@ export class AnimationService {
 
   static stopCartZipper(container: HTMLElement): void {
     if (container) {
+      // Remove any existing animation classes first to ensure animation retriggers
+      container.classList.remove('zipper-enter', 'zipper-exit');
+      // Force reflow to ensure the browser registers the class removal
+      void container.offsetHeight;
+      // Now add the exit class
       container.classList.add('zipper-exit');
     }
   }
@@ -91,5 +96,15 @@ export class AnimationService {
       });
       container.classList.add('stagger-exit');
     }
+  }
+
+  /**
+   * Item removal animation - smooth fade out with height collapse
+   */
+  static startItemRemoval(element: HTMLElement): Promise<void> {
+    element.classList.add('item-removing');
+    return new Promise(resolve => {
+      setTimeout(resolve, this.TRANSITION_SMOOTH); // 500ms for smooth removal with height collapse
+    });
   }
 }

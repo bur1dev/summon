@@ -196,7 +196,6 @@
     .address-form {
         background: var(--background);
         border-radius: var(--card-border-radius);
-        box-shadow: var(--shadow-medium);
         padding: var(--spacing-xl);
         max-width: 500px;
         margin: 0 auto;

@@ -39,7 +39,7 @@
     let checkoutError = "";
     let isEntering = true;
     let isExiting = false;
-    
+
     // Animation (EXACT SlideOutCart pattern)
     let checkoutContainer: HTMLElement | undefined;
     let hasTriggeredCheckoutZipper = false;
@@ -49,7 +49,7 @@
         hasTriggeredCheckoutZipper = false;
         // Clean up any leftover animation classes when entering step 3
         if (checkoutContainer) {
-            checkoutContainer.classList.remove('zipper-enter', 'zipper-exit');
+            checkoutContainer.classList.remove("zipper-enter", "zipper-exit");
         }
     }
 
@@ -59,6 +59,11 @@
         isExiting = true;
     }
 
+    // When cart is closing from step 3, trigger zipper animation
+    $: if (isClosingCart && currentStep === 3 && checkoutContainer) {
+        AnimationService.stopCartZipper(checkoutContainer);
+    }
+
     // Derive selected address from addressHash
     $: selectedAddress =
         checkoutDetails.addressHash && $addressService
@@ -66,15 +71,29 @@
             : null;
 
     // Derive formatted delivery time from saved checkout details
-    $: formattedDeliveryTime = checkoutDetails.deliveryTime ? {
-        date: new Date(checkoutDetails.deliveryTime.date),
-        display: checkoutDetails.deliveryTime.time_slot
-    } : null;
+    $: formattedDeliveryTime = checkoutDetails.deliveryTime
+        ? {
+              date: new Date(checkoutDetails.deliveryTime.date),
+              display: checkoutDetails.deliveryTime.time_slot,
+          }
+        : null;
 
     // Trigger zipper animation when step 3 loads (EXACT SlideOutCart pattern)
-    $: if (currentStep === 3 && cartItems.length > 0 && checkoutContainer && !hasTriggeredCheckoutZipper) {
+    $: if (
+        currentStep === 3 &&
+        cartItems.length > 0 &&
+        checkoutContainer &&
+        !hasTriggeredCheckoutZipper
+    ) {
         AnimationService.startCartZipper(checkoutContainer);
         hasTriggeredCheckoutZipper = true;
+
+        // Remove the animation class after it completes to prevent re-animation on DOM changes
+        setTimeout(() => {
+            if (checkoutContainer) {
+                checkoutContainer.classList.remove("zipper-enter");
+            }
+        }, AnimationService.getAnimationDuration("smooth"));
     }
 
     // Initialize with saved data and delivery time slots
@@ -95,7 +114,6 @@
                 if (savedDetails.currentStep) {
                     currentStep = savedDetails.currentStep;
                 }
-
             }
         }
     });
@@ -169,7 +187,7 @@
     function goBack() {
         isEntering = false;
         isExiting = true;
-        
+
         // If leaving step 3, trigger zipper exit (EXACT SlideOutCart pattern)
         if (currentStep === 3 && checkoutContainer) {
             AnimationService.stopCartZipper(checkoutContainer);
@@ -195,7 +213,7 @@
 
         isEntering = false;
         isExiting = true;
-        
+
         // If leaving step 3, trigger zipper exit (EXACT SlideOutCart pattern)
         if (currentStep === 3 && checkoutContainer) {
             AnimationService.stopCartZipper(checkoutContainer);
@@ -220,8 +238,14 @@
         isEntering = false;
         isExiting = true;
 
+        // Trigger zipper exit animation when placing order from step 3
+        if (currentStep === 3 && checkoutContainer) {
+            AnimationService.stopCartZipper(checkoutContainer);
+        }
+
         // Start Holochain operation in background (don't block animations)
-        cartService.checkoutCart(checkoutDetails)
+        cartService
+            .checkoutCart(checkoutDetails)
             .then((result) => {
                 if (result.success) {
                     console.log("Order placed successfully");
@@ -409,8 +433,8 @@
                     on:placeOrder={placeOrder}
                     on:editAddress={() => goToStep(1)}
                     on:editTime={() => goToStep(2)}
-                    on:containerBound={(e) => { 
-                        checkoutContainer = e.detail; 
+                    on:containerBound={(e) => {
+                        checkoutContainer = e.detail;
                     }}
                 />
 

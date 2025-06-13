@@ -5,6 +5,7 @@
     import AddressForm from "./AddressForm.svelte";
     import { MapPin, NotebookPen } from "lucide-svelte";
     import { clickable } from "../../../shared/actions/clickable";
+    import { AnimationService } from "../../../services/AnimationService";
 
     // Props
     export let selectedAddressHash: string | null = null;
@@ -23,6 +24,9 @@
     let validationError = "";
     export let isEntering = true;
     export let isExiting = false;
+    
+    // Address form animation state
+    let isFormClosing = false;
 
     onMount(() => {
         if ($addressService) {
@@ -74,7 +78,12 @@
             if (result.success && result.hash) {
                 // Select the new address
                 selectAddress(result.hash);
-                showNewAddressForm = false;
+                // Close form with animation
+                isFormClosing = true;
+                setTimeout(() => {
+                    showNewAddressForm = false;
+                    isFormClosing = false;
+                }, AnimationService.getAnimationDuration('normal'));
             } else {
                 validationError = "Failed to save address. Please try again.";
             }
@@ -92,10 +101,14 @@
         dispatch("instructionsChange", { instructions: deliveryInstructions });
     }
 
-    // Cancel add address
+    // Cancel add address with animation
     function handleCancelAddAddress() {
-        showNewAddressForm = false;
-        validationError = "";
+        isFormClosing = true;
+        setTimeout(() => {
+            showNewAddressForm = false;
+            isFormClosing = false;
+            validationError = "";
+        }, AnimationService.getAnimationDuration('normal'));
     }
 </script>
 
@@ -113,26 +126,34 @@
     </div>
 
     {#if showNewAddressForm}
-        <AddressForm
-            on:submit={handleAddAddress}
-            on:cancel={handleCancelAddAddress}
-            {isValidating}
-            {validationError}
-        />
+        <div class="address-form-container {isFormClosing ? 'slide-out-up' : 'slide-in-down'}">
+            <AddressForm
+                on:submit={handleAddAddress}
+                on:cancel={handleCancelAddAddress}
+                {isValidating}
+                {validationError}
+            />
+        </div>
     {:else}
         <div class="addresses-container">
             {#if addresses.size === 0}
-                <div class="no-addresses">
+                <div class="no-addresses {isFormClosing ? 'slide-out-up' : 'slide-in-down'}">
                     <p>You don't have any saved addresses.</p>
                     <button
                         class="add-address-btn"
-                        on:click={() => (showNewAddressForm = true)}
+                        on:click={() => {
+                            isFormClosing = true;
+                            setTimeout(() => {
+                                showNewAddressForm = true;
+                                isFormClosing = false;
+                            }, AnimationService.getAnimationDuration('normal'));
+                        }}
                     >
                         Add New Address
                     </button>
                 </div>
             {:else}
-                <div class="address-list">
+                <div class="address-list {isFormClosing ? 'slide-out-up' : 'slide-in-down'}">
                     {#each [...addresses.entries()] as [hash, address]}
                         <div
                             class="address-card {selectedAddressHash === hash
@@ -185,7 +206,13 @@
                                 : isExiting
                                   ? 'slide-out-right'
                                   : ''}"
-                            on:click={() => (showNewAddressForm = true)}
+                            on:click={() => {
+                                isFormClosing = true;
+                                setTimeout(() => {
+                                    showNewAddressForm = true;
+                                    isFormClosing = false;
+                                }, AnimationService.getAnimationDuration('normal'));
+                            }}
                         >
                             + Add New Address
                         </button>
@@ -257,6 +284,17 @@
         color: var(--text-primary);
     }
 
+    .address-form-container {
+        overflow: hidden;
+    }
+
+    .address-form-container.slide-in-down {
+        animation: slideInDown var(--transition-normal) ease-out forwards;
+    }
+
+    .address-form-container.slide-out-up {
+        animation: slideOutUp var(--transition-normal) ease-in forwards;
+    }
 
     .addresses-container {
         padding: var(--spacing-md);

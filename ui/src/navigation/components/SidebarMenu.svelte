@@ -17,13 +17,15 @@
 
     async function closeMenu() {
         isClosing = true;
-        
+
         // Get the sidebar panel element for animation
-        const sidebarElement = document.querySelector('.sidebar-panel') as HTMLElement;
-        
+        const sidebarElement = document.querySelector(
+            ".sidebar-panel",
+        ) as HTMLElement;
+
         // Use AnimationService for consistent timing
-        await AnimationService.slideOutPanel(sidebarElement, 'left');
-        
+        await AnimationService.slideOutPanel(sidebarElement, "left");
+
         $showMenuStore = false;
         isClosing = false;
     }
@@ -48,7 +50,11 @@
 
     <!-- Sidebar Panel -->
     <div class="sidebar-panel {isClosing ? 'slide-out-left' : 'slide-in-left'}">
-        <div class="sidebar-header">
+        <div
+            class="sidebar-header {isClosing
+                ? 'slide-out-up'
+                : 'slide-in-down'}"
+        >
             <button
                 class="delete-cart-btn btn btn-icon btn-icon-primary btn-icon-sm"
                 on:click={closeMenu}
@@ -60,7 +66,11 @@
         <div class="sidebar-content">
             <!-- Profile Section -->
             {#if avatarLoaded && myAgentPubKeyB64}
-                <div class="profile-section">
+                <div
+                    class="profile-section {isClosing
+                        ? 'slide-out-right'
+                        : 'slide-in-right'}"
+                >
                     <div
                         class="avatar-container"
                         use:clickable={handleAvatarClick}
@@ -78,7 +88,11 @@
             {/if}
 
             <!-- Admin Section -->
-            <div class="menu-section">
+            <div
+                class="menu-section {isClosing
+                    ? 'slide-out-left'
+                    : 'slide-in-left'}"
+            >
                 <h3 class="section-title">Admin Tools</h3>
 
                 <button
@@ -94,7 +108,11 @@
             </div>
 
             <!-- Support Section -->
-            <div class="menu-section">
+            <div
+                class="menu-section {isClosing
+                    ? 'slide-out-left'
+                    : 'slide-in-left'}"
+            >
                 <h3 class="section-title">Support</h3>
 
                 <a

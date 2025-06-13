@@ -248,6 +248,13 @@
   $: if (!isLoading && enrichedCartItems.length > 0 && cartContainer && !hasTriggeredInitialZipper) {
     AnimationService.startCartZipper(cartContainer);
     hasTriggeredInitialZipper = true;
+    
+    // Remove the animation class after it completes to prevent re-animation on DOM changes
+    setTimeout(() => {
+      if (cartContainer) {
+        cartContainer.classList.remove('zipper-enter');
+      }
+    }, AnimationService.getAnimationDuration('smooth'));
   }
 </script>
 

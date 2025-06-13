@@ -12,12 +12,16 @@
     export let deliveryTime: { date: Date; display: string };
     export let isEntering = true;
     export let isExiting = false;
+    
+    // Local state for placing order
+    let isPlacingOrder = false;
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
 
     // Handle checkout button click
     function handlePlaceOrder() {
+        isPlacingOrder = true;
         dispatch("placeOrder");
     }
 
@@ -165,9 +169,9 @@
         <button
             class="place-order-btn"
             on:click={handlePlaceOrder}
-            disabled={isExiting}
+            disabled={isPlacingOrder}
         >
-            {#if isExiting}
+            {#if isPlacingOrder}
                 Placing Order...
             {:else}
                 Place Order
@@ -179,9 +183,11 @@
 <style>
     .checkout-summary {
         background: var(--background);
-        border-radius: var(--card-border-radius);
         width: 100%;
-        box-shadow: var(--shadow-subtle);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
     }
 
     .checkout-summary-header {
@@ -283,17 +289,6 @@
     .time-date {
         font-weight: var(--font-weight-semibold);
         margin-bottom: 4px;
-    }
-
-    .checkout-summary {
-        background: var(--background);
-        border-radius: var(--card-border-radius);
-        width: 100%;
-        box-shadow: var(--shadow-subtle);
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
     }
 
     .summary-content {

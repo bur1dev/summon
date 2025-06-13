@@ -4,7 +4,8 @@
     import { encodeHashToBase64 } from "@holochain/client";
     import type { AddressService } from "../../services/AddressService";
     import type { CartBusinessService } from "../../services/CartBusinessService";
-    import type { CheckoutDetails } from "../../services/CartBusinessService";
+    import type { CheckoutService } from "../../services/CheckoutService";
+    import type { CheckoutDetails } from "../../types/CartTypes";
     import AddressSelector from "../address/AddressSelector.svelte";
     import DeliveryTimeSelector from "../address/DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";
@@ -31,6 +32,10 @@
     // Get AddressService from context
     const addressService =
         getContext<Writable<AddressService | null>>("addressService");
+
+    // Get CheckoutService from context
+    const checkoutService =
+        getContext<Writable<CheckoutService | null>>("checkoutService");
 
     // State
     let currentStep = 1;
@@ -98,12 +103,12 @@
 
     // Initialize with saved data and delivery time slots
     onMount(async () => {
-        if (cartService) {
+        if ($checkoutService) {
             // Generate delivery time slots
-            deliveryTimeSlots = cartService.generateDeliveryTimeSlots();
+            deliveryTimeSlots = $checkoutService.generateDeliveryTimeSlots();
 
             // Load saved delivery details if available
-            const savedDetails = cartService.getSavedDeliveryDetails();
+            const savedDetails = $checkoutService.getSavedDeliveryDetails();
             console.log("Loaded saved delivery details:", savedDetails);
 
             if (savedDetails) {
@@ -122,21 +127,21 @@
     function handleAddressSelect({ detail }: { detail: any }) {
         checkoutDetails.addressHash = detail.addressHash;
         checkoutDetails.currentStep = currentStep;
-        cartService.setSavedDeliveryDetails(checkoutDetails);
+$checkoutService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Handle delivery instructions change
     function handleInstructionsChange({ detail }: { detail: any }) {
         checkoutDetails.deliveryInstructions = detail.instructions;
         checkoutDetails.currentStep = currentStep;
-        cartService.setSavedDeliveryDetails(checkoutDetails);
+$checkoutService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Handle delivery time selection
     function handleTimeSelect({ detail }: { detail: any }) {
         checkoutDetails.deliveryTime = detail.deliveryTime;
         checkoutDetails.currentStep = currentStep;
-        cartService.setSavedDeliveryDetails(checkoutDetails);
+$checkoutService.setSavedDeliveryDetails(checkoutDetails);
     }
 
     // Validate the current state before proceeding to the next step
@@ -179,7 +184,7 @@
 
             // Save the new step
             checkoutDetails.currentStep = currentStep;
-            cartService.setSavedDeliveryDetails(checkoutDetails);
+    $checkoutService.setSavedDeliveryDetails(checkoutDetails);
         }, AnimationService.getAnimationDuration("smooth"));
     }
 
@@ -201,7 +206,7 @@
 
             // Save the new step
             checkoutDetails.currentStep = currentStep;
-            cartService.setSavedDeliveryDetails(checkoutDetails);
+    $checkoutService.setSavedDeliveryDetails(checkoutDetails);
         }, AnimationService.getAnimationDuration("smooth"));
     }
 
@@ -209,7 +214,7 @@
     function handleBackToCart() {
         // Save current state before closing
         checkoutDetails.currentStep = currentStep;
-        cartService.setSavedDeliveryDetails(checkoutDetails);
+$checkoutService.setSavedDeliveryDetails(checkoutDetails);
 
         isEntering = false;
         isExiting = true;
@@ -244,7 +249,7 @@
         }
 
         // Start Holochain operation in background (don't block animations)
-        cartService
+$checkoutService
             .checkoutCart(checkoutDetails)
             .then((result) => {
                 if (result.success) {

@@ -12,7 +12,7 @@
 
   import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
   import SlideOutCart from "./cart/components/SlideOutCart.svelte";
-  import CheckedOutCarts from "./orders/components/CheckedOutCartsView.svelte";
+  import CheckedOutCarts from "./cart/orders/components/CheckedOutCartsView.svelte";
 
   // Import from UI-only store
   import { currentViewStore, isCartOpenStore } from "./stores/UiOnlyStore";

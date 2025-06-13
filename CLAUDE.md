@@ -55,7 +55,9 @@ cd tests && npm run test  # Vitest integration tests
 
 ### Frontend Services (Svelte + TypeScript)
 - `ShopStore`: Main product/category data store
-- `CartBusinessService`: Shopping cart operations  
+- `CartBusinessService`: Core cart state management and coordination
+- `CheckoutService`: Checkout flow and delivery time slot generation
+- `CheckedOutCartsService`: Order history and cart restoration
 - `AddressService`: Delivery address management
 - `PreferencesService`: Product preference management with direct Holochain access
 - `ProductDataService`: Product loading with caching
@@ -223,11 +225,11 @@ UI renders Beverages subcategory rows
 
   1. Service Layer (/services/) - The Engine Room
 
-  CartBusinessService.ts - Main Cart Engine 
-  - Purpose: Central cart state management and business logic
-  - Responsibilities: Cart CRUD, Holochain integration, checkout workflow
+  CartBusinessService.ts - Core Cart Engine 
+  - Purpose: Central cart state management and coordination
+  - Responsibilities: Cart CRUD, Holochain integration, cart calculations
   - Pattern: Reactive store with derived properties (itemCount, hasItems, cartTotal)
-  - Dependencies: Delegates to specialized services below
+  - Dependencies: Delegates to CartPersistenceService and CartCalculationService
 
   CartInteractionService.ts - UI Interaction Wrapper 
   - Purpose: Eliminates duplicated cart patterns across UI components
@@ -248,6 +250,16 @@ UI renders Beverages subcategory rows
   CartPersistenceService.ts - Data Persistence
   - Purpose: localStorage + Holochain synchronization with merge strategies
   - Pattern: Encapsulated async operations with debouncing
+
+  CheckoutService.ts - Checkout Workflow
+  - Purpose: Handles checkout process and delivery time slot generation
+  - Responsibilities: Cart checkout, delivery details management, time slot generation
+  - Dependencies: Uses CartBusinessService for cart clearing and persistence access
+
+  CheckedOutCartsService.ts - Order History Management
+  - Purpose: Manages checked-out cart operations and cart restoration
+  - Responsibilities: Load order history, process cart data enrichment, restore carts to active
+  - Dependencies: Uses CartBusinessService for cart restoration functionality
 
   BrowserNavigationService.ts - Navigation Authority 
   - Purpose: Single source of truth for all product browsing navigation
@@ -375,7 +387,7 @@ UI renders Beverages subcategory rows
 
   Service Access Patterns
 
-  1. Context-based: Components get CartBusinessService from Svelte context
+  1. Context-based: Components get CartBusinessService, CheckoutService, CheckedOutCartsService from Svelte context
   2. Prop-based: CheckoutSummary receives CartBusinessService as prop
   3. Static utilities: CartInteractionService, PriceService, and PreferencesService used as static classes
   4. Singleton services: BrowserNavigationService accessed via browserNavigationService import
@@ -402,6 +414,24 @@ UI renders Beverages subcategory rows
   PreferencesService (static methods)
       ↓ (direct Holochain calls)
   Holochain DHT (cart zome functions)
+
+  Checkout Operations:
+  UI Component (CheckoutFlow)
+      ↓ (context-based service access)
+  CheckoutService
+      ↓ (delegates to cart service)
+  CartBusinessService.clearCart()
+      ↓ (persists to)
+  localStorage + Holochain DHT
+
+  Order History Operations:
+  UI Component (CheckedOutCartsView)
+      ↓ (context-based service access)
+  CheckedOutCartsService
+      ↓ (delegates to cart service for restoration)
+  CartBusinessService.restoreCartItems()
+      ↓ (updates)
+  Cart state + localStorage + Holochain DHT
 
   Navigation Operations:
   UI Component (click/interaction)
@@ -627,3 +657,21 @@ await PreferencesService.deletePreference(preferenceHash, groupHash, productInde
 - ✅ **Maintains functionality** - Same reactive stores and UI patterns
 
 This refactoring exemplifies how proper service boundaries lead to cleaner, more maintainable architecture.
+
+### Cart Service Architecture Update 🎯
+**Refactored**: CartBusinessService split into focused services following Single Responsibility Principle
+
+**Service Structure**:
+- **CartBusinessService**: Core cart state management (~350 lines)
+- **CheckoutService**: Checkout workflow and delivery management (~150 lines)  
+- **CheckedOutCartsService**: Order history and cart restoration (~200 lines)
+- **CartInteractionService**: UI interaction patterns (static utility)
+- **CartPersistenceService**: Data persistence layer
+- **CartCalculationService**: Mathematical operations
+
+**Benefits Achieved**:
+- ✅ **SOLID Compliance**: Each service has single responsibility
+- ✅ **Zero Duplication**: Reuses existing `clearCart()` method instead of creating duplicates
+- ✅ **Clean Dependencies**: Services inject dependencies via constructor, no circular references
+- ✅ **Maintainable**: Smaller, focused files (~150-350 lines each)
+- ✅ **Type Safety**: Shared types in `/cart/types/CartTypes.ts`

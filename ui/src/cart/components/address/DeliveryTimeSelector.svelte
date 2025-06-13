@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
-    import type { DeliveryTimeSlot } from "../../services/CartBusinessService";
+    import type { DeliveryTimeSlot } from "../../types/CartTypes";
     import { ChevronLeft, ChevronRight } from "lucide-svelte";
     import { clickable } from "../../../shared/actions/clickable";
     import { AnimationService } from "../../../services/AnimationService";

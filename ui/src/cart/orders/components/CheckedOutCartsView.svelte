@@ -2,9 +2,10 @@
   import { getContext, onMount } from "svelte";
   import { ShoppingCart, ArrowLeft, MapPin, Clock, X } from "lucide-svelte";
   import type { Writable } from "svelte/store";
-  import { AddressService } from "../../cart/services/AddressService";
-  import { currentViewStore } from "../../stores/UiOnlyStore";
-  import type { ShopStore } from "../../store"; // Adjust path if store.ts is elsewhere
+  import { AddressService } from "../../services/AddressService";
+  import type { CheckedOutCartsService } from "../../services/CheckedOutCartsService";
+  import { currentViewStore } from "../../../stores/UiOnlyStore";
+  import type { ShopStore } from "../../../store"; // Adjust path if store.ts is elsewhere
 
   interface ControllerStoreContext {
     getStore: () => ShopStore;
@@ -13,8 +14,11 @@
   // Import agent-avatar component
   import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
 
-  // Get cart service directly from the context
+  // Get cart service directly from the context (kept for potential cart restoration)
   const cartService = getContext("cartService") as Writable<any>;
+
+  // Get checked out carts service from context
+  const checkedOutCartsService = getContext("checkedOutCartsService") as Writable<CheckedOutCartsService | null>;
 
   // Get the store for the client
   const storeContext = getContext<ControllerStoreContext>("store");
@@ -61,8 +65,8 @@
       isLoading = true;
       errorMessage = "";
 
-      // Use SimpleCartService's loadCheckedOutCarts method
-      const result = await $cartService.loadCheckedOutCarts();
+      // Use CheckedOutCartsService's loadCheckedOutCarts method
+      const result = await $checkedOutCartsService.loadCheckedOutCarts();
 
       if (result.success) {
         checkedOutCarts = result.data || [];
@@ -88,8 +92,8 @@
     try {
       console.log("Returning cart to shopping:", item.id);
 
-      // Use SimpleCartService's returnToShopping method
-      const result = await $cartService.returnToShopping(item.cartHash);
+      // Use CheckedOutCartsService's returnToShopping method
+      const result = await $checkedOutCartsService.returnToShopping(item.cartHash);
 
       if (result.success) {
         // Refresh the list of checked-out carts

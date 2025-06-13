@@ -8,6 +8,8 @@
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
   import { CartBusinessService } from "./cart/services/CartBusinessService";
+  import { CheckoutService } from "./cart/services/CheckoutService";
+  import { CheckedOutCartsService } from "./cart/services/CheckedOutCartsService";
   import { AddressService } from "./cart/services/AddressService";
   import { PreferencesService } from "./products/services/PreferencesService";
   import { setContext } from "svelte";
@@ -37,6 +39,14 @@
   // Start with a writable that we'll set once connected
   const cartService = writable<CartBusinessService | null>(null);
   setContext("cartService", cartService);
+
+  // Create a writable for the checkout service
+  const checkoutServiceStore = writable<CheckoutService | null>(null);
+  setContext("checkoutService", checkoutServiceStore);
+
+  // Create a writable for the checked out carts service
+  const checkedOutCartsServiceStore = writable<CheckedOutCartsService | null>(null);
+  setContext("checkedOutCartsService", checkedOutCartsServiceStore);
 
   // Create a writable for the address service
   const addressServiceStore = writable<AddressService | null>(null);
@@ -87,6 +97,23 @@
     const cartServiceInstance = new CartBusinessService(client);
     console.log("CartBusinessService created with client:", !!client);
     cartService.set(cartServiceInstance); // Set the instance into the cartService store
+
+    // Initialize the checkout service with dependencies
+    const checkoutServiceInstance = new CheckoutService(
+      client,
+      cartServiceInstance.getPersistenceService(),
+      cartServiceInstance
+    );
+    console.log("CheckoutService created with client:", !!client);
+    checkoutServiceStore.set(checkoutServiceInstance);
+
+    // Initialize the checked out carts service with dependencies
+    const checkedOutCartsServiceInstance = new CheckedOutCartsService(
+      client,
+      cartServiceInstance
+    );
+    console.log("CheckedOutCartsService created with client:", !!client);
+    checkedOutCartsServiceStore.set(checkedOutCartsServiceInstance);
 
     // Initialize the address service
     const addressServiceInstance = new AddressService(client);

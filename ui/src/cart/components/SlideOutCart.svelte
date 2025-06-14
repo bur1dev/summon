@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import type { Writable } from "svelte/store";
+  import { Frown } from "lucide-svelte";
   import type { CartBusinessService } from "../services/CartBusinessService";
   import type { ProductDataService } from "../../products/services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
@@ -341,7 +342,10 @@
               {#if isLoading}
                 <div class="loading">Loading cart items...</div>
               {:else if enrichedCartItems.length === 0}
-                <div class="empty-cart">Your cart is empty</div>
+                <div class="empty-cart">
+                  <Frown size={48} class="empty-cart-icon" />
+                  <span class="empty-cart-text">Your cart is empty</span>
+                </div>
               {:else}
                 {#each [...enrichedCartItems]
                   .filter((item) => item && item.groupHash && item.productDetails)
@@ -529,6 +533,20 @@
     text-align: center;
     color: var(--text-secondary);
     font-size: var(--font-size-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .empty-cart :global(.empty-cart-icon) {
+    color: var(--text-secondary);
+    opacity: 0.6;
+  }
+
+  .empty-cart-text {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
   }
 
   .loading {

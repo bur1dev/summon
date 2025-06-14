@@ -2,14 +2,9 @@
   import { getContext, onMount } from "svelte";
   import { ShoppingCart, ArrowLeft, MapPin, Clock, X } from "lucide-svelte";
   import type { Writable } from "svelte/store";
-  import { AddressService } from "../../services/AddressService";
+  import type { AddressService } from "../../services/AddressService";
   import type { CheckedOutCartsService } from "../../services/CheckedOutCartsService";
   import { currentViewStore } from "../../../stores/UiOnlyStore";
-  import type { ShopStore } from "../../../store"; // Adjust path if store.ts is elsewhere
-
-  interface ControllerStoreContext {
-    getStore: () => ShopStore;
-  }
 
   // Import agent-avatar component
   import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
@@ -20,15 +15,11 @@
   // Get checked out carts service from context
   const checkedOutCartsService = getContext("checkedOutCartsService") as Writable<CheckedOutCartsService | null>;
 
-  // Get the store for the client
-  const storeContext = getContext<ControllerStoreContext>("store");
-  const store = storeContext.getStore();
+  // Get address service from context (centralized)
+  const addressService = getContext("addressService") as Writable<AddressService | null>;
 
   // Get profiles store from context
   const profilesStore = getContext("profiles-store");
-
-  // Services
-  let addressService: AddressService;
 
   // State
   let isLoading = true;
@@ -39,19 +30,22 @@
 
   onMount(async () => {
     try {
-      // Initialize address service to fetch address details
-      if (store && store.client) {
-        addressService = new AddressService(store.client);
-
-        // Subscribe to addresses to populate cache
-        const unsubscribe = addressService
-          .getAddresses()
-          .subscribe((addresses) => {
-            addressCache = addresses;
-          });
+      // Subscribe to centralized address service
+      let unsubscribe: (() => void) | undefined;
+      if ($addressService) {
+        unsubscribe = $addressService.getAddresses().subscribe((addresses) => {
+          addressCache = addresses;
+        });
       }
 
       await loadCheckedOutCarts();
+
+      // Return cleanup function
+      return () => {
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      };
     } catch (error) {
       console.error("Error in onMount:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);

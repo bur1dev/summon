@@ -111,5 +111,21 @@ pub fn update_address_impl(action_hash: ActionHash, address: Address) -> ExternR
 }
 
 pub fn delete_address_impl(action_hash: ActionHash) -> ExternResult<ActionHash> {
-    delete_entry(action_hash)
+    let agent_pub_key = agent_info()?.agent_initial_pubkey;
+    
+    // Remove the link from agent to address (entries are immutable in Holochain)
+    let links = get_links(
+        GetLinksInputBuilder::try_new(agent_pub_key.clone(), LinkTypes::AgentToAddress)?.build(),
+    )?;
+    
+    for link in links {
+        if let Some(target_hash) = link.target.into_action_hash() {
+            if target_hash == action_hash {
+                delete_link(link.create_link_hash)?;
+                break;
+            }
+        }
+    }
+    
+    Ok(action_hash)
 }

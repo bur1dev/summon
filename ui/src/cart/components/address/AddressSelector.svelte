@@ -3,8 +3,9 @@
     import { type Address, type AddressService } from "../../services/AddressService";
     import type { Writable } from "svelte/store";
     import AddressForm from "./AddressForm.svelte";
-    import { MapPin, NotebookPen } from "lucide-svelte";
-    import { clickable } from "../../../shared/actions/clickable";
+    import AddressList from "./AddressList.svelte";
+    import DeleteConfirmationModal from "./DeleteConfirmationModal.svelte";
+    import { NotebookPen } from "lucide-svelte";
     import { AnimationService } from "../../../services/AnimationService";
 
     // Props
@@ -27,6 +28,9 @@
     
     // Address form animation state
     let isFormClosing = false;
+    
+    // Address removal animation state
+    let removingAddresses = new Set<string>();
 
     onMount(() => {
         if ($addressService) {
@@ -43,13 +47,11 @@
         }
     });
 
-    // Handle address selection
-    function selectAddress(addressHash: string) {
+    // Handle address selection from AddressList
+    function handleAddressSelect(event: CustomEvent) {
+        const { addressHash, address } = event.detail;
         selectedAddressHash = addressHash;
-        const address = addresses.get(addressHash);
-        if (address) {
-            dispatch("select", { addressHash, address });
-        }
+        dispatch("select", { addressHash, address });
     }
 
     // Add new address
@@ -77,7 +79,11 @@
 
             if (result.success && result.hash) {
                 // Select the new address
-                selectAddress(result.hash);
+                selectedAddressHash = result.hash;
+                const address = addresses.get(result.hash);
+                if (address) {
+                    dispatch("select", { addressHash: result.hash, address });
+                }
                 // Close form with animation
                 isFormClosing = true;
                 setTimeout(() => {
@@ -96,6 +102,15 @@
         isValidating = false;
     }
 
+    // Handle add new address from AddressList
+    function handleAddNew() {
+        isFormClosing = true;
+        setTimeout(() => {
+            showNewAddressForm = true;
+            isFormClosing = false;
+        }, AnimationService.getAnimationDuration('normal'));
+    }
+
     // Update delivery instructions
     function handleInstructionsChange() {
         dispatch("instructionsChange", { instructions: deliveryInstructions });
@@ -109,6 +124,74 @@
             isFormClosing = false;
             validationError = "";
         }, AnimationService.getAnimationDuration('normal'));
+    }
+
+    // Confirmation modal state
+    let showDeleteConfirmation = false;
+    let addressToDelete: Address | null = null;
+    let addressHashToDelete: string | null = null;
+    let isConfirmationClosing = false;
+    
+    // Handle delete request from AddressList
+    function handleAddressDelete(event: CustomEvent) {
+        const { addressHash, address } = event.detail;
+        addressToDelete = address;
+        addressHashToDelete = addressHash;
+        showDeleteConfirmation = true;
+    }
+
+    // Handle confirmation modal cancel
+    function handleDeleteCancel() {
+        isConfirmationClosing = true;
+        setTimeout(() => {
+            showDeleteConfirmation = false;
+            isConfirmationClosing = false;
+            addressToDelete = null;
+            addressHashToDelete = null;
+        }, AnimationService.getAnimationDuration('normal'));
+    }
+
+    // Handle confirmation modal confirm
+    async function handleDeleteConfirm() {
+        if (!addressToDelete || !addressHashToDelete || !$addressService) {
+            console.error("Address service not available or no address to delete");
+            return;
+        }
+
+        const addressHash = addressHashToDelete;
+
+        // Close confirmation modal first
+        handleDeleteCancel();
+
+        // Start removal animation
+        removingAddresses.add(addressHash);
+        removingAddresses = removingAddresses; // Trigger reactivity
+
+        // Find the address element for animation
+        const addressElement = document.querySelector(`[data-address-hash="${addressHash}"]`) as HTMLElement;
+        if (addressElement) {
+            await AnimationService.startItemRemoval(addressElement);
+        }
+
+        // Delete the address
+        const result = await $addressService.deleteAddress(addressHash);
+
+        if (result.success) {
+            // If deleted address was selected, clear selection
+            if (selectedAddressHash === addressHash) {
+                selectedAddressHash = null;
+                dispatch("select", { addressHash: null, address: null });
+            }
+        } else {
+            // On error, remove from removal set to restore UI
+            removingAddresses.delete(addressHash);
+            removingAddresses = removingAddresses;
+            console.error('Failed to delete address:', result.error);
+        }
+
+        // Clean up removal state
+        removingAddresses.delete(addressHash);
+        removingAddresses = removingAddresses;
     }
 </script>
 
@@ -135,135 +218,61 @@
             />
         </div>
     {:else}
-        <div class="addresses-container">
-            {#if addresses.size === 0}
-                <div class="no-addresses {isFormClosing ? 'slide-out-up' : 'slide-in-down'}">
-                    <p>You don't have any saved addresses.</p>
-                    <button
-                        class="add-address-btn"
-                        on:click={() => {
-                            isFormClosing = true;
-                            setTimeout(() => {
-                                showNewAddressForm = true;
-                                isFormClosing = false;
-                            }, AnimationService.getAnimationDuration('normal'));
-                        }}
-                    >
-                        Add New Address
-                    </button>
-                </div>
-            {:else}
-                <div class="address-list {isFormClosing ? 'slide-out-up' : 'slide-in-down'}">
-                    {#each [...addresses.entries()] as [hash, address]}
-                        <div
-                            class="address-card {selectedAddressHash === hash
-                                ? 'selected'
-                                : ''} {isEntering
-                                ? 'slide-in-left'
-                                : isExiting
-                                  ? 'slide-out-left'
-                                  : ''}"
-                            use:clickable={() => selectAddress(hash)}
-                        >
-                            <div class="address-icon">
-                                <MapPin size={18} />
-                            </div>
-                            <div class="address-card-content">
-                                <div class="address-label">
-                                    {address.label || "Address"}
-                                    {#if address.is_default}
-                                        <span class="default-badge"
-                                            >Default</span
-                                        >
-                                    {/if}
-                                </div>
-                                <div class="address-line">
-                                    {address.street}
-                                    {#if address.unit}
-                                        <span class="unit">{address.unit}</span>
-                                    {/if}
-                                </div>
-                                <div class="address-line">
-                                    {address.city}, {address.state}
-                                    {address.zip}
-                                </div>
-                            </div>
-                            <div class="address-card-selector">
-                                <div
-                                    class="radio-circle {selectedAddressHash ===
-                                    hash
-                                        ? 'checked'
-                                        : ''}"
-                                ></div>
-                            </div>
-                        </div>
-                    {/each}
+        <AddressList
+            {addresses}
+            {selectedAddressHash}
+            {removingAddresses}
+            {isEntering}
+            {isExiting}
+            {isFormClosing}
+            on:select={handleAddressSelect}
+            on:delete={handleAddressDelete}
+            on:addNew={handleAddNew}
+        />
 
-                    {#if addresses.size < 3}
-                        <button
-                            class="add-address-btn {isEntering
-                                ? 'slide-in-right'
-                                : isExiting
-                                  ? 'slide-out-right'
-                                  : ''}"
-                            on:click={() => {
-                                isFormClosing = true;
-                                setTimeout(() => {
-                                    showNewAddressForm = true;
-                                    isFormClosing = false;
-                                }, AnimationService.getAnimationDuration('normal'));
-                            }}
-                        >
-                            + Add New Address
-                        </button>
-                    {:else}
-                        <div class="address-limit-message {isEntering
-                            ? 'slide-in-right'
-                            : isExiting
-                              ? 'slide-out-right'
-                              : ''}">
-                            Maximum of 3 addresses allowed
-                        </div>
-                    {/if}
-                </div>
-
-                {#if selectedAddressHash}
-                    <div
-                        class="instructions-container {isEntering
-                            ? 'slide-in-left'
-                            : isExiting
-                              ? 'slide-out-left'
-                              : ''}"
-                    >
-                        <h3>Delivery Instructions</h3>
-                        <textarea
-                            bind:value={deliveryInstructions}
-                            on:change={handleInstructionsChange}
-                            placeholder="Add delivery instructions (optional)"
-                            rows="3"
-                        ></textarea>
-                        <div class="instructions-info">
-                            <div class="info-item">
-                                <span class="info-icon">
-                                    <NotebookPen size={16} />
-                                </span>
-                                Enter gate codes, building info, or where to leave
-                                the delivery
-                            </div>
-                        </div>
+        {#if selectedAddressHash}
+            <div
+                class="instructions-container {isEntering
+                    ? 'slide-in-left'
+                    : isExiting
+                      ? 'slide-out-left'
+                      : ''}"
+            >
+                <h3>Delivery Instructions</h3>
+                <textarea
+                    bind:value={deliveryInstructions}
+                    on:change={handleInstructionsChange}
+                    placeholder="Add delivery instructions (optional)"
+                    rows="3"
+                ></textarea>
+                <div class="instructions-info">
+                    <div class="info-item">
+                        <span class="info-icon">
+                            <NotebookPen size={16} />
+                        </span>
+                        Enter gate codes, building info, or where to leave
+                        the delivery
                     </div>
-                {/if}
-            {/if}
-        </div>
+                </div>
+            </div>
+        {/if}
     {/if}
 </div>
+
+<!-- Delete Confirmation Modal -->
+<DeleteConfirmationModal
+    isOpen={showDeleteConfirmation}
+    address={addressToDelete}
+    isClosing={isConfirmationClosing}
+    on:confirm={handleDeleteConfirm}
+    on:cancel={handleDeleteCancel}
+/>
 
 <style>
     .address-selector {
         background: var(--background);
         border-radius: var(--card-border-radius);
         width: 100%;
-        box-shadow: var(--shadow-subtle);
     }
 
     .address-selector-header {
@@ -296,167 +305,9 @@
         animation: slideOutUp var(--transition-normal) ease-in forwards;
     }
 
-    .addresses-container {
-        padding: var(--spacing-md);
-    }
-
-    .no-addresses {
-        text-align: center;
-        padding: var(--spacing-xxl) 0;
-    }
-
-    .no-addresses p {
-        margin-bottom: var(--spacing-lg);
-        color: var(--text-secondary);
-    }
-
-    .address-list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--spacing-sm);
-    }
-
-    .address-card {
-        display: flex;
-        align-items: center;
-        padding: var(--spacing-sm) var(--spacing-md);
-        border: var(--border-width-thin) solid var(--border);
-        border-radius: var(--btn-border-radius);
-        cursor: pointer;
-        transition: var(--btn-transition);
-        background: var(--background);
-    }
-
-    .address-card:hover {
-        transform: translateY(var(--hover-lift));
-        border-color: var(--primary);
-        box-shadow: var(--shadow-subtle);
-    }
-
-    .address-card.selected {
-        border-color: var(--primary);
-        background: linear-gradient(
-            135deg,
-            rgba(86, 98, 189, 0.1),
-            rgba(112, 70, 168, 0.1)
-        );
-        transform: translateY(var(--hover-lift));
-        box-shadow: var(--shadow-medium);
-    }
-
-    .address-icon {
-        margin-right: var(--spacing-sm);
-        color: var(--primary);
-    }
-
-    :global(.address-icon svg) {
-        color: var(--primary);
-        stroke: var(--primary);
-    }
-
-    .address-card-content {
-        flex: 1;
-    }
-
-    .address-label {
-        font-weight: var(--font-weight-semibold);
-        margin-bottom: 4px;
-        display: flex;
-        align-items: center;
-        color: var(--text-primary);
-    }
-
-    .default-badge {
-        background: linear-gradient(
-            135deg,
-            rgba(86, 98, 189, 0.2),
-            rgba(112, 70, 168, 0.2)
-        );
-        color: var(--primary);
-        font-size: var(--font-size-sm);
-        padding: 2px 6px;
-        border-radius: var(--btn-border-radius);
-        margin-left: var(--spacing-xs);
-        font-weight: var(--font-weight-semibold);
-    }
-
-    .address-line {
-        color: var(--text-secondary);
-        font-size: var(--font-size-sm);
-        line-height: 1.4;
-    }
-
-    .unit {
-        margin-left: 4px;
-    }
-
-    .address-card-selector {
-        margin-left: var(--spacing-md);
-    }
-
-    .radio-circle {
-        width: 20px;
-        height: 20px;
-        border: var(--border-width) solid var(--border);
-        border-radius: 50%;
-        position: relative;
-        transition: var(--btn-transition);
-    }
-
-    .radio-circle.checked {
-        border-color: var(--primary);
-    }
-
-    .radio-circle.checked::after {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
-    }
-
-    .add-address-btn {
-        display: block;
-        width: 100%;
-        height: var(--btn-height-md);
-        margin-top: var(--spacing-sm);
-        background-color: var(--surface);
-        border: var(--border-width-thin) dashed var(--primary);
-        border-radius: var(--btn-border-radius);
-        color: var(--primary);
-        font-weight: var(--font-weight-semibold);
-        cursor: pointer;
-        transition: var(--btn-transition);
-    }
-
-    .add-address-btn:hover {
-        background-color: rgba(86, 98, 189, 0.1);
-        transform: translateY(var(--hover-lift));
-        box-shadow: var(--shadow-subtle);
-    }
-
-    .address-limit-message {
-        display: block;
-        width: 100%;
-        height: var(--btn-height-md);
-        margin-top: var(--spacing-sm);
-        background-color: var(--surface);
-        border: var(--border-width-thin) solid var(--border);
-        border-radius: var(--btn-border-radius);
-        color: var(--text-secondary);
-        font-weight: var(--font-weight-semibold);
-        text-align: center;
-        line-height: var(--btn-height-md);
-        font-size: var(--font-size-sm);
-    }
-
     .instructions-container {
         margin-top: var(--spacing-xl);
-        padding-top: var(--spacing-md);
+        padding: var(--spacing-md) var(--spacing-md) 0;
         border-top: var(--border-width-thin) solid var(--border);
     }
 

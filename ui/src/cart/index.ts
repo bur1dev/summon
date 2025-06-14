@@ -16,4 +16,4 @@ export { default as CheckoutSummary } from './components/checkout/CheckoutSummar
 export { default as AddressForm } from './components/address/AddressForm.svelte';
 export { default as AddressSelector } from './components/address/AddressSelector.svelte';
 export { default as DeliveryTimeSelector } from './components/address/DeliveryTimeSelector.svelte';
-export { default as CheckedOutCartsView } from './orders/components/CheckedOutCartsView.svelte';
+export { default as OrdersView } from './orders/components/OrdersView.svelte';

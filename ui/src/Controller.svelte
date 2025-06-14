@@ -12,7 +12,7 @@
 
   import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
   import SlideOutCart from "./cart/components/SlideOutCart.svelte";
-  import CheckedOutCarts from "./cart/orders/components/CheckedOutCartsView.svelte";
+  import OrdersView from "./cart/orders/components/OrdersView.svelte";
 
   // Import from UI-only store
   import { currentViewStore, isCartOpenStore } from "./stores/UiOnlyStore";
@@ -130,7 +130,7 @@
         {:else}
           <!-- Checked Out Carts View gets its own full container without header -->
           <div class="global-scroll-container scroll-container full-height">
-            <CheckedOutCarts />
+            <OrdersView />
           </div>
         {/if}
       </div>

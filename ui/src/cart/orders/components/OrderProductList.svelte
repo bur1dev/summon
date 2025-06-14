@@ -1,0 +1,100 @@
+<script lang="ts">
+  // Props
+  export let products: any[] = [];
+</script>
+
+<div class="cart-items">
+  {#each products as product}
+    <div class="cart-product">
+      <div class="product-image">
+        {#if product.details?.image_url}
+          <img
+            src={product.details.image_url}
+            alt={product.details.name}
+          />
+        {/if}
+      </div>
+      <div class="product-details">
+        <div class="product-name">
+          {product.details?.name || "Unknown Product"}
+        </div>
+        <div class="product-size">
+          {product.details?.size || "Standard"}
+        </div>
+        <div class="product-quantity">
+          {product.quantity} × ${(
+            product.details?.price || 0
+          ).toFixed(2)}
+        </div>
+      </div>
+      <div class="product-price">
+        ${(
+          (product.details?.price || 0) * product.quantity
+        ).toFixed(2)}
+      </div>
+    </div>
+  {/each}
+</div>
+
+<style>
+  .cart-items {
+    padding: var(--spacing-md);
+    overflow-y: auto;
+    max-height: 300px;
+    flex: 1;
+  }
+
+  .cart-product {
+    display: flex;
+    padding: var(--spacing-sm) 0;
+    border-bottom: var(--border-width-thin) solid var(--border);
+    align-items: center;
+  }
+
+  .product-image {
+    width: 70px;
+    height: 70px;
+    margin-right: var(--spacing-md);
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: var(--card-border-radius);
+  }
+
+  .product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: top;
+  }
+
+  .product-details {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .product-name {
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: 4px;
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+  }
+
+  .product-size {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin-bottom: 2px;
+  }
+
+  .product-quantity {
+    font-size: var(--font-size-sm);
+    color: var(--primary);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .product-price {
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-md);
+    margin-left: var(--spacing-sm);
+    color: var(--text-primary);
+  }
+</style>

@@ -60,8 +60,9 @@
         box-shadow: var(--shadow-medium);
     }
 
-    :global(.close-btn svg) {
+    .close-btn :global(svg) {
         color: var(--button-text);
         stroke: var(--button-text);
+        fill: currentColor;
     }
 </style>

@@ -181,6 +181,14 @@
                 $reportedProductStore = event.detail;
                 $showReportDialogStore = true;
               }}
+              on:productTypeSelect={async (event) => {
+                const { productType, category, subcategory } = event.detail;
+                await browserNavigationService.navigateToProductType(
+                  productType,
+                  category,
+                  subcategory
+                );
+              }}
             />
           {:else}
             <ProductBrowserData

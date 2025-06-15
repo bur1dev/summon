@@ -17,16 +17,13 @@
     searchResultsStore,
     isViewAllStore,
     showMenuStore,
+    searchMethodStore,
   } from "../../stores/UiOnlyStore";
 
-  // Import from data trigger store
-  import {
-    searchModeStore,
-    searchQueryStore,
-  } from "../../stores/DataTriggerStore";
+  // Note: searchMode and searchQuery now come from DataManager navigationState
 
-  // Import helper functions
-  import { setSearchState } from "../utils/UiStateHelpers";
+  // Import navigation service
+  import { browserNavigationService } from "../../services/BrowserNavigationService";
   // Get the store for UI props
   const { getStore } = getContext<StoreContext>("store");
   const store = getStore();
@@ -136,26 +133,28 @@
     <div class="search-container">
       <SearchBar
         {store}
-        on:select={({ detail }) =>
-          setSearchState({
-            searchMode: true,
-            searchQuery: detail.originalQuery,
-            productName: detail.productName,
-            selectedProductHash: detail.hash,
-            searchResults: detail.fuseResults || [],
-            isViewAll: false,
-            searchMethod: "product_selection",
-          })}
-        on:viewAll={({ detail }) =>
-          setSearchState({
-            searchMode: true,
-            searchQuery: detail.query,
-            searchResults: detail.fuseResults || [],
-            isViewAll: detail.isViewAll || false,
-            selectedProductHash: null,
-            productName: "",
-            searchMethod: detail.searchMethod || "",
-          })}
+        on:select={async ({ detail }) => {
+          // Use BrowserNavigationService for navigation state
+          await browserNavigationService.enterSearchMode(detail.originalQuery);
+          
+          // Set UI-only search result data
+          $productNameStore = detail.productName;
+          $selectedProductHashStore = detail.hash;
+          $searchResultsStore = detail.fuseResults || [];
+          $isViewAllStore = false;
+          $searchMethodStore = "product_selection";
+        }}
+        on:viewAll={async ({ detail }) => {
+          // Use BrowserNavigationService for navigation state
+          await browserNavigationService.enterSearchMode(detail.query);
+          
+          // Set UI-only search result data
+          $searchResultsStore = detail.fuseResults || [];
+          $isViewAllStore = detail.isViewAll || false;
+          $selectedProductHashStore = null;
+          $productNameStore = "";
+          $searchMethodStore = detail.searchMethod || "";
+        }}
       />
     </div>
   </div>

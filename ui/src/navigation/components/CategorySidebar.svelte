@@ -1,11 +1,13 @@
 <script lang="ts">
   import { mainCategories } from "../../products/utils/categoryData";
 
-  // Import from data trigger store - all these control data loading
-  import {
-    selectedCategoryStore,
-    selectedSubcategoryStore,
-  } from "../../stores/DataTriggerStore";
+  // Import DataManager for navigation state
+  import { getContext } from "svelte";
+  import type { DataManager } from "../../services/DataManager";
+  
+  // Get DataManager from context and destructure navigationState
+  const dataManager = getContext<DataManager>("dataManager");
+  const { navigationState } = dataManager;
   
   // Import the BrowserNavigationService
   import { browserNavigationService } from "../../services/BrowserNavigationService";
@@ -24,11 +26,9 @@
   let sidebarElement: HTMLElement;
   let headerElement: HTMLElement;
 
-  // Subscribe to the stores to keep local variables in sync
-  // These lines are fine if you need local copies for some reason,
-  // but often you can use $selectedCategoryStore directly in the template or logic.
-  $: selectedCategory = $selectedCategoryStore;
-  $: selectedSubcategory = $selectedSubcategoryStore;
+  // Get current navigation state values
+  $: selectedCategory = $navigationState.category;
+  $: selectedSubcategory = $navigationState.subcategory;
 
   async function selectCategory(category: string) {
     currentPage = 0;
@@ -77,7 +77,7 @@
     currentPage = 0;
     
     // Use BrowserNavigationService for navigation
-    const currentCategory = $selectedCategoryStore;
+    const currentCategory = $navigationState.category;
     if (currentCategory) {
       await browserNavigationService.navigateToSubcategory(currentCategory, subcategory);
     }

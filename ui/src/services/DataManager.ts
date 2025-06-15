@@ -1,10 +1,23 @@
 import type { ProductDataService, NavigationParams, NavigationResult } from '../products/services/ProductDataService';
+import { writable, type Readable } from 'svelte/store';
 
 /**
  * Centralized Data Manager - Single gateway for all data operations
  * Step 2: This class becomes the exclusive interface for data fetching,
  * preventing scattered productDataService calls throughout components
  */
+
+interface NavigationState {
+    category: string | null;
+    subcategory: string | null;
+    productType: string;
+    isHomeView: boolean;
+    searchMode: boolean;
+    searchQuery: string;
+    sortBy: string;
+    selectedBrands: Set<string>;
+    selectedOrganic: "all" | "organic" | "non-organic";
+}
 
 /**
  * DataManager acts as a performance boundary between reactive Svelte components
@@ -17,9 +30,42 @@ import type { ProductDataService, NavigationParams, NavigationResult } from '../
  */
 export class DataManager {
     private productDataService: ProductDataService;
+    private readonly _navigationStore = writable<NavigationState>({
+        category: null,
+        subcategory: null,
+        productType: 'All',
+        isHomeView: true,
+        searchMode: false,
+        searchQuery: '',
+        sortBy: 'best',
+        selectedBrands: new Set(),
+        selectedOrganic: 'all'
+    });
+    public readonly navigationState: Readable<NavigationState> = this._navigationStore;
 
     constructor(productDataService: ProductDataService) {
         this.productDataService = productDataService;
+    }
+
+    // === NAVIGATION STATE METHODS (for BrowserNavigationService) ===
+    updateNavigationState(updates: Partial<NavigationState>): void {
+        this._navigationStore.update(current => ({
+            ...current,
+            ...updates
+        }));
+    }
+
+    // === FILTER STATE METHODS ===
+    public setSortBy(sortBy: string): void {
+        this._navigationStore.update(state => ({ ...state, sortBy }));
+    }
+
+    public setSelectedBrands(brands: Set<string>): void {
+        this._navigationStore.update(state => ({ ...state, selectedBrands: new Set(brands) }));
+    }
+
+    public setSelectedOrganic(organic: "all" | "organic" | "non-organic"): void {
+        this._navigationStore.update(state => ({ ...state, selectedOrganic: organic }));
     }
 
     // === PRODUCT REFERENCE METHODS ===

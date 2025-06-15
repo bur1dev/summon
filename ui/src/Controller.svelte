@@ -19,6 +19,7 @@
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
   import type { CartBusinessService } from "./cart/services/CartBusinessService";
+  import { browserNavigationService } from "./services/BrowserNavigationService";
 
   export let roleName = "";
   export let client: AppClient;
@@ -76,6 +77,9 @@
 
   onMount(() => {
     store.setUIprops({ showMenu: false });
+
+    // Initialize BrowserNavigationService with DataManager
+    browserNavigationService.setDataManager(dataManager);
 
     // Inject DataManager into cart service
     if ($cartService && dataManager) {

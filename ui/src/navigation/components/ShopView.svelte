@@ -20,15 +20,12 @@
     featuredSubcategories,
   } from "../../stores/UiOnlyStore";
 
-  // Import from data trigger store
-  import {
-    searchModeStore,
-    searchQueryStore,
-    selectedCategoryStore,
-    selectedSubcategoryStore,
-    selectedProductTypeStore,
-    isHomeViewStore,
-  } from "../../stores/DataTriggerStore";
+  // Import from data trigger store (keeping sort/filter stores for now)
+  // Note: searchMode and searchQuery now come from DataManager navigationState
+  
+  // Get DataManager from context and destructure navigationState
+  const dataManager = getContext<DataManager>("dataManager");
+  const { navigationState } = dataManager;
 
   // UPDATED: Import category utilities
   import {
@@ -42,8 +39,6 @@
   const storeContext = getContext<StoreContext>("store");
   let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
 
-  // STEP 2: Get DataManager from context instead of ProductDataService
-  const dataManager = getContext<DataManager>("dataManager");
 
   export function selectCategory(category: any, subcategory: any) {
     handleCategorySelect({ detail: { category, subcategory } });
@@ -57,9 +52,7 @@
   $: {
     if (uiProps && $uiProps) {
       const props = $uiProps as any;
-      if (props.searchMode !== undefined) $searchModeStore = props.searchMode;
-      if (props.searchQuery !== undefined)
-        $searchQueryStore = props.searchQuery;
+      // Note: searchMode and searchQuery now managed by DataManager navigationState
       if (props.selectedProductHash !== undefined)
         $selectedProductHashStore = props.selectedProductHash;
       if (props.productName !== undefined)
@@ -120,14 +113,14 @@
 
   // UPDATED: Use centralized function for product type navigation visibility
   $: showProductTypeNavigation = shouldShowProductTypeNav(
-    $selectedCategoryStore || "",
-    $selectedSubcategoryStore || "",
+    $navigationState.category || "",
+    $navigationState.subcategory || "",
   );
 
   // UPDATED: Use centralized function for filtered product types
   $: filteredProductTypes = getFilteredProductTypes(
-    $selectedCategoryStore || "",
-    $selectedSubcategoryStore || "",
+    $navigationState.category || "",
+    $navigationState.subcategory || "",
   );
 </script>
 
@@ -135,13 +128,13 @@
   <div class="main-content">
     {#if store && dataManager}
       <div class="content-wrapper">
-        {#if !$searchModeStore}
-          {#if !$isHomeViewStore && $selectedCategoryStore && $selectedSubcategoryStore}
+        {#if !$navigationState.searchMode}
+          {#if !$navigationState.isHomeView && $navigationState.category && $navigationState.subcategory}
             {#if showProductTypeNavigation}
               <div class="product-type-nav">
                 <div class="product-type-container">
                   <button
-                    class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
+                    class="product-type-btn btn btn-toggle {$navigationState.productType ===
                     'All'
                       ? 'active'
                       : ''}"
@@ -152,7 +145,7 @@
                   </button>
                   {#each filteredProductTypes as productType}
                     <button
-                      class="product-type-btn btn btn-toggle {$selectedProductTypeStore ===
+                      class="product-type-btn btn btn-toggle {$navigationState.productType ===
                       productType
                         ? 'active'
                         : ''}"
@@ -169,10 +162,10 @@
         {/if}
 
         <div class="product-sections">
-          {#if $searchModeStore}
+          {#if $navigationState.searchMode}
             <SearchResults
               {store}
-              query={$searchQueryStore}
+              query={$navigationState.searchQuery}
               selectedProductHash={$selectedProductHashStore}
               productName={$productNameStore}
               searchResults={$searchResultsStore}

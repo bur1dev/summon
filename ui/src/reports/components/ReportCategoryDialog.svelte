@@ -2,10 +2,15 @@
     import { createEventDispatcher, onMount, onDestroy } from "svelte";
     import { mainCategories } from "../../products/utils/categoryData";
     import { X } from "lucide-svelte";
-    import { lastCategorySelection } from "../../stores/categorySelectionStore";
+    import { getContext } from "svelte";
+    import type { DataManager } from "../../services/DataManager";
     import { clickable } from "../../shared/actions/clickable";
 
     const dispatch = createEventDispatcher();
+    
+    // Get DataManager from context for navigation state
+    const dataManager = getContext<DataManager>("dataManager");
+    const { navigationState } = dataManager;
 
     export let product: any;
     export let isOpen: boolean = false;
@@ -13,7 +18,7 @@
     let selectedCategory: string | null = null;
     let selectedSubcategory: string | null = null;
     let selectedProductType: string | null = null;
-    let unsubscribeStore: (() => void) | null = null;
+    let unsubscribeNavigation: (() => void) | null = null;
     let notes: string = "";
     let reportType: string = "suggestion"; // Default to suggestion type (can be "suggestion" or "incorrect")
     let isClosing: boolean = false; // Animation state for smooth closing
@@ -75,14 +80,14 @@
             }
         }
 
-        // Get values from store when component mounts
-        unsubscribeStore = lastCategorySelection.subscribe((values: any) => {
-            if (values.category) {
-                selectedCategory = values.category;
-                selectedSubcategory = values.subcategory;
-                selectedProductType = values.productType;
+        // Get values from navigation state when component mounts
+        unsubscribeNavigation = navigationState.subscribe((navState: any) => {
+            if (navState.category) {
+                selectedCategory = navState.category;
+                selectedSubcategory = navState.subcategory;
+                selectedProductType = navState.productType;
             } else {
-                // Fall back to product's category if no stored values
+                // Fall back to product's category if no navigation state
                 if (product) {
                     // Ensure product exists
                     selectedCategory = product.category;
@@ -98,8 +103,8 @@
         });
 
         return () => {
-            // Clean up store subscription
-            if (unsubscribeStore) unsubscribeStore();
+            // Clean up navigation subscription
+            if (unsubscribeNavigation) unsubscribeNavigation();
             if (isOpen) {
                 // Ensure overflow is reset if dialog was open
                 document.body.style.overflow = "";
@@ -108,12 +113,8 @@
     });
 
     function handleSubmit() {
-        // Update the store with current selection
-        lastCategorySelection.set({
-            category: selectedCategory,
-            subcategory: selectedSubcategory,
-            productType: selectedProductType || selectedSubcategory,
-        });
+        // Note: We no longer update a store since navigation state is read-only
+        // The current category selection is now handled by the navigation service
 
         // Create a defensive copy of the product prop to ensure we don't modify the original
         // and to explicitly check for productId.
@@ -296,8 +297,8 @@
         if (typeof document !== "undefined") {
             document.body.style.overflow = "";
         }
-        if (unsubscribeStore) {
-            unsubscribeStore();
+        if (unsubscribeNavigation) {
+            unsubscribeNavigation();
         }
     });
 </script>

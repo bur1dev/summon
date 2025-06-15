@@ -263,12 +263,12 @@ UI renders Beverages subcategory rows
   - Dependencies: Uses CartBusinessService for cart restoration functionality
 
   BrowserNavigationService.ts - Navigation Authority 
-  - Purpose: Single source of truth for all product browsing navigation
-  - Pattern: Singleton service with atomic store operations and ultra-simple race condition prevention
+  - Purpose: Single action interface for all product browsing navigation
+  - Pattern: Singleton service that delegates to DataManager for state updates
   - Key Methods: navigateToHome(), navigateToCategory(), navigateToSubcategory(), navigateToProductType(), navigateViewMore()
-  - Race Protection: Navigation ID pattern - only 3 lines instead of complex blocking logic
+  - State Integration: Calls DataManager.updateNavigationState() with atomic updates including filter resets
   - Coverage: Used by CategorySidebar, ShopView, ProductRow, and all navigation components
-  - Architecture: Direct store updates with instant responsiveness and navigation cancellation
+  - Architecture: Clean delegation pattern - navigation actions → DataManager state updates
 
   PreferencesService.ts - Product Preferences Authority
   - Purpose: Centralized product preference management for "Remember my preferences" functionality
@@ -279,12 +279,13 @@ UI renders Beverages subcategory rows
   - Coverage: Used by ProductDetailModal, PreferencesSection
   - Benefits: Eliminates 140+ lines of duplicated preference logic and removes circular dependencies
 
-  DataManager.ts - Business Logic Gateway
-  - Purpose: Single interface for all data operations and business logic
-  - Pattern: Centralized service layer with performance optimization boundary
-  - Key Methods: getSortedFilteredProducts(), getProductByReference(), loadSubcategoryProducts()
-  - Integration: Wraps ProductDataService, used by AllProductsGrid and CartCalculationService
-  - Benefits: Prevents scattered productDataService calls, centralizes sorting/filtering logic
+  DataManager.ts - Centralized State & Business Logic Authority ⭐
+  - Purpose: Single source of truth for ALL navigation and filter state + business logic gateway
+  - Pattern: Centralized NavigationState store with reactive read access + performance optimization boundary
+  - State Management: category, subcategory, productType, isHomeView, searchMode, searchQuery, sortBy, selectedBrands, selectedOrganic
+  - Key Methods: updateNavigationState(), setSortBy(), setSelectedBrands(), setSelectedOrganic(), getSortedFilteredProducts()
+  - Integration: Used by BrowserNavigationService (writes), AllProductsGrid + Components (reads), wraps ProductDataService
+  - Benefits: Eliminates DataTriggerStore.ts, provides atomic state updates, prevents scattered state management
 
   2. Utility Layer (/utils/) - Smart Helpers
 
@@ -293,9 +294,6 @@ UI renders Beverages subcategory rows
   - Functions: getIncrementValue(), getDisplayUnit(), isSoldByWeight(), parseProductHash()
   - Impact: 60+ lines of hash parsing → 1 function call
 
-  UiStateHelpers.ts - State Coordination
-  - Purpose: Safe coordination between UI-only and data-trigger stores
-  - Pattern: Explicit function calls (not reactive cascades)
 
   categoryUtils.ts - Category Logic
   - Purpose: Category navigation and filtering logic
@@ -703,7 +701,7 @@ $: sortedFilteredProducts = (() => {
 })();
 
 // After: Simple service call (1 line)
-$: sortedFilteredProducts = dataManager.getSortedFilteredProducts(products, $sortByStore, $selectedBrandsStore, $selectedOrganicStore);
+$: sortedFilteredProducts = dataManager.getSortedFilteredProducts(products, $navigationState.sortBy, $navigationState.selectedBrands, $navigationState.selectedOrganic);
 ```
 
 **Benefits Achieved**:
@@ -712,3 +710,53 @@ $: sortedFilteredProducts = dataManager.getSortedFilteredProducts(products, $sor
 - ✅ **Testable Logic**: Business rules separated from UI reactivity
 - ✅ **Performance Boundary**: Prevents reactive cascades during scroll events
 - ✅ **SOLID Compliance**: Clear interfaces and dependency injection
+
+### Complete State Consolidation 🎯
+**Achievement**: Eliminated DataTriggerStore.ts and consolidated ALL data-related state into DataManager
+**Problem Solved**: Scattered state management across multiple store files created complexity and potential race conditions
+
+**Before**: Multiple separate stores
+```typescript
+// DataTriggerStore.ts
+export const sortByStore = writable<string>('best');
+export const selectedBrandsStore = writable<Set<string>>(new Set());
+export const selectedOrganicStore = writable<"all" | "organic" | "non-organic">("all");
+
+// Plus navigation state in other stores...
+```
+
+**After**: Single centralized NavigationState in DataManager
+```typescript
+interface NavigationState {
+    category: string | null;
+    subcategory: string | null;
+    productType: string;
+    isHomeView: boolean;
+    searchMode: boolean;
+    searchQuery: string;
+    sortBy: string;                              // ← Moved from DataTriggerStore
+    selectedBrands: Set<string>;                 // ← Moved from DataTriggerStore  
+    selectedOrganic: "all" | "organic" | "non-organic"; // ← Moved from DataTriggerStore
+}
+```
+
+**Architecture Pattern**:
+- **DataManager**: Single source of truth for ALL data-related state
+- **BrowserNavigationService**: Action layer that calls DataManager.updateNavigationState()
+- **Components**: Read from DataManager.navigationState, call DataManager filter methods
+- **Atomic Updates**: Navigation changes include filter resets in single operation
+
+**Files Affected**:
+- ✅ **Deleted**: `DataTriggerStore.ts`, `UiStateHelpers.ts`, `categorySelectionStore.ts`
+- ✅ **Enhanced**: `DataManager.ts` with filter state and setter methods
+- ✅ **Updated**: `BrowserNavigationService.ts` to use DataManager delegation pattern
+- ✅ **Simplified**: `AllProductsGrid.svelte` with direct DataManager integration
+- ✅ **Unified**: All components now use single navigation state source
+
+**Benefits Achieved**:
+- ✅ **Single Source of Truth**: DataManager is now the ONLY source for all data-related state
+- ✅ **Atomic State Updates**: Filter resets happen atomically with navigation changes
+- ✅ **Zero Race Conditions**: Eliminated potential conflicts between separate stores
+- ✅ **Simplified Architecture**: Clear delegation pattern - Actions → DataManager → Components
+- ✅ **Maintainable Code**: One place to understand and modify all data state
+- ✅ **Clean Dependencies**: No more scattered store imports across components

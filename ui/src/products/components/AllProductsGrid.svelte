@@ -1,17 +1,10 @@
 <script lang="ts">
     import { getContext, onMount, onDestroy } from "svelte";
-    import type { StoreContext } from "../../store";
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import SortFilterDropdown from "../../shared/components/SortFilterDropdown.svelte";
     import type { DataManager } from "../../services/DataManager";
 
-    // Import from data trigger store (these control filtering/sorting)
-    import {
-        sortByStore,
-        selectedBrandsStore,
-        selectedOrganicStore,
-    } from "../../stores/DataTriggerStore";
 
     import { shouldShowSortControls } from "../utils/categoryUtils";
     import { useResizeObserver } from "../../shared/utils/useResizeObserver";
@@ -22,8 +15,8 @@
     export let selectedProductType: string | null = null;
     export let products: any[] = [];
 
-    const { getStore } = getContext<StoreContext>("store");
     const dataManager = getContext<DataManager>("dataManager");
+    const { navigationState } = dataManager;
     const dispatch = createEventDispatcher();
 
     let productsGridRef: HTMLElement;
@@ -56,20 +49,20 @@
 
     // Track previous sort/filter state to detect order changes
     let previousSortState = {
-        sortBy: $sortByStore,
-        brands: new Set($selectedBrandsStore),
-        organic: $selectedOrganicStore,
+        sortBy: $navigationState.sortBy,
+        brands: new Set($navigationState.selectedBrands),
+        organic: $navigationState.selectedOrganic,
     };
 
     // Apply sorting and filtering to products using DataManager
     $: sortedFilteredProducts = (() => {
-        const filtered = dataManager.getSortedFilteredProducts(products, $sortByStore, $selectedBrandsStore, $selectedOrganicStore);
+        const filtered = dataManager.getSortedFilteredProducts(products, $navigationState.sortBy, $navigationState.selectedBrands, $navigationState.selectedOrganic);
 
         // Detect if array order changed (not just data changes)
         const currentSortState = {
-            sortBy: $sortByStore,
-            brands: new Set($selectedBrandsStore),
-            organic: $selectedOrganicStore,
+            sortBy: $navigationState.sortBy,
+            brands: new Set($navigationState.selectedBrands),
+            organic: $navigationState.selectedOrganic,
         };
 
         const orderChanged =
@@ -139,17 +132,17 @@
 
     // Event handlers for dropdowns
     function handleSortChange(event: CustomEvent<any>) {
-        sortByStore.set(event.detail);
+        dataManager.setSortBy(event.detail);
         sortDropdownOpen = false;
     }
 
     function handleBrandsChange(event: CustomEvent<any>) {
-        selectedBrandsStore.set(event.detail);
+        dataManager.setSelectedBrands(event.detail);
         brandsDropdownOpen = false;
     }
 
     function handleOrganicChange(event: CustomEvent<any>) {
-        selectedOrganicStore.set(event.detail);
+        dataManager.setSelectedOrganic(event.detail);
         organicDropdownOpen = false;
     }
 
@@ -213,14 +206,14 @@
                 <div class="sort-filter-controls">
                     <SortFilterDropdown
                         type="sort"
-                        currentSort={$sortByStore}
+                        currentSort={$navigationState.sortBy}
                         bind:isOpen={sortDropdownOpen}
                         on:sortChange={handleSortChange}
                         on:open={handleSortOpen}
                     />
                     <SortFilterDropdown
                         type="brands"
-                        selectedBrands={$selectedBrandsStore}
+                        selectedBrands={$navigationState.selectedBrands}
                         {availableBrands}
                         bind:isOpen={brandsDropdownOpen}
                         on:brandsChange={handleBrandsChange}
@@ -228,7 +221,7 @@
                     />
                     <SortFilterDropdown
                         type="organic"
-                        selectedOrganic={$selectedOrganicStore}
+                        selectedOrganic={$navigationState.selectedOrganic}
                         bind:isOpen={organicDropdownOpen}
                         on:organicChange={handleOrganicChange}
                         on:open={handleOrganicOpen}

@@ -11,20 +11,14 @@
         getAllSubcategories,
     } from "../utils/categoryUtils";
 
-    // Import stores for direct reactive subscriptions
-    import {
-        selectedCategoryStore,
-        selectedSubcategoryStore,
-        selectedProductTypeStore,
-        isHomeViewStore,
-        searchModeStore,
-    } from "../../stores/DataTriggerStore";
-
     // Import the BrowserNavigationService
     import { browserNavigationService } from "../../services/BrowserNavigationService";
 
     // Required props
     export let dataManager: DataManager;
+    
+    // Get navigation state from DataManager (after dataManager is declared)
+    const { navigationState } = dataManager;
     export let featuredSubcategories: Array<{
         category: string;
         subcategory: string | null;
@@ -83,16 +77,10 @@
 
     export const action = resizeObserver.action;
 
-    // Reactive navigation handling - respond to store changes
-    $: navigationState = {
-        category: $selectedCategoryStore,
-        subcategory: $selectedSubcategoryStore,
-        productType: $selectedProductTypeStore,
-        isHomeView: $isHomeViewStore,
-        searchMode: $searchModeStore,
-    };
+    // Reactive navigation handling - respond to navigation state changes
+    $: navigationStateValue = $navigationState;
 
-    $: handleNavigationChange(navigationState);
+    $: handleNavigationChange(navigationStateValue);
 
     // Initialize home view when component is mounted and ready
     onMount(async () => {
@@ -106,7 +94,7 @@
     });
 
     // Handle navigation state changes with debouncing
-    function handleNavigationChange(newState: typeof navigationState) {
+    function handleNavigationChange(newState: typeof navigationStateValue) {
         // Fast navigation state comparison using key concatenation
         const newStateKey = `${newState.category}|${newState.subcategory}|${newState.productType}|${newState.isHomeView}|${newState.searchMode}`;
         const currentStateKey = `${currentNavigationState.category}|${currentNavigationState.subcategory}|${currentNavigationState.productType}|${currentNavigationState.isHomeView}|${currentNavigationState.searchMode}`;

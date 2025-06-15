@@ -1,19 +1,16 @@
-import {
-    selectedCategoryStore,
-    selectedSubcategoryStore,
-    selectedProductTypeStore,
-    isHomeViewStore,
-    sortByStore,
-    selectedBrandsStore,
-    selectedOrganicStore,
-    searchModeStore
-} from '../stores/DataTriggerStore';
+import type { DataManager } from './DataManager';
 
 export class BrowserNavigationService {
     private static instance: BrowserNavigationService | null = null;
     private navigationCompleteCallbacks: (() => void)[] = [];
+    private dataManager: DataManager | null = null;
 
     private constructor() {}
+
+    // Set the DataManager instance (called during app initialization)
+    setDataManager(dataManager: DataManager): void {
+        this.dataManager = dataManager;
+    }
 
     static getInstance(): BrowserNavigationService {
         if (!BrowserNavigationService.instance) {
@@ -26,17 +23,25 @@ export class BrowserNavigationService {
     async navigateToHome(): Promise<void> {
         console.log('BrowserNavigationService: Navigating to home view');
 
-        // Reset sort and filter state
-        sortByStore.set("best");
-        selectedBrandsStore.set(new Set());
-        selectedOrganicStore.set("all");
+        if (!this.dataManager) {
+            console.error('BrowserNavigationService: DataManager not set. Call setDataManager() first.');
+            return;
+        }
 
-        // Update navigation stores atomically
-        selectedCategoryStore.set(null);
-        selectedSubcategoryStore.set(null);
-        selectedProductTypeStore.set('All');
-        isHomeViewStore.set(true);
-        searchModeStore.set(false);
+        // Exit search mode first
+        await this.exitSearchMode();
+
+        // Update navigation state through DataManager (including filter reset)
+        this.dataManager.updateNavigationState({
+            category: null,
+            subcategory: null,
+            productType: 'All',
+            isHomeView: true,
+            searchMode: false,
+            sortBy: 'best',
+            selectedBrands: new Set(),
+            selectedOrganic: 'all'
+        });
 
         // Scroll to top
         this.scrollToTop();
@@ -48,23 +53,31 @@ export class BrowserNavigationService {
     async navigateToCategory(category: string): Promise<void> {
         console.log(`BrowserNavigationService: Navigating to category: ${category}`);
 
+        if (!this.dataManager) {
+            console.error('BrowserNavigationService: DataManager not set. Call setDataManager() first.');
+            return;
+        }
+
         // Validate category
         if (!category || typeof category !== 'string') {
             console.error('BrowserNavigationService: Invalid category provided');
             return;
         }
 
-        // Reset sort and filter state
-        sortByStore.set("best");
-        selectedBrandsStore.set(new Set());
-        selectedOrganicStore.set("all");
+        // Exit search mode first
+        await this.exitSearchMode();
 
-        // Update navigation stores atomically
-        selectedCategoryStore.set(category);
-        selectedSubcategoryStore.set(null);
-        selectedProductTypeStore.set('All');
-        isHomeViewStore.set(false);
-        searchModeStore.set(false);
+        // Update navigation state through DataManager (including filter reset)
+        this.dataManager.updateNavigationState({
+            category: category,
+            subcategory: null,
+            productType: 'All',
+            isHomeView: false,
+            searchMode: false,
+            sortBy: 'best',
+            selectedBrands: new Set(),
+            selectedOrganic: 'all'
+        });
 
         // Scroll to top
         this.scrollToTop();
@@ -76,23 +89,31 @@ export class BrowserNavigationService {
     async navigateToSubcategory(category: string, subcategory: string): Promise<void> {
         console.log(`BrowserNavigationService: Navigating to subcategory: ${category} > ${subcategory}`);
 
+        if (!this.dataManager) {
+            console.error('BrowserNavigationService: DataManager not set. Call setDataManager() first.');
+            return;
+        }
+
         // Validate parameters
         if (!category || !subcategory || typeof category !== 'string' || typeof subcategory !== 'string') {
             console.error('BrowserNavigationService: Invalid category or subcategory provided');
             return;
         }
 
-        // Reset sort and filter state
-        sortByStore.set("best");
-        selectedBrandsStore.set(new Set());
-        selectedOrganicStore.set("all");
+        // Exit search mode first
+        await this.exitSearchMode();
 
-        // Update navigation stores atomically
-        selectedCategoryStore.set(category);
-        selectedSubcategoryStore.set(subcategory);
-        selectedProductTypeStore.set('All');
-        isHomeViewStore.set(false);
-        searchModeStore.set(false);
+        // Update navigation state through DataManager (including filter reset)
+        this.dataManager.updateNavigationState({
+            category: category,
+            subcategory: subcategory,
+            productType: 'All',
+            isHomeView: false,
+            searchMode: false,
+            sortBy: 'best',
+            selectedBrands: new Set(),
+            selectedOrganic: 'all'
+        });
 
         // Scroll to top
         this.scrollToTop();
@@ -104,27 +125,38 @@ export class BrowserNavigationService {
     async navigateToProductType(productType: string, category?: string, subcategory?: string): Promise<void> {
         console.log(`BrowserNavigationService: Navigating to product type: ${productType}`);
 
+        if (!this.dataManager) {
+            console.error('BrowserNavigationService: DataManager not set. Call setDataManager() first.');
+            return;
+        }
+
         // Validate product type
         if (!productType || typeof productType !== 'string') {
             console.error('BrowserNavigationService: Invalid product type provided');
             return;
         }
 
-        // Reset sort and filter state (same as other navigation methods)
-        sortByStore.set("best");
-        selectedBrandsStore.set(new Set());
-        selectedOrganicStore.set("all");
+        // Exit search mode first
+        await this.exitSearchMode();
 
-        // If category and subcategory are provided, update them atomically
+        // Create navigation update object (including filter reset)
+        const navigationUpdate: any = {
+            productType: productType,
+            sortBy: 'best',
+            selectedBrands: new Set(),
+            selectedOrganic: 'all'
+        };
+
+        // If category and subcategory are provided, include them
         if (category && subcategory) {
-            selectedCategoryStore.set(category);
-            selectedSubcategoryStore.set(subcategory);
-            isHomeViewStore.set(false);
-            searchModeStore.set(false);
+            navigationUpdate.category = category;
+            navigationUpdate.subcategory = subcategory;
+            navigationUpdate.isHomeView = false;
+            navigationUpdate.searchMode = false;
         }
 
-        // Update product type
-        selectedProductTypeStore.set(productType);
+        // Update navigation state through DataManager
+        this.dataManager.updateNavigationState(navigationUpdate);
 
         // Scroll to top (same as other navigation methods)
         this.scrollToTop();
@@ -137,6 +169,41 @@ export class BrowserNavigationService {
     async navigateViewMore(category: string, subcategory: string): Promise<void> {
         console.log(`BrowserNavigationService: View More navigation: ${category} > ${subcategory}`);
         return this.navigateToSubcategory(category, subcategory);
+    }
+
+    // Search navigation methods
+    async enterSearchMode(searchQuery: string): Promise<void> {
+        console.log(`BrowserNavigationService: Entering search mode with query: ${searchQuery}`);
+
+        if (!this.dataManager) {
+            console.error('BrowserNavigationService: DataManager not set. Call setDataManager() first.');
+            return;
+        }
+
+        // Update navigation state through DataManager (single source of truth)
+        this.dataManager.updateNavigationState({
+            searchMode: true,
+            searchQuery: searchQuery
+        });
+
+        console.log('BrowserNavigationService: Search mode entered');
+    }
+
+    async exitSearchMode(): Promise<void> {
+        console.log('BrowserNavigationService: Exiting search mode');
+
+        if (!this.dataManager) {
+            console.error('BrowserNavigationService: DataManager not set. Call setDataManager() first.');
+            return;
+        }
+
+        // Update navigation state through DataManager (single source of truth)
+        this.dataManager.updateNavigationState({
+            searchMode: false,
+            searchQuery: ''
+        });
+
+        console.log('BrowserNavigationService: Search mode exited');
     }
 
     // Helper method to scroll to top during navigation

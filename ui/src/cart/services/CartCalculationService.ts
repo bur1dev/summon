@@ -1,6 +1,6 @@
 import { PriceService } from "../../services/PriceService";
 import { encodeHashToBase64 } from "@holochain/client";
-import type { ProductDataService } from "../../products/services/ProductDataService";
+import type { DataManager } from "../../services/DataManager";
 
 interface CartItem {
     groupHash: string;
@@ -22,21 +22,21 @@ interface Product {
 }
 
 export class CartCalculationService {
-    private productDataService?: ProductDataService;
+    private dataManager?: DataManager;
 
-    constructor(productDataService?: ProductDataService) {
-        this.productDataService = productDataService;
+    constructor(dataManager?: DataManager) {
+        this.dataManager = dataManager;
     }
 
-    // Set ProductDataService reference
-    setProductDataService(productDataService: ProductDataService): void {
-        this.productDataService = productDataService;
+    // Set DataManager reference
+    setDataManager(dataManager: DataManager): void {
+        this.dataManager = dataManager;
     }
 
     // Calculate complete cart totals
     async calculateCartTotals(cartItems: CartItem[]): Promise<CartTotals> {
-        if (!this.productDataService) {
-            console.log("Cannot calculate cart total - ProductDataService not set");
+        if (!this.dataManager) {
+            console.log("Cannot calculate cart total - DataManager not set");
             return { regular: 0, promo: 0 };
         }
 
@@ -63,8 +63,8 @@ export class CartCalculationService {
                     groupHashBase64 = encodeHashToBase64(byteArray);
                 }
 
-                // Use ProductDataService to get product details
-                const rawProduct = await this.productDataService.getProductByReference(groupHashBase64, item.productIndex);
+                // Use DataManager to get product details
+                const rawProduct = await this.dataManager.getProductByReference(groupHashBase64, item.productIndex);
 
                 if (rawProduct && typeof rawProduct.price === 'number') {
                     // Convert to Product type for PriceService
@@ -100,9 +100,9 @@ export class CartCalculationService {
             // Use provided product data if available (synchronous path)
             if (product && typeof product.price === 'number') {
                 productData = product;
-            } else if (this.productDataService) {
-                // Fallback to fetching from ProductDataService (async path)
-                productData = await this.productDataService.getProductByReference(groupHashBase64, productIndex);
+            } else if (this.dataManager) {
+                // Fallback to fetching from DataManager (async path)
+                productData = await this.dataManager.getProductByReference(groupHashBase64, productIndex);
             } else {
                 return { regular: 0, promo: 0 };
             }

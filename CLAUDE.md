@@ -55,12 +55,13 @@ cd tests && npm run test  # Vitest integration tests
 
 ### Frontend Services (Svelte + TypeScript)
 - `ShopStore`: Main product/category data store
+- `DataManager`: Business logic layer and single gateway for all data operations
 - `CartBusinessService`: Core cart state management and coordination
 - `CheckoutService`: Checkout flow and delivery time slot generation
 - `CheckedOutCartsService`: Order history and cart restoration
 - `AddressService`: Delivery address management
 - `PreferencesService`: Product preference management with direct Holochain access
-- `ProductDataService`: Product loading with caching
+- `ProductDataService`: Product loading with caching (accessed via DataManager)
 - `EmbeddingService`: Local semantic search with transformers.js
 
 ### Backend (Express.js - Temporary)
@@ -245,7 +246,7 @@ UI renders Beverages subcategory rows
 
   CartCalculationService.ts - Mathematical Operations
   - Purpose: Cart totals, price deltas, validation logic
-  - Integration: Delegates to PriceService for consistency
+  - Integration: Uses DataManager for product data access, delegates to PriceService for calculations
 
   CartPersistenceService.ts - Data Persistence
   - Purpose: localStorage + Holochain synchronization with merge strategies
@@ -277,6 +278,13 @@ UI renders Beverages subcategory rows
   - Initialization: PreferencesService.setClient(client) called during app startup in App.svelte
   - Coverage: Used by ProductDetailModal, PreferencesSection
   - Benefits: Eliminates 140+ lines of duplicated preference logic and removes circular dependencies
+
+  DataManager.ts - Business Logic Gateway
+  - Purpose: Single interface for all data operations and business logic
+  - Pattern: Centralized service layer with performance optimization boundary
+  - Key Methods: getSortedFilteredProducts(), getProductByReference(), loadSubcategoryProducts()
+  - Integration: Wraps ProductDataService, used by AllProductsGrid and CartCalculationService
+  - Benefits: Prevents scattered productDataService calls, centralizes sorting/filtering logic
 
   2. Utility Layer (/utils/) - Smart Helpers
 
@@ -403,7 +411,8 @@ UI renders Beverages subcategory rows
   CartBusinessService (reactive instance)
       ↓ (uses specialized services)
   CartPersistenceService + CartCalculationService
-      ↓ (PriceService for calculations)
+      ↓ (DataManager for product data, PriceService for calculations)
+  DataManager → ProductDataService → Holochain DHT
   PriceService (static utility)
       ↓ (persists to)
   localStorage + Holochain DHT
@@ -675,3 +684,31 @@ This refactoring exemplifies how proper service boundaries lead to cleaner, more
 - ✅ **Clean Dependencies**: Services inject dependencies via constructor, no circular references
 - ✅ **Maintainable**: Smaller, focused files (~150-350 lines each)
 - ✅ **Type Safety**: Shared types in `/cart/types/CartTypes.ts`
+
+### DataManager Business Logic Centralization 🎯
+**Refactored**: Moved sorting/filtering logic from UI components to centralized business layer
+
+**Key Changes**:
+- **AllProductsGrid.svelte**: Reduced from 379 to 351 lines by extracting sorting/filtering logic
+- **DataManager.ts**: Added `getSortedFilteredProducts()` method containing business logic
+- **Service Dependencies**: CartCalculationService now uses DataManager instead of ProductDataService
+- **Single Gateway**: DataManager becomes exclusive interface for all data operations
+
+**Implementation Pattern**:
+```typescript
+// Before: Complex reactive logic in component (55 lines)
+$: sortedFilteredProducts = (() => {
+    let result = [...products];
+    // 50+ lines of filtering and sorting logic
+})();
+
+// After: Simple service call (1 line)
+$: sortedFilteredProducts = dataManager.getSortedFilteredProducts(products, $sortByStore, $selectedBrandsStore, $selectedOrganicStore);
+```
+
+**Benefits Achieved**:
+- ✅ **Business Logic Separation**: UI components focus on presentation
+- ✅ **Single Responsibility**: DataManager handles all product transformations
+- ✅ **Testable Logic**: Business rules separated from UI reactivity
+- ✅ **Performance Boundary**: Prevents reactive cascades during scroll events
+- ✅ **SOLID Compliance**: Clear interfaces and dependency injection

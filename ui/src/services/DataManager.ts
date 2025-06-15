@@ -84,5 +84,41 @@ export class DataManager {
         return this.productDataService.extractProductsFromGroups(groupRecords);
     }
 
+    // === BUSINESS LOGIC METHODS ===
+    getSortedFilteredProducts(products: any[], sortBy: string, brands: Set<string>, organic: string): any[] {
+        let result = [...products];
+
+        // Apply brand filter
+        if (brands.size > 0) {
+            result = result.filter(
+                (product: any) =>
+                    product.brand &&
+                    brands.has(product.brand.trim()),
+            );
+        }
+
+        // Apply organic filter
+        if (organic === "organic") {
+            result = result.filter(
+                (product: any) => product.is_organic === true,
+            );
+        } else if (organic === "non-organic") {
+            result = result.filter(
+                (product: any) =>
+                    product.is_organic === false ||
+                    product.is_organic === undefined,
+            );
+        }
+
+        // Apply sorting
+        if (sortBy === "price-asc") {
+            result.sort((a: any, b: any) => (a.price || 0) - (b.price || 0));
+        } else if (sortBy === "price-desc") {
+            result.sort((a: any, b: any) => (b.price || 0) - (a.price || 0));
+        }
+
+        return result;
+    }
+
 
 }

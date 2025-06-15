@@ -1,6 +1,6 @@
 import { encodeHashToBase64 } from '@holochain/client';
 import { writable, derived } from 'svelte/store';
-import type { ProductDataService } from "../../products/services/ProductDataService";
+import type { DataManager } from "../../services/DataManager";
 import { CartPersistenceService } from "./CartPersistenceService";
 import { CartCalculationService } from "./CartCalculationService";
 import type { CartItem, ActionHashB64 } from '../types/CartTypes';
@@ -35,9 +35,9 @@ export class CartBusinessService {
     // Loading state to track data loading operations
     public loading = writable(true);
 
-    constructor(public client: any, productDataService?: ProductDataService) {
+    constructor(public client: any, dataManager?: DataManager) {
         this.persistenceService = new CartPersistenceService(client);
-        this.calculationService = new CartCalculationService(productDataService);
+        this.calculationService = new CartCalculationService(dataManager);
 
         this.cartItems.set([]);
         this.cartTotal.set(0);
@@ -48,9 +48,9 @@ export class CartBusinessService {
         this.initialize();
     }
 
-    // Set ProductDataService reference (called from Controller)
-    public setProductDataService(productDataService: ProductDataService): void {
-        this.calculationService.setProductDataService(productDataService);
+    // Set DataManager reference (called from Controller)
+    public setDataManager(dataManager: DataManager): void {
+        this.calculationService.setDataManager(dataManager);
 
         // Force immediate recalculation
         setTimeout(() => this.recalculateCartTotal(), 0);

@@ -4,6 +4,7 @@
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import SortFilterDropdown from "../../shared/components/SortFilterDropdown.svelte";
+    import type { DataManager } from "../../services/DataManager";
 
     // Import from data trigger store (these control filtering/sorting)
     import {
@@ -22,6 +23,7 @@
     export let products: any[] = [];
 
     const { getStore } = getContext<StoreContext>("store");
+    const dataManager = getContext<DataManager>("dataManager");
     const dispatch = createEventDispatcher();
 
     let productsGridRef: HTMLElement;
@@ -59,38 +61,9 @@
         organic: $selectedOrganicStore,
     };
 
-    // Apply sorting and filtering to products (BUSINESS LOGIC - stays reactive)
+    // Apply sorting and filtering to products using DataManager
     $: sortedFilteredProducts = (() => {
-        let result = [...products];
-
-        // Apply brand filter
-        if ($selectedBrandsStore.size > 0) {
-            result = result.filter(
-                (product: any) =>
-                    product.brand &&
-                    $selectedBrandsStore.has(product.brand.trim()),
-            );
-        }
-
-        // Apply organic filter
-        if ($selectedOrganicStore === "organic") {
-            result = result.filter(
-                (product: any) => product.is_organic === true,
-            );
-        } else if ($selectedOrganicStore === "non-organic") {
-            result = result.filter(
-                (product: any) =>
-                    product.is_organic === false ||
-                    product.is_organic === undefined,
-            );
-        }
-
-        // Apply sorting
-        if ($sortByStore === "price-asc") {
-            result.sort((a: any, b: any) => (a.price || 0) - (b.price || 0));
-        } else if ($sortByStore === "price-desc") {
-            result.sort((a: any, b: any) => (b.price || 0) - (a.price || 0));
-        }
+        const filtered = dataManager.getSortedFilteredProducts(products, $sortByStore, $selectedBrandsStore, $selectedOrganicStore);
 
         // Detect if array order changed (not just data changes)
         const currentSortState = {
@@ -113,7 +86,7 @@
         }
 
         previousSortState = currentSortState;
-        return result;
+        return filtered;
     })();
 
     // === DIRECT CSS POSITIONING (Vanilla JS performance) ===

@@ -77,9 +77,9 @@
   onMount(() => {
     store.setUIprops({ showMenu: false });
 
-    // Inject ProductDataService into cart service
-    if ($cartService && productDataService) {
-      $cartService.setProductDataService(productDataService);
+    // Inject DataManager into cart service
+    if ($cartService && dataManager) {
+      $cartService.setDataManager(dataManager);
     }
 
     // Subscribe to the cartTotal from the cart service

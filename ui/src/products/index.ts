@@ -1,7 +1,7 @@
 // Products feature exports
 export { ProductDataService } from './services/ProductDataService';
 export { ProductRowCacheService } from './services/ProductRowCacheService';
-export { PreferencesService } from './services/PreferencesService';
+export * from './services/PreferencesService';
 
 export * from './utils/categoryData';
 export * from './utils/categoryUtils';

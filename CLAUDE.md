@@ -270,14 +270,15 @@ UI renders Beverages subcategory rows
   - Coverage: Used by CategorySidebar, ShopView, ProductRow, and all navigation components
   - Architecture: Clean delegation pattern - navigation actions → DataManager state updates
 
-  PreferencesService.ts - Product Preferences Authority
-  - Purpose: Centralized product preference management for "Remember my preferences" functionality
-  - Pattern: Static methods with reactive Svelte stores and direct Holochain client access
-  - Key Methods: loadPreference(), savePreference(), deletePreference(), getPreferenceStore(), setClient()
+  PreferencesService.ts - Product Preferences Store ⭐ **RADICALLY SIMPLIFIED**
+  - Purpose: Idiomatic Svelte store for product preference management ("Remember my preferences")
+  - Pattern: Single writable store with functional API - pure Svelte reactivity patterns
+  - Store: `export const preferences = writable<PreferencesMap>({})` - one store for all preferences
+  - Key Functions: loadPreference(), savePreference(), deletePreference(), getPreferenceKey(), setPreferencesClient()
   - Backend: Direct Holochain zome calls (cart zome) - completely independent from CartBusinessService
-  - Initialization: PreferencesService.setClient(client) called during app startup in App.svelte
-  - Coverage: Used by ProductDetailModal, PreferencesSection
-  - Benefits: Eliminates 140+ lines of duplicated preference logic and removes circular dependencies
+  - Initialization: setPreferencesClient(client) called during app startup in App.svelte
+  - Usage: Components use `$preferences[key]` for direct reactive access - no subscription boilerplate
+  - Migration: Eliminated 270+ lines of over-engineered abstractions, Map-based factories, and manual subscriptions
 
   DataManager.ts - Centralized State & Business Logic Authority ⭐
   - Purpose: Single source of truth for ALL navigation and filter state + business logic gateway
@@ -395,7 +396,7 @@ UI renders Beverages subcategory rows
 
   1. Context-based: Components get CartBusinessService, CheckoutService, CheckedOutCartsService from Svelte context
   2. Prop-based: CheckoutSummary receives CartBusinessService as prop
-  3. Static utilities: CartInteractionService, PriceService, and PreferencesService used as static classes
+  3. Static utilities: CartInteractionService, PriceService used as static classes; PreferencesService as reactive store
   4. Singleton services: BrowserNavigationService accessed via browserNavigationService import
   5. Direct client access: PreferencesService has its own Holochain client (initialized in App.svelte)
 
@@ -417,8 +418,8 @@ UI renders Beverages subcategory rows
 
   Preference Operations:
   UI Component (ProductDetailModal, PreferencesSection)
-      ↓ (direct calls)
-  PreferencesService (static methods)
+      ↓ (reactive access + function calls)
+  PreferencesService (writable store + functions)
       ↓ (direct Holochain calls)
   Holochain DHT (cart zome functions)
 
@@ -485,8 +486,9 @@ UI renders Beverages subcategory rows
   // 3. Context-based service sharing
   const cartServiceStore = getContext<Writable<CartBusinessService | null>>("cartService");
 
-  // 4. Direct static service access (no context needed)
-  await PreferencesService.loadPreference(groupHash, productIndex);
+  // 4. Direct reactive store access (no context needed)
+  await loadPreference(groupHash, productIndex);
+  $: preferenceData = $preferences[getPreferenceKey(groupHash, productIndex)];
 
   3. Consistent Hash Handling
 
@@ -512,7 +514,7 @@ UI renders Beverages subcategory rows
   - Price changes: Modify PriceService only
   - Cart behavior: Modify CartInteractionService only
   - Navigation changes: Modify BrowserNavigationService only
-  - Preference changes: Modify PreferencesService only
+  - Preference changes: Modify preferences store functions only
   - New products: Add to cartHelpers utility functions
   - UI changes: Components are pure presentation
 
@@ -664,6 +666,56 @@ await PreferencesService.deletePreference(preferenceHash, groupHash, productInde
 - ✅ **Maintains functionality** - Same reactive stores and UI patterns
 
 This refactoring exemplifies how proper service boundaries lead to cleaner, more maintainable architecture.
+
+### PreferencesService Store Migration 🎯 **COMPLETED**
+**Achievement**: Radically simplified PreferencesService from over-engineered class to idiomatic Svelte store
+**Problem Solved**: Complex Map-based factory patterns and manual subscription management created unnecessary complexity
+
+**Before**: Over-engineered class-based service (236 lines)
+```typescript
+export class PreferencesService {
+    private static stores = new Map<string, Writable<PreferenceState>>();
+    static getPreferenceStore(groupHash, productIndex) { /* complex abstraction */ }
+    // ... 200+ lines of wrapper functions and abstractions
+}
+```
+
+**After**: Pure Svelte store with functions (94 lines)
+```typescript
+export const preferences = writable<PreferencesMap>({});
+export async function loadPreference(groupHash, productIndex) {
+    preferences.update(prefs => ({...prefs, [key]: result}));
+}
+```
+
+**Component Transformation**:
+```typescript
+// Before: Complex store management with subscriptions
+$: preferenceStore = PreferencesService.getPreferenceStore(groupHash, productIndex);
+$: savePreference = $preferenceStore.savePreference;
+
+// After: Direct reactive access
+$: preferenceKey = getPreferenceKey(groupHash, productIndex);
+$: preferenceData = $preferences[preferenceKey] || defaultState;
+$: savePreference = preferenceData.savePreference;
+```
+
+**Files Transformed**:
+- ✅ **PreferencesService.ts**: 236 → 94 lines (**-60% code reduction**)
+- ✅ **DELETED**: PreferencesStore.ts (127 lines eliminated completely)
+- ✅ **ProductDetailModal.svelte**: Eliminated complex subscription boilerplate
+- ✅ **PreferencesSection.svelte**: Direct function calls, no manual subscriptions
+- ✅ **App.svelte**: Functional client initialization (setPreferencesClient)
+- ✅ **index.ts**: Fixed exports for new function-based API
+
+**Benefits Achieved**:
+- ✅ **Idiomatic Svelte**: Single writable store with direct reactive access
+- ✅ **Zero Boilerplate**: No onMount/onDestroy subscription management in components
+- ✅ **TypeScript Safety**: Proper PreferencesMap typing eliminates index errors
+- ✅ **Function-Based**: Simple exported functions replace static class methods
+- ✅ **Total Elimination**: ~270 lines of over-engineered abstractions removed
+
+**Migration Success**: This demonstrates the power of embracing Svelte's natural reactivity patterns over complex abstractions. The functionality remains identical while achieving massive code reduction and improved maintainability.
 
 ### Cart Service Architecture Update 🎯
 **Refactored**: CartBusinessService split into focused services following Single Responsibility Principle

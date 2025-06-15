@@ -4,14 +4,13 @@
     AppWebsocket,
     AdminWebsocket,
     type AppWebsocketConnectionOptions,
-    encodeHashToBase64,
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
   import { CartBusinessService } from "./cart/services/CartBusinessService";
   import { CheckoutService } from "./cart/services/CheckoutService";
   import { CheckedOutCartsService } from "./cart/services/CheckedOutCartsService";
   import { AddressService } from "./cart/services/AddressService";
-  import { PreferencesService } from "./products/services/PreferencesService";
+  import { setPreferencesClient } from "./products/services/PreferencesService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
   import { ShopStore, type StoreContext } from "./store";
@@ -45,7 +44,9 @@
   setContext("checkoutService", checkoutServiceStore);
 
   // Create a writable for the checked out carts service
-  const checkedOutCartsServiceStore = writable<CheckedOutCartsService | null>(null);
+  const checkedOutCartsServiceStore = writable<CheckedOutCartsService | null>(
+    null,
+  );
   setContext("checkedOutCartsService", checkedOutCartsServiceStore);
 
   // Create a writable for the address service
@@ -102,7 +103,7 @@
     const checkoutServiceInstance = new CheckoutService(
       client,
       cartServiceInstance.getPersistenceService(),
-      cartServiceInstance
+      cartServiceInstance,
     );
     console.log("CheckoutService created with client:", !!client);
     checkoutServiceStore.set(checkoutServiceInstance);
@@ -110,7 +111,7 @@
     // Initialize the checked out carts service with dependencies
     const checkedOutCartsServiceInstance = new CheckedOutCartsService(
       client,
-      cartServiceInstance
+      cartServiceInstance,
     );
     console.log("CheckedOutCartsService created with client:", !!client);
     checkedOutCartsServiceStore.set(checkedOutCartsServiceInstance);
@@ -121,7 +122,7 @@
     addressServiceStore.set(addressServiceInstance); // Update the address service store
 
     // Initialize PreferencesService with client
-    PreferencesService.setClient(client);
+    setPreferencesClient(client);
 
     // Initialize ProfilesStore
     profilesStore = new ProfilesStore(new ProfilesClient(client, "grocery"), {

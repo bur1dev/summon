@@ -8,7 +8,8 @@
     import { get, type Writable } from "svelte/store"; // Import get
     import type { CartBusinessService } from "../../../cart/services/CartBusinessService";
     import { CartInteractionService } from "../../../cart/services/CartInteractionService";
-    import { PreferencesService } from "../../services/PreferencesService";
+    import { preferences, loadPreference, getPreferenceKey } from "../../services/PreferencesService";
+    import { derived } from "svelte/store";
     import ProductModalHeader from "./ProductModalHeader.svelte";
     import ProductImage from "./ProductImage.svelte";
     import ProductInfo from "./ProductInfo.svelte";
@@ -41,14 +42,12 @@
     let isClosing: boolean = false;
     let isTransitioning: boolean = false; // Flag to track button state transitions
 
-    // Get preference store from service - reactive state management
-    $: preferenceStore = PreferencesService.getPreferenceStore(groupHashBase64, productIndex);
-    
-    // Derive preference state from service store (maintains exact same variable names)
-    $: savePreference = $preferenceStore.savePreference;
-    $: existingPreference = $preferenceStore.preference;
-    $: loadingPreference = $preferenceStore.loading;
-
+    // Ultra-simple reactive preference access - massive code reduction!
+    $: preferenceKey = getPreferenceKey(groupHashBase64, productIndex);
+    $: preferenceData = $preferences[preferenceKey] || { loading: false, preference: null, savePreference: false };
+    $: savePreference = preferenceData.savePreference;
+    $: existingPreference = preferenceData.preference;
+    $: loadingPreference = preferenceData.loading;
 
     function closeModal() {
         isClosing = true;
@@ -74,8 +73,6 @@
         }
     }
 
-
-
     async function addToCart() {
         try {
             isTransitioning = true; // Start transition animation
@@ -86,7 +83,7 @@
                 productIndex,
                 quantity,
                 existingNote || undefined,
-                product
+                product,
             );
 
             if (!success) {
@@ -107,7 +104,6 @@
         }
     }
 
-
     function checkCartStatus() {
         const serviceInstance = get(cartServiceStore);
         if (!serviceInstance) {
@@ -117,8 +113,12 @@
         }
         // Use centralized service to get cart data
         const items = serviceInstance.getCartItems();
-        const item = CartInteractionService.findCartItem(items, groupHashBase64, productIndex);
-        
+        const item = CartInteractionService.findCartItem(
+            items,
+            groupHashBase64,
+            productIndex,
+        );
+
         if (item) {
             isInCart = true;
             quantity = item.quantity;
@@ -143,15 +143,18 @@
             return;
         }
 
-        await PreferencesService.loadPreference(groupHashBase64, productIndex);
-        
+        await loadPreference(groupHashBase64, productIndex);
+
         // If not already in cart and there's a saved preference, pre-populate the note
-        if (!isInCart && existingPreference && existingPreference.preference?.note) {
+        if (
+            !isInCart &&
+            existingPreference &&
+            existingPreference.preference?.note
+        ) {
             note = existingPreference.preference.note;
             existingNote = existingPreference.preference.note;
         }
     }
-
 
     function portal(node: HTMLElement) {
         let target = document.body;
@@ -171,7 +174,6 @@
             destroy,
         };
     }
-
 
     let unsubscribeFromServiceInstance: (() => void) | null = null;
 
@@ -245,7 +247,6 @@
     } else {
         document.body.style.overflow = "";
     }
-
 </script>
 
 {#if isOpen}
@@ -266,9 +267,9 @@
                 <div class="product-section">
                     <ProductImage {product} />
 
-                    <ProductInfo 
-                        {product} 
-                        {selectedCategory} 
+                    <ProductInfo
+                        {product}
+                        {selectedCategory}
                         {selectedSubcategory}
                         on:productTypeSelect
                         on:close={closeModal}
@@ -286,10 +287,14 @@
                             {isInCart}
                             {existingNote}
                             {isTransitioning}
-                            onQuantityChange={(newQuantity) => { quantity = newQuantity; }}
+                            onQuantityChange={(newQuantity) => {
+                                quantity = newQuantity;
+                            }}
                             onAddToCart={addToCart}
-                            onTransitionStart={() => { isTransitioning = true; }}
-                            onTransitionEnd={() => { 
+                            onTransitionStart={() => {
+                                isTransitioning = true;
+                            }}
+                            onTransitionEnd={() => {
                                 isInCart = false;
                                 showPreferences = false;
                                 isTransitioning = false;
@@ -308,13 +313,20 @@
                     {showPreferences}
                     bind:showButtons
                     bind:noteChanged
-                    {savePreference}
                     {existingPreference}
                     {loadingPreference}
-                    onNoteChange={(newNote) => { note = newNote; }}
-                    onShowButtonsChange={(show) => { showButtons = show; }}
-                    onNoteChangedChange={(changed) => { noteChanged = changed; }}
-                    onExistingNoteChange={(newNote) => { existingNote = newNote; }}
+                    onNoteChange={(newNote) => {
+                        note = newNote;
+                    }}
+                    onShowButtonsChange={(show) => {
+                        showButtons = show;
+                    }}
+                    onNoteChangedChange={(changed) => {
+                        noteChanged = changed;
+                    }}
+                    onExistingNoteChange={(newNote) => {
+                        existingNote = newNote;
+                    }}
                     onSave={closeModal}
                 />
             </div>
@@ -369,7 +381,6 @@
         animation: scaleOut var(--transition-normal) ease forwards;
     }
 
-
     .modal-content {
         display: flex;
         flex-direction: column;
@@ -383,17 +394,12 @@
         padding: var(--spacing-xl);
     }
 
-
-
     .purchase-section {
         display: flex;
         flex-direction: column;
         gap: var(--spacing-xl);
         padding-right: var(--spacing-sm);
     }
-
-
-
 
     @media (max-width: 1024px) {
         .product-section {
@@ -406,6 +412,5 @@
             height: auto;
             max-height: 90vh;
         }
-
     }
 </style>

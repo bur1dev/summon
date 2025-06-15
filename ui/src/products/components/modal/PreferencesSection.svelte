@@ -1,9 +1,9 @@
 <script lang="ts">
     import { get, type Writable } from "svelte/store";
     import type { CartBusinessService } from "../../../cart/services/CartBusinessService";
-    import { PreferencesService } from "../../services/PreferencesService";
+    import { preferences, savePreference as savePreferenceAPI, deletePreference, updateSavePreference, getPreferenceKey } from "../../services/PreferencesService";
     import { Save } from "lucide-svelte";
-    
+
     export let cartServiceStore: Writable<CartBusinessService | null>;
     export let groupHashBase64: string;
     export let productIndex: number;
@@ -13,7 +13,6 @@
     export let showPreferences: boolean;
     export let showButtons: boolean;
     export let noteChanged: boolean;
-    export let savePreference: boolean;
     export let existingPreference: any;
     export let loadingPreference: boolean;
     export let onNoteChange: (newNote: string) => void;
@@ -22,33 +21,20 @@
     export let onExistingNoteChange: (note: string) => void;
     export let onSave: (() => void) | null = null;
 
+    // Direct reactive access to preference state
+    $: preferenceKey = getPreferenceKey(groupHashBase64, productIndex);
+    $: preferenceData = $preferences[preferenceKey] || { loading: false, preference: null, savePreference: false };
+    $: savePreference = preferenceData.savePreference;
+
     async function saveProductPreference() {
         if (!note || !note.trim()) return;
-
-        const success = await PreferencesService.savePreference(
-            groupHashBase64,
-            productIndex,
-            note.trim()
-        );
-
-        if (success) {
-            // Update local state to reflect the saved preference
-            const preferenceStore = PreferencesService.getPreferenceStore(groupHashBase64, productIndex);
-            preferenceStore.subscribe((state: any) => {
-                existingPreference = state.preference;
-            });
-        }
+        await savePreferenceAPI(groupHashBase64, productIndex, note.trim());
     }
 
     async function deleteProductPreference() {
         if (!existingPreference || !existingPreference.hash) return;
 
-        const success = await PreferencesService.deletePreference(
-            existingPreference.hash,
-            groupHashBase64,
-            productIndex
-        );
-
+        const success = await deletePreference(existingPreference.hash, groupHashBase64, productIndex);
         if (success) {
             existingPreference = null;
             savePreference = false;
@@ -107,34 +93,26 @@
         const checked = target.checked;
 
         // Update service state
-        PreferencesService.updateSavePreference(groupHashBase64, productIndex, checked);
+        updateSavePreference(groupHashBase64, productIndex, checked);
 
         // If toggle turned off and there's an existing preference, show delete button
         onShowButtonsChange(
-            checked !== (existingPreference !== null) || noteChanged
+            checked !== (existingPreference !== null) || noteChanged,
         );
     }
 </script>
 
-<div
-    class="preferences-section {showPreferences
-        ? 'visible'
-        : ''}"
->
+<div class="preferences-section {showPreferences ? 'visible' : ''}">
     <h2>Your preferences</h2>
     <div class="preferences-input-row">
         <div class="input-container">
-            <p class="preferences-label">
-                Special instructions
-            </p>
+            <p class="preferences-label">Special instructions</p>
             <input
                 type="text"
                 bind:value={note}
                 on:input={handleNoteInput}
                 placeholder="I would like my shopper to..."
-                class="preferences-input {noteChanged
-                    ? 'active'
-                    : ''}"
+                class="preferences-input {noteChanged ? 'active' : ''}"
             />
 
             <!-- Checkbox for saving preferences -->
@@ -150,8 +128,7 @@
                         {#if loadingPreference}
                             Loading...
                         {:else}
-                            Remember my preferences for next
-                            time
+                            Remember my preferences for next time
                         {/if}
                     </span>
                     {#if existingPreference}

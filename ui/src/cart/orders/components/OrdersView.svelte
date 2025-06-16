@@ -1,15 +1,10 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import { ShoppingCart, X } from "lucide-svelte";
-  import type { Writable } from "svelte/store";
   import { addresses } from "../../services/AddressService";
-  import type { CheckedOutCartsService } from "../../services/CheckedOutCartsService";
+  import { loadOrders, returnToShopping as returnOrderToShopping } from "../../services/OrdersService";
   import { currentViewStore } from "../../../stores/UiOnlyStore";
   import OrderCard from "./OrderCard.svelte";
-
-
-  // Get checked out carts service from context
-  const checkedOutCartsService = getContext("checkedOutCartsService") as Writable<CheckedOutCartsService | null>;
 
 
   // Get the store for the client
@@ -39,11 +34,8 @@
       isLoading = true;
       errorMessage = "";
 
-      // Use CheckedOutCartsService's loadCheckedOutCarts method
-      if (!$checkedOutCartsService) {
-        throw new Error("CheckedOutCartsService not available");
-      }
-      const result = await $checkedOutCartsService.loadCheckedOutCarts();
+      // Use functional OrdersService
+      const result = await loadOrders();
 
       if (result.success) {
         checkedOutCarts = result.data || [];
@@ -69,11 +61,8 @@
     try {
       console.log("Returning cart to shopping:", item.id);
 
-      // Use CheckedOutCartsService's returnToShopping method
-      if (!$checkedOutCartsService) {
-        throw new Error("CheckedOutCartsService not available");
-      }
-      const result = await $checkedOutCartsService.returnToShopping(item.cartHash);
+      // Use functional OrdersService
+      const result = await returnOrderToShopping(item.cartHash);
 
       if (result.success) {
         // Refresh the list of checked-out carts

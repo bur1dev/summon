@@ -17,7 +17,7 @@ export async function checkoutCart(details: CheckoutDetails) {
     if (!client) return { success: false, message: "No Holochain client available" };
     
     try {
-        forceSyncToHolochain();
+        await forceSyncToHolochain();
         const localCartItems = getCartItems();
         
         const cartProducts = localCartItems.map(item => {

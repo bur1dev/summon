@@ -15,143 +15,108 @@ interface CartTotals {
     promo: number;
 }
 
-interface Product {
-    price: number;
-    promo_price?: number;
-    sold_by?: string;
+
+let dataManager: DataManager | null = null;
+
+export function setCalculationDataManager(dm: DataManager): void {
+    dataManager = dm;
 }
 
-export class CartCalculationService {
-    private dataManager?: DataManager;
-
-    constructor(dataManager?: DataManager) {
-        this.dataManager = dataManager;
-    }
-
-    // Set DataManager reference
-    setDataManager(dataManager: DataManager): void {
-        this.dataManager = dataManager;
-    }
-
-    // Calculate complete cart totals
-    async calculateCartTotals(cartItems: CartItem[]): Promise<CartTotals> {
-        if (!this.dataManager) {
-            console.log("Cannot calculate cart total - DataManager not set");
-            return { regular: 0, promo: 0 };
-        }
-
-        if (cartItems.length === 0) {
-            return { regular: 0, promo: 0 };
-        }
-
-        let regularTotal = 0;
-        let promoTotal = 0;
-
-        for (const item of cartItems) {
-            try {
-                // Skip invalid items
-                if (!item || !item.groupHash) {
-                    console.warn("Skipping invalid cart item", item);
-                    continue;
-                }
-
-                // Check if the groupHash needs to be converted from comma-separated to base64
-                let groupHashBase64 = item.groupHash;
-                if (typeof item.groupHash === 'string' && item.groupHash.includes(',')) {
-                    // It's a comma-separated string, convert to proper base64
-                    const byteArray = new Uint8Array(item.groupHash.split(',').map(Number));
-                    groupHashBase64 = encodeHashToBase64(byteArray);
-                }
-
-                // Use DataManager to get product details
-                const rawProduct = await this.dataManager.getProductByReference(groupHashBase64, item.productIndex);
-
-                if (rawProduct && typeof rawProduct.price === 'number') {
-                    // Convert to Product type for PriceService
-                    const product: Product = {
-                        price: rawProduct.price,
-                        promo_price: rawProduct.promo_price,
-                        sold_by: rawProduct.sold_by
-                    };
-
-                    // Use PriceService for calculations
-                    const itemTotals = PriceService.calculateItemTotal(product, item.quantity);
-                    regularTotal += itemTotals.regular;
-                    promoTotal += itemTotals.promo;
-                }
-            } catch (error) {
-                console.error('Error calculating cart total:', error);
-            }
-        }
-
-        console.log(`Calculated cart totals - Regular: ${regularTotal}, Promo: ${promoTotal}`);
-        return { regular: regularTotal, promo: promoTotal };
-    }
-
-    // Calculate price delta for a single item change
-    async calculateItemDelta(groupHashBase64: string, productIndex: number, quantityDelta: number, product?: any): Promise<CartTotals> {
-        if (quantityDelta === 0) {
-            return { regular: 0, promo: 0 };
-        }
-
-        try {
-            let productData: any = null;
-
-            // Use provided product data if available (synchronous path)
-            if (product && typeof product.price === 'number') {
-                productData = product;
-            } else if (this.dataManager) {
-                // Fallback to fetching from DataManager (async path)
-                productData = await this.dataManager.getProductByReference(groupHashBase64, productIndex);
-            } else {
-                return { regular: 0, promo: 0 };
-            }
-
-            if (productData && typeof productData.price === 'number') {
-                // Convert to Product type for PriceService
-                const productForCalculation: Product = {
-                    price: productData.price,
-                    promo_price: productData.promo_price,
-                    sold_by: productData.sold_by
-                };
-
-                // Use PriceService for calculations
-                const itemTotals = PriceService.calculateItemTotal(productForCalculation, Math.abs(quantityDelta));
-
-                // Apply sign for delta
-                const sign = quantityDelta > 0 ? 1 : -1;
-                return {
-                    regular: itemTotals.regular * sign,
-                    promo: itemTotals.promo * sign
-                };
-            }
-        } catch (error) {
-            console.error('Error calculating item delta:', error);
-        }
-
+// Calculate complete cart totals
+export async function calculateCartTotals(cartItems: CartItem[]): Promise<CartTotals> {
+    if (!dataManager || !cartItems.length) {
         return { regular: 0, promo: 0 };
     }
 
-    // Validate quantity change
-    validateQuantityChange(currentQuantity: number, newQuantity: number, isSoldByWeight: boolean): boolean {
-        const incrementValue = isSoldByWeight ? 0.25 : 1;
+    let regularTotal = 0;
+    let promoTotal = 0;
 
-        // Must be positive
-        if (newQuantity < 0) return false;
+    for (const item of cartItems) {
+        if (!item?.groupHash) continue;
 
-        // Must be in valid increments
-        if (isSoldByWeight) {
-            // For weight items, allow quarter-pound increments
-            const remainder = (newQuantity * 4) % 1;
-            return Math.abs(remainder) < 0.001; // Account for floating point precision
-        } else {
-            // For count items, must be whole numbers
-            return newQuantity % 1 === 0;
+        try {
+            // Normalize hash format if needed
+            const groupHashBase64 = item.groupHash.includes(',') 
+                ? encodeHashToBase64(new Uint8Array(item.groupHash.split(',').map(Number)))
+                : item.groupHash;
+
+            const rawProduct = await dataManager.getProductByReference(groupHashBase64, item.productIndex);
+            if (rawProduct && typeof rawProduct.price === 'number') {
+                const itemTotals = PriceService.calculateItemTotal(rawProduct as any, item.quantity);
+                regularTotal += itemTotals.regular;
+                promoTotal += itemTotals.promo;
+            }
+        } catch (error) {
+            console.error('Error calculating cart total:', error);
         }
     }
 
-    // Calculate savings
+    return { regular: regularTotal, promo: promoTotal };
+}
+
+// Calculate price delta for a single item change
+export async function calculateItemDelta(groupHashBase64: string, productIndex: number, quantityDelta: number, product?: any): Promise<CartTotals> {
+    if (quantityDelta === 0) return { regular: 0, promo: 0 };
+
+    try {
+        const productData = product?.price ? product : (dataManager ? await dataManager.getProductByReference(groupHashBase64, productIndex) : null);
+        
+        if (productData && typeof productData.price === 'number') {
+            const itemTotals = PriceService.calculateItemTotal(productData, Math.abs(quantityDelta));
+            const sign = quantityDelta > 0 ? 1 : -1;
+            return {
+                regular: itemTotals.regular * sign,
+                promo: itemTotals.promo * sign
+            };
+        }
+    } catch (error) {
+        console.error('Error calculating item delta:', error);
+    }
+
+    return { regular: 0, promo: 0 };
+}
+
+// Validate quantity change
+export function validateQuantityChange(newQuantity: number, isSoldByWeight: boolean): boolean {
+    if (newQuantity < 0) return false;
+
+    if (isSoldByWeight) {
+        // Quarter-pound increments for weight items
+        return Math.abs((newQuantity * 4) % 1) < 0.001;
+    } else {
+        // Whole numbers for count items
+        return newQuantity % 1 === 0;
+    }
+}
+
+// Calculate savings
+export function calculateSavings(regularTotal: number, promoTotal: number): number {
+    return PriceService.calculateSavings(regularTotal, promoTotal);
+}
+
+// Legacy class for backward compatibility
+export class CartCalculationService {
+    constructor(dataManager?: DataManager) {
+        if (dataManager) setCalculationDataManager(dataManager);
+    }
+
+    setDataManager(dm: DataManager): void {
+        setCalculationDataManager(dm);
+    }
+
+    async calculateCartTotals(cartItems: CartItem[]): Promise<CartTotals> {
+        return calculateCartTotals(cartItems);
+    }
+
+    async calculateItemDelta(groupHashBase64: string, productIndex: number, quantityDelta: number, product?: any): Promise<CartTotals> {
+        return calculateItemDelta(groupHashBase64, productIndex, quantityDelta, product);
+    }
+
+    validateQuantityChange(_currentQuantity: number, newQuantity: number, isSoldByWeight: boolean): boolean {
+        return validateQuantityChange(newQuantity, isSoldByWeight);
+    }
+
     calculateSavings(regularTotal: number, promoTotal: number): number {
-        return PriceService.calculateSavings(regularTotal, promoTotal);
+        return calculateSavings(regularTotal, promoTotal);
     }
 }

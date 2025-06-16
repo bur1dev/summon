@@ -8,182 +8,145 @@ interface CartItem {
     note?: string;
 }
 
+let client: any = null;
+let syncTimeoutId: ReturnType<typeof setTimeout> | null = null;
+const syncInterval = 3000; // 3 seconds
+
+export function setPersistenceClient(holoClient: any): void {
+    client = holoClient;
+    
+    // Add event listener for page unload to sync cart
+    window.addEventListener('beforeunload', () => {
+        forceSyncToHolochain([]);
+    });
+}
+
+// Load cart from localStorage
+export async function loadFromLocalStorage(): Promise<CartItem[]> {
+    try {
+        const storedCart = localStorage.getItem('cart');
+        if (storedCart) {
+            const parsedCart = JSON.parse(storedCart);
+            return Array.isArray(parsedCart) ? parsedCart : [];
+        }
+        return [];
+    } catch (error) {
+        console.error('Error loading cart from localStorage:', error);
+        return [];
+    }
+}
+
+// Save cart to localStorage
+export function saveToLocalStorage(cartItems: CartItem[]): void {
+    try {
+        localStorage.setItem('cart', JSON.stringify(cartItems));
+    } catch (error) {
+        console.error('Error saving cart to localStorage:', error);
+    }
+}
+
+// Load cart from Holochain private entry
+export async function loadFromPrivateEntry(): Promise<CartItem[]> {
+    if (!client) return [];
+
+    try {
+        const result = await client.callZome({
+            role_name: 'grocery',
+            zome_name: 'cart',
+            fn_name: 'get_private_cart',
+            payload: null
+        });
+
+        if (result?.items) {
+            return result.items
+                .map((item: any) => ({
+                    groupHash: encodeHashToBase64(item.group_hash),
+                    productIndex: item.product_index,
+                    quantity: item.quantity,
+                    timestamp: item.timestamp,
+                    note: item.note
+                }))
+                .filter((item: any) => item?.groupHash && item.productIndex !== undefined);
+        }
+        return [];
+    } catch (error) {
+        console.error('Error loading cart from private entry:', error);
+        return [];
+    }
+}
+
+// Schedule sync to Holochain with debounce
+export function scheduleSyncToHolochain(cartItems: CartItem[]): void {
+    if (syncTimeoutId) clearTimeout(syncTimeoutId);
+    syncTimeoutId = setTimeout(() => syncToHolochain(cartItems), syncInterval);
+}
+
+// Force immediate sync to Holochain
+export async function forceSyncToHolochain(cartItems: CartItem[]): Promise<void> {
+    if (syncTimeoutId) {
+        clearTimeout(syncTimeoutId);
+        syncTimeoutId = null;
+    }
+    if (cartItems.length > 0) {
+        await syncToHolochain(cartItems);
+    }
+}
+
+// Sync cart to Holochain
+async function syncToHolochain(cartItems: CartItem[]): Promise<void> {
+    if (!client) return;
+
+    try {
+        console.log("Syncing cart to Holochain:", cartItems);
+        await client.callZome({
+            role_name: 'grocery',
+            zome_name: 'cart',
+            fn_name: 'replace_private_cart',
+            payload: { items: cartItems, last_updated: Date.now() }
+        });
+        
+        console.log("Cart successfully synced to Holochain");
+        localStorage.removeItem('cart');
+    } catch (error) {
+        console.error('Error syncing cart to Holochain:', error);
+    } finally {
+        syncTimeoutId = null;
+    }
+}
+
+// Merge local and Holochain carts
+export function mergeLocalAndHolochainCarts(localItems: CartItem[], holochainItems: CartItem[]): CartItem[] {
+    const itemMap = new Map<string, CartItem>();
+    
+    // Add all items, newer timestamp wins
+    [...localItems, ...holochainItems].forEach(item => {
+        const key = `${item.groupHash}_${item.productIndex}`;
+        const existing = itemMap.get(key);
+        if (!existing || item.timestamp > existing.timestamp) {
+            itemMap.set(key, item);
+        }
+    });
+    
+    // Return items with quantity > 0
+    return Array.from(itemMap.values()).filter(item => item.quantity > 0);
+}
+
+// Legacy class for backward compatibility  
 export class CartPersistenceService {
     private client: any;
     private syncTimeoutId: ReturnType<typeof setTimeout> | null = null;
-    private readonly syncInterval = 3000; // 3 seconds
 
     constructor(client: any) {
         this.client = client;
-
-        // Add event listener for page unload to sync cart
-        window.addEventListener('beforeunload', () => {
-            this.forceSyncToHolochain([]);
-        });
+        setPersistenceClient(client);
     }
 
-    // Load cart from localStorage
-    async loadFromLocalStorage(): Promise<CartItem[]> {
-        try {
-            const storedCart = localStorage.getItem('cart');
-            if (storedCart) {
-                const parsedCart = JSON.parse(storedCart);
-                console.log("Loaded cart from localStorage:", parsedCart);
-
-                if (Array.isArray(parsedCart)) {
-                    return parsedCart;
-                }
-            }
-            return [];
-        } catch (error) {
-            console.error('Error loading cart from localStorage:', error);
-            return [];
-        }
-    }
-
-    // Save cart to localStorage
-    saveToLocalStorage(cartItems: CartItem[]): void {
-        try {
-            localStorage.setItem('cart', JSON.stringify(cartItems));
-        } catch (error) {
-            console.error('Error saving cart to localStorage:', error);
-        }
-    }
-
-    // Load cart from Holochain private entry
-    async loadFromPrivateEntry(): Promise<CartItem[]> {
-        try {
-            if (!this.client) {
-                console.warn("No client available for loadFromPrivateEntry");
-                return [];
-            }
-
-            const result = await this.client.callZome({
-                role_name: 'grocery',
-                zome_name: 'cart',
-                fn_name: 'get_private_cart',
-                payload: null
-            });
-
-            if (result && result.items) {
-                // Transform items to the expected format
-                const cartItems = result.items.map((item: any) => {
-                    const hashBase64 = encodeHashToBase64(item.group_hash);
-
-                    return {
-                        groupHash: hashBase64,
-                        productIndex: item.product_index,
-                        quantity: item.quantity,
-                        timestamp: item.timestamp,
-                        note: item.note
-                    };
-                });
-
-                // Filter out any invalid items
-                return cartItems.filter((item: any) =>
-                    item && item.groupHash && item.productIndex !== undefined);
-            }
-
-            return [];
-        } catch (error) {
-            console.error('Error loading cart from private entry:', error);
-            return [];
-        }
-    }
-
-    // Schedule sync to Holochain with debounce
-    scheduleSyncToHolochain(cartItems: CartItem[]): void {
-        if (this.syncTimeoutId) {
-            clearTimeout(this.syncTimeoutId);
-        }
-
-        this.syncTimeoutId = setTimeout(() => {
-            this.syncToHolochain(cartItems);
-        }, this.syncInterval);
-    }
-
-    // Force immediate sync to Holochain
-    forceSyncToHolochain(cartItems: CartItem[]): void {
-        if (this.syncTimeoutId) {
-            clearTimeout(this.syncTimeoutId);
-            this.syncTimeoutId = null;
-        }
-
-        // Only sync if there are items
-        if (cartItems.length > 0) {
-            this.syncToHolochain(cartItems);
-        }
-    }
-
-    // Sync cart to Holochain
-    private async syncToHolochain(cartItems: CartItem[]): Promise<void> {
-        if (!this.client) return;
-
-        try {
-            console.log("Syncing cart to Holochain:", cartItems);
-
-            await this.client.callZome({
-                role_name: 'grocery',
-                zome_name: 'cart',
-                fn_name: 'replace_private_cart',
-                payload: {
-                    items: cartItems,
-                    last_updated: Date.now()
-                }
-            });
-
-            console.log("Cart successfully synced to Holochain");
-
-            // Clear localStorage after successful sync to avoid stale data
-            localStorage.removeItem('cart');
-        } catch (error) {
-            console.error('Error syncing cart to Holochain:', error);
-        } finally {
-            this.syncTimeoutId = null;
-        }
-    }
-
-    // Merge local and Holochain carts
+    async loadFromLocalStorage(): Promise<CartItem[]> { return loadFromLocalStorage(); }
+    saveToLocalStorage(cartItems: CartItem[]): void { saveToLocalStorage(cartItems); }
+    async loadFromPrivateEntry(): Promise<CartItem[]> { return loadFromPrivateEntry(); }
+    scheduleSyncToHolochain(cartItems: CartItem[]): void { scheduleSyncToHolochain(cartItems); }
+    async forceSyncToHolochain(cartItems: CartItem[]): Promise<void> { return forceSyncToHolochain(cartItems); }
     mergeLocalAndHolochainCarts(localItems: CartItem[], holochainItems: CartItem[]): CartItem[] {
-        // Create a map of Holochain items for quick lookup
-        const holochainItemsMap = new Map();
-        holochainItems.forEach(item => {
-            const key = `${item.groupHash}_${item.productIndex}`;
-            holochainItemsMap.set(key, item);
-        });
-
-        // Create a map of local items
-        const localItemsMap = new Map();
-        localItems.forEach(item => {
-            const key = `${item.groupHash}_${item.productIndex}`;
-            localItemsMap.set(key, item);
-        });
-
-        // Merge strategy: Use the item with the most recent timestamp
-        const mergedItems: CartItem[] = [];
-
-        // Add all local items, updating with Holochain items if needed
-        for (const [key, localItem] of localItemsMap.entries()) {
-            const holochainItem = holochainItemsMap.get(key);
-
-            if (holochainItem && holochainItem.timestamp > localItem.timestamp) {
-                // Holochain item is newer
-                mergedItems.push(holochainItem);
-            } else {
-                // Local item is newer or no Holochain item
-                mergedItems.push(localItem);
-            }
-
-            // Remove from Holochain map to track what's been processed
-            holochainItemsMap.delete(key);
-        }
-
-        // Add remaining Holochain items that aren't in local
-        for (const holochainItem of holochainItemsMap.values()) {
-            mergedItems.push(holochainItem);
-        }
-
-        // Filter out zero quantity items
-        return mergedItems.filter(item => item.quantity > 0);
+        return mergeLocalAndHolochainCarts(localItems, holochainItems);
     }
 }

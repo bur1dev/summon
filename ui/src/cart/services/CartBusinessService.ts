@@ -319,8 +319,8 @@ export async function restoreCartItems(cart: any): Promise<void> {
 }
 
 // Force sync to Holochain (used after zome calls)
-export function forceSyncToHolochain(): void {
+export async function forceSyncToHolochain(): Promise<void> {
     if (persistenceService) {
-        persistenceService.forceSyncToHolochain(localCartItems);
+        await persistenceService.forceSyncToHolochain(localCartItems);
     }
 }

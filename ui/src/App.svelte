@@ -8,7 +8,7 @@
   import "@shoelace-style/shoelace/dist/themes/light.css";
   import { setCartServices } from "./cart/services/CartBusinessService";
   import { setCheckoutServices } from "./cart/services/CheckoutService";
-  import { CheckedOutCartsService } from "./cart/services/CheckedOutCartsService";
+  import { setOrdersClient } from "./cart/services/OrdersService";
   import { setAddressClient } from "./cart/services/AddressService";
   import { setPreferencesClient } from "./products/services/PreferencesService";
   import { setContext } from "svelte";
@@ -35,13 +35,6 @@
   let shopStoreInstance: ShopStore | null = null;
 
   // Cart service is now store-based, no context needed
-
-
-  // Create a writable for the checked out carts service
-  const checkedOutCartsServiceStore = writable<CheckedOutCartsService | null>(
-    null,
-  );
-  setContext("checkedOutCartsService", checkedOutCartsServiceStore);
 
 
   // Set the "store" context immediately. shopStoreInstance is initially null.
@@ -93,10 +86,9 @@
     setCheckoutServices(client);
     console.log("CheckoutService initialized with client:", !!client);
 
-    // Initialize the checked out carts service with dependencies
-    const checkedOutCartsServiceInstance = new CheckedOutCartsService(client);
-    console.log("CheckedOutCartsService created with client:", !!client);
-    checkedOutCartsServiceStore.set(checkedOutCartsServiceInstance);
+    // Initialize OrdersService with functional pattern
+    setOrdersClient(client);
+    console.log("OrdersService client initialized:", !!client);
 
     // Initialize AddressService client
     setAddressClient(client);

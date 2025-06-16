@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from "svelte";
-    import { type Address, addresses, addressesLoading, loadAddresses, createAddress, deleteAddress, validateAddress } from "../../services/AddressService";
+    import { type Address, addresses, loadAddresses, createAddress, deleteAddress, validateAddress } from "../../services/AddressService";
     import AddressForm from "./AddressForm.svelte";
     import AddressList from "./AddressList.svelte";
     import DeleteConfirmationModal from "./DeleteConfirmationModal.svelte";
@@ -59,12 +59,12 @@
             // Save the address
             const result = await createAddress(newAddress);
 
-            if (result.success && result.hash) {
+            if (result.success && result.data?.hash) {
                 // Select the new address
-                selectedAddressHash = result.hash;
-                const address = $addresses[result.hash];
+                selectedAddressHash = result.data.hash;
+                const address = $addresses[result.data.hash];
                 if (address) {
-                    dispatch("select", { addressHash: result.hash, address });
+                    dispatch("select", { addressHash: result.data.hash, address });
                 }
                 // Close form with animation
                 isFormClosing = true;

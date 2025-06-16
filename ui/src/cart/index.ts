@@ -1,12 +1,14 @@
 // Cart feature exports
-// CartBusinessService is now functional, not a class export
-export { CartCalculationService } from './services/CartCalculationService';
-export { CartInteractionService } from './services/CartInteractionService';
-export { CartPersistenceService } from './services/CartPersistenceService';
+// All services are now functional, not class exports
+export * from './services/CartCalculationService';
+export * from './services/CartInteractionService';
+export * from './services/CartPersistenceService';
 export * from './services/AddressService';
 export * from './services/CheckoutService';
 
 export * from './utils/cartHelpers';
+export * from './utils/zomeHelpers';
+export * from './utils/errorHelpers';
 
 export { default as SlideOutCart } from './components/SlideOutCart.svelte';
 export { default as CartItem } from './components/items/CartItem.svelte';

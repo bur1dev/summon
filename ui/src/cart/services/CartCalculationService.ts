@@ -1,5 +1,5 @@
 import { PriceService } from "../../services/PriceService";
-import { encodeHashToBase64 } from "@holochain/client";
+import { standardizeHashFormat } from "../utils/zomeHelpers";
 import type { DataManager } from "../../services/DataManager";
 
 interface CartItem {
@@ -36,9 +36,7 @@ export async function calculateCartTotals(cartItems: CartItem[]): Promise<CartTo
 
         try {
             // Normalize hash format if needed
-            const groupHashBase64 = item.groupHash.includes(',') 
-                ? encodeHashToBase64(new Uint8Array(item.groupHash.split(',').map(Number)))
-                : item.groupHash;
+            const groupHashBase64 = standardizeHashFormat(item.groupHash);
 
             const rawProduct = await dataManager.getProductByReference(groupHashBase64, item.productIndex);
             if (rawProduct && typeof rawProduct.price === 'number') {
@@ -94,29 +92,3 @@ export function calculateSavings(regularTotal: number, promoTotal: number): numb
     return PriceService.calculateSavings(regularTotal, promoTotal);
 }
 
-// Legacy class for backward compatibility
-export class CartCalculationService {
-    constructor(dataManager?: DataManager) {
-        if (dataManager) setCalculationDataManager(dataManager);
-    }
-
-    setDataManager(dm: DataManager): void {
-        setCalculationDataManager(dm);
-    }
-
-    async calculateCartTotals(cartItems: CartItem[]): Promise<CartTotals> {
-        return calculateCartTotals(cartItems);
-    }
-
-    async calculateItemDelta(groupHashBase64: string, productIndex: number, quantityDelta: number, product?: any): Promise<CartTotals> {
-        return calculateItemDelta(groupHashBase64, productIndex, quantityDelta, product);
-    }
-
-    validateQuantityChange(_currentQuantity: number, newQuantity: number, isSoldByWeight: boolean): boolean {
-        return validateQuantityChange(newQuantity, isSoldByWeight);
-    }
-
-    calculateSavings(regularTotal: number, promoTotal: number): number {
-        return calculateSavings(regularTotal, promoTotal);
-    }
-}

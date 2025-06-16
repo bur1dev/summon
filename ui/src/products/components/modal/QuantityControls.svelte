@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Plus, Minus } from "lucide-svelte";
-    import { CartInteractionService } from "../../../cart/services/CartInteractionService";
+    import { updateQuantity } from "../../../cart/services/CartInteractionService";
     import { getIncrementValue, formatQuantityDisplay } from "../../../cart/utils/cartHelpers";
     import { clickable } from "../../../shared/actions/clickable";
     
@@ -28,7 +28,7 @@
         onQuantityChange(newQuantity);
         
         if (isInCart) {
-            await CartInteractionService.updateQuantity(
+            await updateQuantity(
                 groupHashBase64,
                 productIndex,
                 newQuantity,
@@ -53,7 +53,7 @@
         }
         
         if (isInCart) {
-            await CartInteractionService.updateQuantity(
+            await updateQuantity(
                 groupHashBase64,
                 productIndex,
                 newQuantity,

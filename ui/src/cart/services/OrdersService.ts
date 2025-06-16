@@ -1,6 +1,7 @@
-import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
+import { encodeHash, decodeHash, callZome } from '../utils/zomeHelpers';
+import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
 import type { ActionHashB64, DecodedProductGroup } from '../types/CartTypes';
-import { getCalculationService, restoreCartItems, forceSyncToHolochain } from './CartBusinessService';
+import { getClient, restoreCartItems, forceSyncToHolochain } from './CartBusinessService';
 
 let client: any = null;
 
@@ -10,57 +11,32 @@ export function setOrdersClient(holoClient: any) {
 
 // Load orders
 export async function loadOrders() {
+    const clientError = validateClient(client, 'loading checked out carts');
+    if (clientError) return clientError;
+
     try {
-        if (client) {
-            console.log("Loading checked out carts...");
-            const result = await client.callZome({
-                role_name: 'grocery',
-                zome_name: 'cart',
-                fn_name: 'get_checked_out_carts',
-                payload: null
-            });
+        console.log("Loading checked out carts...");
+        const result = await callZome(client, 'cart', 'get_checked_out_carts', null);
+        console.log("Loaded checked out carts:", result);
 
-            console.log("Loaded checked out carts:", result);
-
-            // Process the results to make them easier to use in the UI
-            const processedCarts = await processOrders(result);
-
-            return { success: true, data: processedCarts };
-        } else {
-            console.warn("No Holochain client available for loading checked out carts");
-            return { success: false, message: "No Holochain client available" };
-        }
+        // Process the results to make them easier to use in the UI
+        const processedCarts = await processOrders(result);
+        return createSuccessResult(processedCarts);
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('Error loading checked out carts:', error);
-        return { success: false, message: errorMessage };
+        return createErrorResult(error);
     }
 }
 
-// Helper: Get product details with simplified fallback
+// Helper: Get product details with direct zome call fallback
 async function getProductDetails(product: any) {
     if (!product?.group_hash) return null;
     
-    const groupHash = encodeHashToBase64(product.group_hash);
+    const groupHash = encodeHash(product.group_hash);
     
-    // Try DataManager if available
-    const calculationService = getCalculationService();
-    if (calculationService && (calculationService as any).dataManager) {
-        try {
-            return await (calculationService as any).dataManager.getProductByReference(groupHash, product.product_index);
-        } catch (error) {
-            console.error(`DataManager failed for ${groupHash}:${product.product_index}`, error);
-        }
-    }
-    
-    // Fallback to direct zome call
+    // Direct zome call for product details
     try {
-        const result = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'products', 
-            fn_name: 'get_product_group',
-            payload: decodeHashFromBase64(groupHash)
-        });
+        const result = await callZome(client, 'products', 'get_product_group', decodeHash(groupHash));
         
         if (result) {
             const { decode } = await import("@msgpack/msgpack");
@@ -93,7 +69,7 @@ async function processOrders(carts: any[]) {
     console.log("Processing checked out carts from Holochain:", carts);
 
     return Promise.all(carts.map(async (cart) => {
-        const cartHash = encodeHashToBase64(cart.cart_hash);
+        const cartHash = encodeHash(cart.cart_hash);
         const { id, products, total, created_at, status, address_hash, delivery_instructions, delivery_time } = cart.cart;
 
         // Get product details
@@ -104,7 +80,7 @@ async function processOrders(carts: any[]) {
 
             const details = await getProductDetails(product);
             return {
-                groupHash: encodeHashToBase64(product.group_hash),
+                groupHash: encodeHash(product.group_hash),
                 productIndex: product.product_index,
                 quantity: product.quantity,
                 details,
@@ -123,7 +99,7 @@ async function processOrders(carts: any[]) {
             total: calculatedTotal > 0 ? calculatedTotal : total,
             createdAt: new Date(created_at / 1000).toLocaleString(),
             status,
-            addressHash: address_hash ? encodeHashToBase64(address_hash) : null,
+            addressHash: address_hash ? encodeHash(address_hash) : null,
             deliveryInstructions: delivery_instructions,
             deliveryTime: formatDeliveryTime(delivery_time)
         };
@@ -132,9 +108,8 @@ async function processOrders(carts: any[]) {
 
 // Return to shopping
 export async function returnToShopping(cartHash: ActionHashB64) {
-    if (!client) {
-        return { success: false, message: "No Holochain client available" };
-    }
+    const clientError = validateClient(client, 'return to shopping');
+    if (clientError) return clientError;
 
     try {
         console.log("START: returnToShopping for hash:", cartHash);
@@ -151,20 +126,14 @@ export async function returnToShopping(cartHash: ActionHashB64) {
         }
 
         // Call zome function then sync
-        const result = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'return_to_shopping',
-            payload: decodeHashFromBase64(cartHash)
-        });
+        const result = await callZome(client, 'cart', 'return_to_shopping', decodeHash(cartHash));
         
         console.log("SUCCESS: Zome call result:", result);
         forceSyncToHolochain();
 
-        return { success: true };
+        return createSuccessResult();
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('Error returning cart to shopping:', error);
-        return { success: false, message: errorMessage };
+        return createErrorResult(error);
     }
 }

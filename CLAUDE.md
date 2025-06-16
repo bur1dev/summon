@@ -58,7 +58,7 @@ cd tests && npm run test  # Vitest integration tests
 ### Core Services (Svelte + TypeScript)
 - **DataManager**: Centralized state management and business logic gateway
 - **CartBusinessService**: Core cart state management (~350 lines) with reactive stores
-- **CartInteractionService**: UI interaction wrapper - eliminates duplicated cart patterns
+- **CartInteractionService**: Functional cart operation utilities - eliminates duplicated cart patterns
 - **CartCalculationService**: Mathematical operations for cart totals and validation
 - **CartPersistenceService**: localStorage + Holochain synchronization with merge strategies
 - **BrowserNavigationService**: Single source of truth for navigation state
@@ -99,12 +99,14 @@ import { loadOrders } from './services/OrdersService';
 ### Service Access Patterns
 1. **Direct imports**: All cart services use functional exports with direct imports
 2. **Reactive stores**: Components access service state via exported Svelte stores
-3. **Static utilities**: CartInteractionService, PriceService used as static classes
-4. **Functional services**: CartBusinessService, CheckoutService, OrdersService, AddressService use functional patterns
+3. **Static utilities**: PriceService used as static class for calculations
+4. **Functional services**: All cart services use functional patterns with direct exports
 5. **Store-based**: PreferencesService exports reactive stores for state management
 
 ### Utility Layer (/utils/)
 - **cartHelpers.ts**: Pure utility functions - `getIncrementValue()`, `getDisplayUnit()`, `isSoldByWeight()`, `parseProductHash()`
+- **zomeHelpers.ts**: Holochain operation utilities - `encodeHash()`, `callZome()`, `standardizeHashFormat()`
+- **errorHelpers.ts**: Consistent error handling patterns - `createSuccessResult()`, `createErrorResult()`, `validateClient()`
 - **categoryUtils.ts**: Category navigation and filtering logic (pure functions)
 
 ## Component Architecture
@@ -145,7 +147,7 @@ import { loadOrders } from './services/OrdersService';
 
 ### Cart Operations
 ```
-UI Component → CartInteractionService (functional wrapper) → CartBusinessService (functional stores) → 
+UI Component → CartInteractionService (functional utilities) → CartBusinessService (functional stores) → 
 CartPersistenceService + CartCalculationService (functional exports) → DataManager → Holochain DHT
 ```
 
@@ -174,8 +176,8 @@ $: displayPrices = PriceService.getDisplayPrices(product);
 $: incrementValue = getIncrementValue(product);
 
 // 2. Direct functional service calls
-await CartInteractionService.addToCart(groupHash, productIndex);
-await addToCart(groupHash, productIndex, quantity);
+import { addProductToCart, incrementItem } from './services/CartInteractionService';
+await addProductToCart(groupHash, productIndex);
 
 // 3. Direct reactive store access
 await loadPreference(groupHash, productIndex);
@@ -250,11 +252,12 @@ cd product-categorization && pip install -r requirements.txt  # Python deps
 - **CheckoutService**: Class → Functional pattern (31% code reduction)
 - **CartBusinessService**: Class → Functional stores (40% code reduction)
 - **OrdersService**: Class → Functional pattern (17% code reduction, renamed from CheckedOutCartsService)
-- **CartCalculationService**: Class → Functional exports with legacy wrapper (22% code reduction)
-- **CartPersistenceService**: Class → Functional exports with legacy wrapper (20% code reduction)
+- **CartCalculationService**: Class → Pure functional exports (22% code reduction)
+- **CartPersistenceService**: Class → Pure functional exports (20% code reduction)
+- **CartInteractionService**: Class → Functional utilities with zero legacy code
 
 ### Architecture Status: COMPLETE ✅
-**Pattern**: All cart services follow consistent functional patterns with direct store access and zero context injection. Legacy class wrappers maintained for backward compatibility during transition.
+**Pattern**: All cart services follow consistent functional patterns with direct store access and zero context injection. Zero legacy code remaining - complete functional architecture achieved.
 
 ## AI Categorization Pipeline
 **Location**: `/product-categorization/`

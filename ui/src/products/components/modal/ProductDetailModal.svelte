@@ -7,7 +7,7 @@
     } from "svelte";
     import { get } from "svelte/store"; // Import get
     import { cartItems, getCartItems } from "../../../cart/services/CartBusinessService";
-    import { CartInteractionService } from "../../../cart/services/CartInteractionService";
+    import { updateQuantity, findCartItem } from "../../../cart/services/CartInteractionService";
     import { preferences, loadPreference, getPreferenceKey } from "../../services/PreferencesService";
     import { derived } from "svelte/store";
     import ProductModalHeader from "./ProductModalHeader.svelte";
@@ -75,7 +75,7 @@
         try {
             isTransitioning = true; // Start transition animation
 
-            const success = await CartInteractionService.updateQuantity(
+            const success = await updateQuantity(
                 groupHashBase64,
                 productIndex,
                 quantity,
@@ -104,7 +104,7 @@
     function checkCartStatus() {
         // Use centralized service to get cart data
         const items = getCartItems();
-        const item = CartInteractionService.findCartItem(
+        const item = findCartItem(
             items,
             groupHashBase64,
             productIndex,

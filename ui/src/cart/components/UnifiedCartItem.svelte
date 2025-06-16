@@ -1,7 +1,7 @@
 <script lang="ts">
     import { PencilLine, Plus, Minus } from "lucide-svelte";
     import { PriceService } from "../../services/PriceService";
-    import { CartInteractionService } from "../services/CartInteractionService";
+    import { decrementItem, incrementItem, removeItem } from "../services/CartInteractionService";
     import { getDisplayUnit } from "../utils/cartHelpers";
     import ProductDetailModal from "../../products/components/modal/ProductDetailModal.svelte";
     import CartItem from "./items/CartItem.svelte";
@@ -30,7 +30,6 @@
     // State for modal and animation
     let showModal = false;
     let isRemoving = false;
-    let cartItemComponent: any;
     let cartItemElement: HTMLElement | undefined;
     let checkoutItemElement: HTMLElement;
 
@@ -56,7 +55,7 @@
             }
         }
 
-        await CartInteractionService.decrementItem(
+        await decrementItem(
             normalizedGroupHash,
             normalizedProductIndex,
             normalizedQuantity,
@@ -66,7 +65,7 @@
     };
 
     const handleIncrementItem = async () => {
-        await CartInteractionService.incrementItem(
+        await incrementItem(
             normalizedGroupHash,
             normalizedProductIndex,
             normalizedQuantity,
@@ -86,7 +85,7 @@
         }
 
         // Then remove from cart
-        await CartInteractionService.removeItem(
+        await removeItem(
             normalizedGroupHash,
             normalizedProductIndex,
         );
@@ -100,7 +99,6 @@
 {#if variant === "cart"}
     <!-- Cart variant - uses existing CartItem wrapper and component structure -->
     <CartItem
-        bind:this={cartItemComponent}
         bind:element={cartItemElement}
         id={`${normalizedGroupHash}_${normalizedProductIndex}`}
         class={isRemoving ? "item-removing" : ""}
@@ -260,26 +258,24 @@
                 </button>
             </div>
             <div class="item-right">
-                {#if true}
-                    <div class="quantity-control">
-                        <button
-                            class="quantity-btn minus-btn"
-                            on:click|stopPropagation={handleDecrementItem}
-                        >
-                            <Minus size={14} />
-                        </button>
-                        <span class="quantity-display">
-                            {normalizedQuantity}
-                            {displayUnit}
-                        </span>
-                        <button
-                            class="quantity-btn plus-btn"
-                            on:click|stopPropagation={handleIncrementItem}
-                        >
-                            <Plus size={14} />
-                        </button>
-                    </div>
-                {/if}
+                <div class="quantity-control">
+                    <button
+                        class="quantity-btn minus-btn"
+                        on:click|stopPropagation={handleDecrementItem}
+                    >
+                        <Minus size={14} />
+                    </button>
+                    <span class="quantity-display">
+                        {normalizedQuantity}
+                        {displayUnit}
+                    </span>
+                    <button
+                        class="quantity-btn plus-btn"
+                        on:click|stopPropagation={handleIncrementItem}
+                    >
+                        <Plus size={14} />
+                    </button>
+                </div>
 
                 <!-- Item totals using PriceService -->
                 <div class="item-price">
@@ -300,14 +296,12 @@
                     {/if}
                 </div>
 
-                {#if true}
-                    <button
-                        class="btn btn-text remove-item"
-                        on:click|stopPropagation={handleRemove}
-                    >
-                        Remove
-                    </button>
-                {/if}
+                <button
+                    class="btn btn-text remove-item"
+                    on:click|stopPropagation={handleRemove}
+                >
+                    Remove
+                </button>
             </div>
         </div>
     </div>

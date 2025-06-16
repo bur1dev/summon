@@ -10,7 +10,7 @@
   import { PriceService } from "../../services/PriceService";
   import { StockService } from "../../services/StockService";
   import { cartItems } from "../../cart/services/CartBusinessService";
-  import { CartInteractionService } from "../../cart/services/CartInteractionService";
+  import { addProductToCart, incrementItem, decrementItem, getCurrentQuantity } from "../../cart/services/CartInteractionService";
   import {
     isSoldByWeight,
     parseProductHash,
@@ -58,7 +58,7 @@
 
   // Update item count whenever it changes
   function updateItemCount(items: any[]) {
-    const quantity = CartInteractionService.getCurrentQuantity(
+    const quantity = getCurrentQuantity(
       items,
       groupHashBase64,
       productIndex,
@@ -135,7 +135,7 @@
       productIndex,
     });
 
-    addProductToCart();
+    handleAddToCart();
   }
 
   function handleCardClick(e?: Event) {
@@ -153,7 +153,7 @@
 
   async function handleIncrementClick() {
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await CartInteractionService.incrementItem(
+    await incrementItem(
       groupHashBase64,
       productIndex,
       currentAmount,
@@ -163,7 +163,7 @@
 
   async function handleDecrementClick() {
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await CartInteractionService.decrementItem(
+    await decrementItem(
       groupHashBase64,
       productIndex,
       currentAmount,
@@ -172,8 +172,8 @@
   }
 
   // Add product to cart using centralized service
-  async function addProductToCart() {
-    await CartInteractionService.addToCart(
+  async function handleAddToCart() {
+    await addProductToCart(
       groupHashBase64,
       productIndex,
       undefined, // note

@@ -1,14 +1,24 @@
-import { encodeHashToBase64 } from '@holochain/client';
+import { standardizeHashFormat } from "../utils/zomeHelpers";
 import { writable, derived } from 'svelte/store';
 import type { DataManager } from "../../services/DataManager";
-import { CartPersistenceService } from "./CartPersistenceService";
-import { CartCalculationService } from "./CartCalculationService";
+import { 
+    setPersistenceClient, 
+    loadFromLocalStorage, 
+    loadFromPrivateEntry, 
+    saveToLocalStorage, 
+    scheduleSyncToHolochain, 
+    forceSyncToHolochain as persistenceForceSyncToHolochain, 
+    mergeLocalAndHolochainCarts 
+} from "./CartPersistenceService";
+import { 
+    setCalculationDataManager, 
+    calculateCartTotals, 
+    calculateItemDelta 
+} from "./CartCalculationService";
 import type { CartItem, ActionHashB64 } from '../types/CartTypes';
 
 // Service dependencies
 let client: any = null;
-let persistenceService: CartPersistenceService | null = null;
-let calculationService: CartCalculationService | null = null;
 
 // Core stores
 export const cartItems = writable<CartItem[]>([]);
@@ -30,8 +40,8 @@ let localCartItems: CartItem[] = [];
 // Service initialization
 export function setCartServices(holoClient: any, dataManager?: DataManager): void {
     client = holoClient;
-    persistenceService = new CartPersistenceService(holoClient);
-    calculationService = new CartCalculationService(dataManager);
+    setPersistenceClient(holoClient);
+    if (dataManager) setCalculationDataManager(dataManager);
 
     cartItems.set([]);
     cartTotal.set(0);
@@ -44,22 +54,20 @@ export function setCartServices(holoClient: any, dataManager?: DataManager): voi
 
 // Set DataManager reference (called from Controller)
 export function setDataManager(dataManager: DataManager): void {
-    if (calculationService) {
-        calculationService.setDataManager(dataManager);
-        // Force immediate recalculation
-        setTimeout(() => recalculateCartTotal(), 0);
-    }
+    setCalculationDataManager(dataManager);
+    // Force immediate recalculation
+    setTimeout(() => recalculateCartTotal(), 0);
 }
 
 async function initialize(): Promise<void> {
-    if (!persistenceService) return;
+    if (!client) return;
     
     try {
         cartReady.set(false);
         cartLoading.set(true);
 
         // First check localStorage
-        const localItems = await persistenceService.loadFromLocalStorage();
+        const localItems = await loadFromLocalStorage();
         if (localItems.length > 0) {
             localCartItems = localItems;
             cartItems.set(localItems);
@@ -88,17 +96,17 @@ async function initialize(): Promise<void> {
 
 // Load cart from Holochain
 export async function loadCart(): Promise<void> {
-    if (!persistenceService) return;
+    if (!client) return;
     
     cartLoading.set(true);
 
     try {
-        const holochainItems = await persistenceService.loadFromPrivateEntry();
+        const holochainItems = await loadFromPrivateEntry();
 
         if (holochainItems.length > 0) {
             if (localCartItems.length > 0) {
                 console.log("Merging Holochain cart with local cart");
-                localCartItems = persistenceService.mergeLocalAndHolochainCarts(
+                localCartItems = mergeLocalAndHolochainCarts(
                     localCartItems,
                     holochainItems
                 );
@@ -111,13 +119,13 @@ export async function loadCart(): Promise<void> {
             cartItems.set([...localCartItems]);
 
             // Save to localStorage
-            persistenceService.saveToLocalStorage(localCartItems);
+            saveToLocalStorage(localCartItems);
 
             // Recalculate cart total after loading items
             await recalculateCartTotal();
         } else if (localCartItems.length > 0) {
             // If we have local items but nothing in Holochain, sync to Holochain
-            persistenceService.forceSyncToHolochain(localCartItems);
+            persistenceForceSyncToHolochain(localCartItems);
         }
     } catch (error) {
         console.error('Error loading cart from Holochain:', error);
@@ -128,7 +136,7 @@ export async function loadCart(): Promise<void> {
 
 // Add product to cart (or update quantity)
 export async function addToCart(groupHash: ActionHashB64, productIndex: number, quantity: number = 1, note?: string, product?: any) {
-    if (!persistenceService) return { success: false, error: "Service not initialized", local: true };
+    if (!client) return { success: false, error: "Service not initialized", local: true };
     
     try {
         if (!groupHash) {
@@ -139,12 +147,7 @@ export async function addToCart(groupHash: ActionHashB64, productIndex: number, 
         console.log(`Adding to cart: groupHash=${groupHash}, productIndex=${productIndex}, quantity=${quantity}, note=${note}`);
 
         // Handle different hash formats - standardize to base64
-        let standardizedHash = groupHash;
-        if (typeof groupHash === 'string' && groupHash.includes(',')) {
-            console.log("Converting comma-separated hash to base64");
-            const byteArray = new Uint8Array(groupHash.split(',').map(Number));
-            standardizedHash = encodeHashToBase64(byteArray);
-        }
+        const standardizedHash = standardizeHashFormat(groupHash);
 
         // Get current item quantity for price delta calculation
         const currentItem = localCartItems.find(item =>
@@ -160,7 +163,7 @@ export async function addToCart(groupHash: ActionHashB64, productIndex: number, 
         await updateCartTotalDelta(standardizedHash, productIndex, quantityDelta, product);
 
         // Schedule sync to Holochain
-        persistenceService.scheduleSyncToHolochain(localCartItems);
+        scheduleSyncToHolochain(localCartItems);
 
         return { success: true, local: true };
     } catch (error) {
@@ -171,10 +174,10 @@ export async function addToCart(groupHash: ActionHashB64, productIndex: number, 
 
 // Update cart total with delta calculation
 async function updateCartTotalDelta(groupHash: ActionHashB64, productIndex: number, quantityDelta: number, product?: any): Promise<void> {
-    if (quantityDelta === 0 || !calculationService) return;
+    if (quantityDelta === 0) return;
 
     try {
-        const delta = await calculationService.calculateItemDelta(groupHash, productIndex, quantityDelta, product);
+        const delta = await calculateItemDelta(groupHash, productIndex, quantityDelta, product);
 
         cartTotal.update(current => {
             const newTotal = current + delta.regular;
@@ -193,7 +196,7 @@ async function updateCartTotalDelta(groupHash: ActionHashB64, productIndex: numb
 
 // Clear cart
 export async function clearCart() {
-    if (!persistenceService) return { success: false, error: "Service not initialized" };
+    if (!client) return { success: false, error: "Service not initialized" };
     
     try {
         // Clear local cart immediately
@@ -201,10 +204,10 @@ export async function clearCart() {
         cartItems.set([]);
         cartTotal.set(0);
         cartPromoTotal.set(0);
-        persistenceService.saveToLocalStorage([]);
+        saveToLocalStorage([]);
 
         // Schedule sync to Holochain
-        persistenceService.scheduleSyncToHolochain([]);
+        scheduleSyncToHolochain([]);
 
         return { success: true };
     } catch (error) {
@@ -214,7 +217,7 @@ export async function clearCart() {
 }
 
 function updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantity: number, note?: string): void {
-    if (!persistenceService) return;
+    if (!client) return;
     
     const currentTime = Date.now();
     const itemIndex = localCartItems.findIndex(item =>
@@ -247,15 +250,13 @@ function updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantit
     cartItems.set([...localCartItems]);
 
     // Save to localStorage
-    persistenceService.saveToLocalStorage(localCartItems);
+    saveToLocalStorage(localCartItems);
 }
 
 // Recalculate cart total completely
 async function recalculateCartTotal(): Promise<void> {
-    if (!calculationService) return;
-    
     try {
-        const totals = await calculationService.calculateCartTotals(localCartItems);
+        const totals = await calculateCartTotals(localCartItems);
         cartTotal.set(totals.regular);
         cartPromoTotal.set(totals.promo);
     } catch (error) {
@@ -276,19 +277,14 @@ export function subscribe(callback: (items: CartItem[]) => void) {
 
 // Helper methods for other services
 
-// Expose persistence service for other services
-export function getPersistenceService(): CartPersistenceService | null {
-    return persistenceService;
-}
-
-// Expose calculation service for product data access
-export function getCalculationService(): CartCalculationService | null {
-    return calculationService;
+// Get client for other services (backward compatibility)
+export function getClient(): any {
+    return client;
 }
 
 // Restore cart items from checked-out cart (used by CheckedOutCartsService)
 export async function restoreCartItems(cart: any): Promise<void> {
-    if (!persistenceService) return;
+    if (!client) return;
     
     console.log("Adding products back to cart:", cart.products.length);
 
@@ -312,7 +308,7 @@ export async function restoreCartItems(cart: any): Promise<void> {
     cartItems.set([...localCartItems]);
 
     // Save to localStorage
-    persistenceService.saveToLocalStorage(localCartItems);
+    saveToLocalStorage(localCartItems);
 
     // Recalculate total
     await recalculateCartTotal();
@@ -320,7 +316,7 @@ export async function restoreCartItems(cart: any): Promise<void> {
 
 // Force sync to Holochain (used after zome calls)
 export async function forceSyncToHolochain(): Promise<void> {
-    if (persistenceService) {
-        await persistenceService.forceSyncToHolochain(localCartItems);
+    if (client) {
+        await persistenceForceSyncToHolochain(localCartItems);
     }
 }

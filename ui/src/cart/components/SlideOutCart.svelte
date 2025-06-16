@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import { Frown } from "lucide-svelte";
-  import { cartItems, cartTotal, cartPromoTotal, hasItems, clearCart as clearCartService } from "../services/CartBusinessService";
+  import { cartItems, cartTotal, cartPromoTotal, clearCart as clearCartService } from "../services/CartBusinessService";
   import type { ProductDataService } from "../../products/services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
   import UnifiedCartItem from "./UnifiedCartItem.svelte";
@@ -36,9 +36,7 @@
   let checkoutError = "";
   let isClosing = false;
   let isTransitioningToCheckout = false;
-  // Direct reactive access to cart totals
-  $: cartTotalValue = $cartTotal;
-  $: cartPromoTotalValue = $cartPromoTotal;
+  // Use cart totals directly from stores
 
   // Animation
   let cartContainer: HTMLElement;
@@ -212,7 +210,7 @@
   }
 
   // Use PriceService for savings calculation
-  $: totalSavings = PriceService.calculateSavings(cartTotalValue, cartPromoTotalValue);
+  $: totalSavings = PriceService.calculateSavings($cartTotal, $cartPromoTotal);
 
   // Trigger zipper animation ONLY on initial cart load
   $: if (!isLoading && enrichedCartItems.length > 0 && cartContainer && !hasTriggeredInitialZipper) {
@@ -294,10 +292,10 @@
                   : 'slide-in-left'}"
             >
               <div class="cart-total-regular">
-                Total: {PriceService.formatTotal(cartTotalValue)}
+                Total: {PriceService.formatTotal($cartTotal)}
               </div>
               <div class="cart-total-promo">
-                With loyalty card: {PriceService.formatTotal(cartPromoTotalValue)}
+                With loyalty card: {PriceService.formatTotal($cartPromoTotal)}
               </div>
               {#if totalSavings > 0}
                 <div class="savings-amount">

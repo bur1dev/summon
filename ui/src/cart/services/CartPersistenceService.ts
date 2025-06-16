@@ -1,4 +1,4 @@
-import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
+import { encodeHash, callZome } from '../utils/zomeHelpers';
 
 interface CartItem {
     groupHash: string;
@@ -50,17 +50,12 @@ export async function loadFromPrivateEntry(): Promise<CartItem[]> {
     if (!client) return [];
 
     try {
-        const result = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'get_private_cart',
-            payload: null
-        });
+        const result = await callZome(client, 'cart', 'get_private_cart', null);
 
         if (result?.items) {
             return result.items
                 .map((item: any) => ({
-                    groupHash: encodeHashToBase64(item.group_hash),
+                    groupHash: encodeHash(item.group_hash),
                     productIndex: item.product_index,
                     quantity: item.quantity,
                     timestamp: item.timestamp,
@@ -98,11 +93,9 @@ async function syncToHolochain(cartItems: CartItem[]): Promise<void> {
 
     try {
         console.log("Syncing cart to Holochain:", cartItems);
-        await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'replace_private_cart',
-            payload: { items: cartItems, last_updated: Date.now() }
+        await callZome(client, 'cart', 'replace_private_cart', { 
+            items: cartItems, 
+            last_updated: Date.now() 
         });
         
         console.log("Cart successfully synced to Holochain");
@@ -131,22 +124,3 @@ export function mergeLocalAndHolochainCarts(localItems: CartItem[], holochainIte
     return Array.from(itemMap.values()).filter(item => item.quantity > 0);
 }
 
-// Legacy class for backward compatibility  
-export class CartPersistenceService {
-    private client: any;
-    private syncTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    constructor(client: any) {
-        this.client = client;
-        setPersistenceClient(client);
-    }
-
-    async loadFromLocalStorage(): Promise<CartItem[]> { return loadFromLocalStorage(); }
-    saveToLocalStorage(cartItems: CartItem[]): void { saveToLocalStorage(cartItems); }
-    async loadFromPrivateEntry(): Promise<CartItem[]> { return loadFromPrivateEntry(); }
-    scheduleSyncToHolochain(cartItems: CartItem[]): void { scheduleSyncToHolochain(cartItems); }
-    async forceSyncToHolochain(cartItems: CartItem[]): Promise<void> { return forceSyncToHolochain(cartItems); }
-    mergeLocalAndHolochainCarts(localItems: CartItem[], holochainItems: CartItem[]): CartItem[] {
-        return mergeLocalAndHolochainCarts(localItems, holochainItems);
-    }
-}

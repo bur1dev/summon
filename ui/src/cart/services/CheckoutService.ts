@@ -1,4 +1,5 @@
-import { decodeHashFromBase64 } from '@holochain/client';
+import { decodeHash, callZome } from '../utils/zomeHelpers';
+import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
 import { writable, get } from 'svelte/store';
 import type { CheckoutDetails } from '../types/CartTypes';
 import { getCartItems, forceSyncToHolochain, clearCart } from './CartBusinessService';
@@ -14,7 +15,8 @@ export function setCheckoutServices(holoClient: any) {
 
 // Checkout cart with delivery details
 export async function checkoutCart(details: CheckoutDetails) {
-    if (!client) return { success: false, message: "No Holochain client available" };
+    const clientError = validateClient(client, 'checkout cart');
+    if (clientError) return { success: false, message: clientError.message };
     
     try {
         await forceSyncToHolochain();
@@ -22,7 +24,7 @@ export async function checkoutCart(details: CheckoutDetails) {
         
         const cartProducts = localCartItems.map(item => {
             try {
-                const groupHash = decodeHashFromBase64(item.groupHash);
+                const groupHash = decodeHash(item.groupHash);
                 return {
                     group_hash: groupHash,
                     product_index: item.productIndex,
@@ -41,7 +43,7 @@ export async function checkoutCart(details: CheckoutDetails) {
         const payload: any = {
             address_hash: details.addressHash ? (() => {
                 try {
-                    return decodeHashFromBase64(details.addressHash);
+                    return decodeHash(details.addressHash);
                 } catch {
                     throw new Error('Invalid address hash format');
                 }
@@ -52,22 +54,16 @@ export async function checkoutCart(details: CheckoutDetails) {
         };
         
         console.log("Checking out cart with details:", payload);
-        const checkoutResult = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'checkout_cart',
-            payload
-        });
+        const checkoutResult = await callZome(client, 'cart', 'checkout_cart', payload);
         
         console.log("Checkout result:", checkoutResult);
         await clearCart();
         savedDeliveryDetails.set({});
         
-        return { success: true, data: checkoutResult };
+        return createSuccessResult(checkoutResult);
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('Error checking out cart:', error);
-        return { success: false, message: errorMessage };
+        return createErrorResult(error);
     }
 }
 

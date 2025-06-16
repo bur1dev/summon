@@ -1,4 +1,5 @@
-import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
+import { encodeHash, decodeHash, callZome } from '../utils/zomeHelpers';
+import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
 import { writable, get } from 'svelte/store';
 
 // Type for Address object
@@ -34,21 +35,17 @@ export function setAddressClient(holoClient: any) {
 
 // Load addresses
 export async function loadAddresses() {
-    if (!client) return;
+    const clientError = validateClient(client, 'loadAddresses');
+    if (clientError) return;
     
     addressesLoading.set(true);
     try {
-        const result = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'get_addresses',
-            payload: null
-        });
+        const result = await callZome(client, 'cart', 'get_addresses', null);
 
         if (Array.isArray(result)) {
             const addressMap: AddressMap = {};
             result.forEach(([hash, address]) => {
-                addressMap[encodeHashToBase64(hash)] = address;
+                addressMap[encodeHash(hash)] = address;
             });
             addresses.set(addressMap);
         }
@@ -59,73 +56,59 @@ export async function loadAddresses() {
 
 // Create address
 export async function createAddress(address: Address) {
-    if (!client) return { success: false, error: 'Client not available' };
+    const clientError = validateClient(client, 'createAddress');
+    if (clientError) return clientError;
     
     try {
-        const result = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'create_address',
-            payload: address
-        });
-
-        const hashB64 = encodeHashToBase64(result);
+        const result = await callZome(client, 'cart', 'create_address', address);
+        const hashB64 = encodeHash(result);
         addresses.update(current => ({ ...current, [hashB64]: address }));
         
         if (address.is_default) {
             updateDefaultAddress(hashB64);
         }
 
-        return { success: true, hash: hashB64 };
+        return createSuccessResult({ hash: hashB64 });
     } catch (error) {
-        return { success: false, error };
+        return createErrorResult(error);
     }
 }
 
 // Update address
 export async function updateAddress(hashB64: ActionHashB64, address: Address) {
-    if (!client) return { success: false, error: 'Client not available' };
+    const clientError = validateClient(client, 'updateAddress');
+    if (clientError) return clientError;
     
     try {
-        await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'update_address',
-            payload: [decodeHashFromBase64(hashB64), address]
-        });
-
+        await callZome(client, 'cart', 'update_address', [decodeHash(hashB64), address]);
         addresses.update(current => ({ ...current, [hashB64]: address }));
         
         if (address.is_default) {
             updateDefaultAddress(hashB64);
         }
 
-        return { success: true };
+        return createSuccessResult();
     } catch (error) {
-        return { success: false, error };
+        return createErrorResult(error);
     }
 }
 
 // Delete address
 export async function deleteAddress(hashB64: ActionHashB64) {
-    if (!client) return { success: false, error: 'Client not available' };
+    const clientError = validateClient(client, 'deleteAddress');
+    if (clientError) return clientError;
     
     try {
-        await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
-            fn_name: 'delete_address',
-            payload: decodeHashFromBase64(hashB64)
-        });
+        await callZome(client, 'cart', 'delete_address', decodeHash(hashB64));
 
         addresses.update(current => {
             const { [hashB64]: deleted, ...remaining } = current;
             return remaining;
         });
 
-        return { success: true };
+        return createSuccessResult();
     } catch (error) {
-        return { success: false, error };
+        return createErrorResult(error);
     }
 }
 

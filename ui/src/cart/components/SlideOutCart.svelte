@@ -1,8 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import type { Writable } from "svelte/store";
   import { Frown } from "lucide-svelte";
-  import type { CartBusinessService } from "../services/CartBusinessService";
+  import { cartItems, cartTotal, cartPromoTotal, hasItems, clearCart as clearCartService } from "../services/CartBusinessService";
   import type { ProductDataService } from "../../products/services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
   import UnifiedCartItem from "./UnifiedCartItem.svelte";
@@ -20,17 +19,14 @@
     hasTriggeredInitialZipper = false;
   }
 
-  // Get cart service directly from the context
-  const cartServiceStore =
-    getContext<Writable<CartBusinessService | null>>("cartService");
+  // Cart service is now store-based, no context needed
 
 
   // Get ProductDataService from context (must be at top level)
   const productDataService =
     getContext<ProductDataService>("productDataService");
 
-  // State
-  let cartItems: any[] = [];
+  // State  
   let enrichedCartItems: any[] = [];
   let isLoading = true;
   
@@ -40,10 +36,9 @@
   let checkoutError = "";
   let isClosing = false;
   let isTransitioningToCheckout = false;
-  let cartTotalUnsubscribe: (() => void) | null = null;
-  let cartPromoTotalUnsubscribe: (() => void) | null = null;
-  let cartTotal = 0;
-  let cartPromoTotal = 0;
+  // Direct reactive access to cart totals
+  $: cartTotalValue = $cartTotal;
+  $: cartPromoTotalValue = $cartPromoTotal;
 
   // Animation
   let cartContainer: HTMLElement;
@@ -118,40 +113,19 @@
   }
 
   onMount(() => {
-    if (
-      $cartServiceStore &&
-      typeof $cartServiceStore.subscribe === "function"
-    ) {
-      unsubscribe = $cartServiceStore.subscribe(async (items) => {
-        // Filter out any invalid items - ones with no groupHash
-        cartItems = (items || []).filter((item) => item && item.groupHash);
+    // Subscribe directly to cart items store
+    unsubscribe = cartItems.subscribe(async (items) => {
+      // Filter out any invalid items - ones with no groupHash
+      const validItems = (items || []).filter((item) => item && item.groupHash);
 
-        // Use smart enrichment - only fetch new items
-        await updateEnrichedItems(cartItems);
+      // Use smart enrichment - only fetch new items
+      await updateEnrichedItems(validItems);
 
-        isLoading = false;
-      });
-
-      // Subscribe to cart totals
-      cartTotalUnsubscribe = $cartServiceStore.cartTotal.subscribe((total) => {
-        cartTotal = total;
-      });
-
-      cartPromoTotalUnsubscribe = $cartServiceStore.cartPromoTotal.subscribe(
-        (total) => {
-          cartPromoTotal = total;
-        },
-      );
-    } else {
-      console.warn("Cart service not available in SlideOutCart");
-      cartItems = [];
       isLoading = false;
-    }
+    });
 
     return () => {
       if (unsubscribe) unsubscribe();
-      if (cartTotalUnsubscribe) cartTotalUnsubscribe();
-      if (cartPromoTotalUnsubscribe) cartPromoTotalUnsubscribe();
     };
   });
 
@@ -183,12 +157,7 @@
   // Clear cart
   async function clearCart() {
     try {
-      if (
-        $cartServiceStore &&
-        typeof $cartServiceStore.clearCart === "function"
-      ) {
-        await $cartServiceStore.clearCart();
-      }
+      await clearCartService();
       closeCart();
     } catch (error) {
       console.error("Error clearing cart:", error);
@@ -243,7 +212,7 @@
   }
 
   // Use PriceService for savings calculation
-  $: totalSavings = PriceService.calculateSavings(cartTotal, cartPromoTotal);
+  $: totalSavings = PriceService.calculateSavings(cartTotalValue, cartPromoTotalValue);
 
   // Trigger zipper animation ONLY on initial cart load
   $: if (!isLoading && enrichedCartItems.length > 0 && cartContainer && !hasTriggeredInitialZipper) {
@@ -272,9 +241,8 @@
       on:click|stopPropagation
       on:keydown|stopPropagation
     >
-      {#if isShowingCheckoutFlow && $cartServiceStore}
+      {#if isShowingCheckoutFlow}
         <CheckoutFlow
-          cartService={$cartServiceStore}
           cartItems={enrichedCartItems}
           onClose={closeCheckoutFlow}
           isClosingCart={isClosing}
@@ -326,10 +294,10 @@
                   : 'slide-in-left'}"
             >
               <div class="cart-total-regular">
-                Total: {PriceService.formatTotal(cartTotal)}
+                Total: {PriceService.formatTotal(cartTotalValue)}
               </div>
               <div class="cart-total-promo">
-                With loyalty card: {PriceService.formatTotal(cartPromoTotal)}
+                With loyalty card: {PriceService.formatTotal(cartPromoTotalValue)}
               </div>
               {#if totalSavings > 0}
                 <div class="savings-amount">

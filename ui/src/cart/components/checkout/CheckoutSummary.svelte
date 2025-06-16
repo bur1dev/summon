@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import type { Address } from "../../services/AddressService";
-    import type { CartBusinessService } from "../../services/CartBusinessService";
+    // CartBusinessService no longer exported
     import CheckoutOrderList from "./CheckoutOrderList.svelte";
     import CheckoutPriceSummary from "./CheckoutPriceSummary.svelte";
 

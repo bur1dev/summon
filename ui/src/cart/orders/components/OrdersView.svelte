@@ -2,7 +2,7 @@
   import { getContext, onMount } from "svelte";
   import { ShoppingCart, X } from "lucide-svelte";
   import type { Writable } from "svelte/store";
-  import type { AddressService } from "../../services/AddressService";
+  import { addresses } from "../../services/AddressService";
   import type { CheckedOutCartsService } from "../../services/CheckedOutCartsService";
   import { currentViewStore } from "../../../stores/UiOnlyStore";
   import OrderCard from "./OrderCard.svelte";
@@ -11,8 +11,6 @@
   // Get checked out carts service from context
   const checkedOutCartsService = getContext("checkedOutCartsService") as Writable<CheckedOutCartsService | null>;
 
-  // Get address service from context (centralized)
-  const addressService = getContext("addressService") as Writable<AddressService | null>;
 
   // Get the store for the client
   const storeContext = getContext<import("../../../store").StoreContext>("store");
@@ -22,17 +20,9 @@
   let isLoading = true;
   let checkedOutCarts: any[] = [];
   let errorMessage = "";
-  let addressCache = new Map();
   let isClosing = false;
 
   onMount(() => {
-    // Subscribe to centralized address service
-    let unsubscribe: (() => void) | undefined;
-    if ($addressService) {
-      unsubscribe = $addressService.getAddresses().subscribe((addresses) => {
-        addressCache = addresses;
-      });
-    }
 
     // Load checked out carts
     loadCheckedOutCarts().catch((error) => {
@@ -42,12 +32,6 @@
       isLoading = false;
     });
 
-    // Return cleanup function
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
   });
 
   async function loadCheckedOutCarts() {
@@ -145,7 +129,7 @@
         {#each checkedOutCarts as item}
           <OrderCard 
             {item} 
-            {addressCache} 
+            addressCache={$addresses} 
             agentPubKey={store?.myAgentPubKeyB64}
             on:returnToShopping={() => returnToShopping(item)}
           />

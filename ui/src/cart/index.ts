@@ -1,9 +1,10 @@
 // Cart feature exports
-export { CartBusinessService } from './services/CartBusinessService';
+// CartBusinessService is now functional, not a class export
 export { CartCalculationService } from './services/CartCalculationService';
 export { CartInteractionService } from './services/CartInteractionService';
 export { CartPersistenceService } from './services/CartPersistenceService';
-export { AddressService } from './services/AddressService';
+export * from './services/AddressService';
+export * from './services/CheckoutService';
 
 export * from './utils/cartHelpers';
 

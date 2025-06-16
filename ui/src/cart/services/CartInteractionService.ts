@@ -1,6 +1,4 @@
-import type { Writable } from 'svelte/store';
-import { get } from 'svelte/store';
-import type { CartBusinessService } from './CartBusinessService';
+import { addToCart } from './CartBusinessService';
 import { getIncrementValue } from '../utils/cartHelpers';
 
 /**
@@ -8,35 +6,19 @@ import { getIncrementValue } from '../utils/cartHelpers';
  * Following the PriceService pattern for clean, reusable cart operations
  */
 export class CartInteractionService {
-    
-    /**
-     * Safely gets cart service instance with error handling
-     */
-    static getCartService(cartServiceStore: Writable<CartBusinessService | null>): CartBusinessService | null {
-        const serviceInstance = get(cartServiceStore);
-        if (!serviceInstance) {
-            console.error("CartInteractionService: Cart service instance not available");
-            return null;
-        }
-        return serviceInstance;
-    }
 
     /**
      * Adds a product to cart with default quantity (1)
      */
     static async addToCart(
-        cartServiceStore: Writable<CartBusinessService | null>,
         groupHash: string,
         productIndex: number,
         note?: string,
         product?: any
     ): Promise<boolean> {
-        const service = this.getCartService(cartServiceStore);
-        if (!service) return false;
-
         try {
-            await service.addToCart(groupHash, productIndex, 1, note, product);
-            return true;
+            const result = await addToCart(groupHash, productIndex, 1, note, product);
+            return result.success;
         } catch (error) {
             console.error("Error adding to cart:", error);
             return false;
@@ -47,21 +29,17 @@ export class CartInteractionService {
      * Increments item quantity using product-specific increment value
      */
     static async incrementItem(
-        cartServiceStore: Writable<CartBusinessService | null>,
         groupHash: string,
         productIndex: number,
         currentQuantity: number,
         product: any,
         note?: string
     ): Promise<boolean> {
-        const service = this.getCartService(cartServiceStore);
-        if (!service) return false;
-
         try {
             const incrementValue = getIncrementValue(product);
             const newQuantity = currentQuantity + incrementValue;
-            await service.addToCart(groupHash, productIndex, newQuantity, note, product);
-            return true;
+            const result = await addToCart(groupHash, productIndex, newQuantity, note, product);
+            return result.success;
         } catch (error) {
             console.error("Error incrementing item:", error);
             return false;
@@ -73,27 +51,21 @@ export class CartInteractionService {
      * Removes item if quantity would be 0 or negative
      */
     static async decrementItem(
-        cartServiceStore: Writable<CartBusinessService | null>,
         groupHash: string,
         productIndex: number,
         currentQuantity: number,
         product: any,
         note?: string
     ): Promise<boolean> {
-        const service = this.getCartService(cartServiceStore);
-        if (!service) return false;
-
         try {
             const incrementValue = getIncrementValue(product);
             const newQuantity = currentQuantity - incrementValue;
             
-            if (newQuantity > 0) {
-                await service.addToCart(groupHash, productIndex, newQuantity, note, product);
-            } else {
-                // Remove item by setting quantity to 0
-                await service.addToCart(groupHash, productIndex, 0, undefined, product);
-            }
-            return true;
+            const result = newQuantity > 0 
+                ? await addToCart(groupHash, productIndex, newQuantity, note, product)
+                : await addToCart(groupHash, productIndex, 0, undefined, product);
+            
+            return result.success;
         } catch (error) {
             console.error("Error decrementing item:", error);
             return false;
@@ -104,17 +76,13 @@ export class CartInteractionService {
      * Removes item completely from cart
      */
     static async removeItem(
-        cartServiceStore: Writable<CartBusinessService | null>,
         groupHash: string,
         productIndex: number,
         product?: any
     ): Promise<boolean> {
-        const service = this.getCartService(cartServiceStore);
-        if (!service) return false;
-
         try {
-            await service.addToCart(groupHash, productIndex, 0, undefined, product);
-            return true;
+            const result = await addToCart(groupHash, productIndex, 0, undefined, product);
+            return result.success;
         } catch (error) {
             console.error("Error removing item:", error);
             return false;
@@ -125,19 +93,15 @@ export class CartInteractionService {
      * Updates item quantity to a specific value
      */
     static async updateQuantity(
-        cartServiceStore: Writable<CartBusinessService | null>,
         groupHash: string,
         productIndex: number,
         newQuantity: number,
         note?: string,
         product?: any
     ): Promise<boolean> {
-        const service = this.getCartService(cartServiceStore);
-        if (!service) return false;
-
         try {
-            await service.addToCart(groupHash, productIndex, newQuantity, note, product);
-            return true;
+            const result = await addToCart(groupHash, productIndex, newQuantity, note, product);
+            return result.success;
         } catch (error) {
             console.error("Error updating quantity:", error);
             return false;

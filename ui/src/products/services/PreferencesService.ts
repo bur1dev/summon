@@ -26,12 +26,7 @@ export async function loadPreference(groupHash: string, productIndex: number): P
     if (!client) return false;
     
     const key = getPreferenceKey(groupHash, productIndex);
-    
-    // Set loading state
-    preferences.update(prefs => ({
-        ...prefs,
-        [key]: { ...prefs[key], loading: true }
-    }));
+    updatePreference(key, { loading: true });
     
     try {
         const result = await client.callZome({
@@ -46,27 +41,18 @@ export async function loadPreference(groupHash: string, productIndex: number): P
 
         if (result) {
             const [prefHash, preference] = result;
-            preferences.update(prefs => ({
-                ...prefs,
-                [key]: {
-                    loading: false,
-                    preference: { hash: encodeHashToBase64(prefHash), preference },
-                    savePreference: true
-                }
-            }));
+            updatePreference(key, {
+                loading: false,
+                preference: { hash: encodeHashToBase64(prefHash), preference },
+                savePreference: true
+            });
         } else {
-            preferences.update(prefs => ({
-                ...prefs,
-                [key]: { loading: false, preference: null, savePreference: false }
-            }));
+            updatePreference(key, { loading: false, preference: null, savePreference: false });
         }
         return true;
     } catch (error) {
         console.error("Error loading preference:", error);
-        preferences.update(prefs => ({
-            ...prefs,
-            [key]: { loading: false, preference: null, savePreference: false }
-        }));
+        updatePreference(key, { loading: false, preference: null, savePreference: false });
         return false;
     }
 }
@@ -89,14 +75,10 @@ export async function savePreference(groupHash: string, productIndex: number, no
         });
 
         const key = getPreferenceKey(groupHash, productIndex);
-        preferences.update(prefs => ({
-            ...prefs,
-            [key]: {
-                ...prefs[key],
-                preference: { hash: encodeHashToBase64(hash), preference: { note: note.trim() } },
-                savePreference: true
-            }
-        }));
+        updatePreference(key, {
+            preference: { hash: encodeHashToBase64(hash), preference: { note: note.trim() } },
+            savePreference: true
+        });
         return true;
     } catch (error) {
         console.error("Error saving preference:", error);
@@ -116,10 +98,7 @@ export async function deletePreference(preferenceHash: string, groupHash: string
         });
 
         const key = getPreferenceKey(groupHash, productIndex);
-        preferences.update(prefs => ({
-            ...prefs,
-            [key]: { ...prefs[key], preference: null, savePreference: false }
-        }));
+        updatePreference(key, { preference: null, savePreference: false });
         return true;
     } catch (error) {
         console.error("Error deleting preference:", error);
@@ -129,8 +108,13 @@ export async function deletePreference(preferenceHash: string, groupHash: string
 
 export function updateSavePreference(groupHash: string, productIndex: number, value: boolean): void {
     const key = getPreferenceKey(groupHash, productIndex);
+    updatePreference(key, { savePreference: value });
+}
+
+// Helper to update preference state
+function updatePreference(key: string, updates: Partial<PreferenceState>) {
     preferences.update(prefs => ({
         ...prefs,
-        [key]: { ...prefs[key], savePreference: value }
+        [key]: { ...prefs[key], ...updates }
     }));
 }

@@ -6,10 +6,10 @@
     type AppWebsocketConnectionOptions,
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
-  import { CartBusinessService } from "./cart/services/CartBusinessService";
-  import { CheckoutService } from "./cart/services/CheckoutService";
+  import { setCartServices } from "./cart/services/CartBusinessService";
+  import { setCheckoutServices } from "./cart/services/CheckoutService";
   import { CheckedOutCartsService } from "./cart/services/CheckedOutCartsService";
-  import { AddressService } from "./cart/services/AddressService";
+  import { setAddressClient } from "./cart/services/AddressService";
   import { setPreferencesClient } from "./products/services/PreferencesService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
@@ -34,14 +34,8 @@
   let profilesStore: ProfilesStore;
   let shopStoreInstance: ShopStore | null = null;
 
-  // Create a single cart service that all components can access
-  // Start with a writable that we'll set once connected
-  const cartService = writable<CartBusinessService | null>(null);
-  setContext("cartService", cartService);
+  // Cart service is now store-based, no context needed
 
-  // Create a writable for the checkout service
-  const checkoutServiceStore = writable<CheckoutService | null>(null);
-  setContext("checkoutService", checkoutServiceStore);
 
   // Create a writable for the checked out carts service
   const checkedOutCartsServiceStore = writable<CheckedOutCartsService | null>(
@@ -49,9 +43,6 @@
   );
   setContext("checkedOutCartsService", checkedOutCartsServiceStore);
 
-  // Create a writable for the address service
-  const addressServiceStore = writable<AddressService | null>(null);
-  setContext("addressService", addressServiceStore);
 
   // Set the "store" context immediately. shopStoreInstance is initially null.
   setContext<StoreContext>("store", {
@@ -94,32 +85,22 @@
     // Initialize ShopStore once client is available
     shopStoreInstance = new ShopStore(client, roleName);
 
-    // Now that we have a client, initialize the cart service and set it in the store
-    const cartServiceInstance = new CartBusinessService(client);
-    console.log("CartBusinessService created with client:", !!client);
-    cartService.set(cartServiceInstance); // Set the instance into the cartService store
+    // Initialize cart service with functional pattern
+    setCartServices(client);
+    console.log("CartBusinessService initialized with client:", !!client);
 
-    // Initialize the checkout service with dependencies
-    const checkoutServiceInstance = new CheckoutService(
-      client,
-      cartServiceInstance.getPersistenceService(),
-      cartServiceInstance,
-    );
-    console.log("CheckoutService created with client:", !!client);
-    checkoutServiceStore.set(checkoutServiceInstance);
+    // Initialize CheckoutService with dependencies
+    setCheckoutServices(client);
+    console.log("CheckoutService initialized with client:", !!client);
 
     // Initialize the checked out carts service with dependencies
-    const checkedOutCartsServiceInstance = new CheckedOutCartsService(
-      client,
-      cartServiceInstance,
-    );
+    const checkedOutCartsServiceInstance = new CheckedOutCartsService(client);
     console.log("CheckedOutCartsService created with client:", !!client);
     checkedOutCartsServiceStore.set(checkedOutCartsServiceInstance);
 
-    // Initialize the address service
-    const addressServiceInstance = new AddressService(client);
-    console.log("AddressService created with client:", !!client);
-    addressServiceStore.set(addressServiceInstance); // Update the address service store
+    // Initialize AddressService client
+    setAddressClient(client);
+    console.log("AddressService client initialized:", !!client);
 
     // Initialize PreferencesService with client
     setPreferencesClient(client);

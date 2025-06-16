@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { getContext, onMount, onDestroy } from "svelte";
-  import type { Writable } from "svelte/store";
+  import { onMount, onDestroy } from "svelte";
   import ReportCategoryDialog from "../../reports/components/ReportCategoryDialog.svelte";
   import ProductDetailModal from "./modal/ProductDetailModal.svelte";
   import ProductCardDisplay from "./ProductCardDisplay.svelte";
@@ -10,7 +9,7 @@
 
   import { PriceService } from "../../services/PriceService";
   import { StockService } from "../../services/StockService";
-  import type { CartBusinessService } from "../../cart/services/CartBusinessService";
+  import { cartItems } from "../../cart/services/CartBusinessService";
   import { CartInteractionService } from "../../cart/services/CartInteractionService";
   import {
     isSoldByWeight,
@@ -26,9 +25,7 @@
 
   const dispatch = createEventDispatcher();
 
-  // Get cart service directly from the context and type it as a Svelte store
-  const cartService =
-    getContext<Writable<CartBusinessService | null>>("cartService");
+  // Cart service is now store-based, no context needed
 
   export let product: any;
   export let actionHash: any = undefined;
@@ -37,8 +34,6 @@
   let itemCount: number = 0;
   let itemWeight: number = 1; // Default to 1 lb for weight items
   let unsubscribeCartState: (() => void) | null = null;
-  let isServiceReady: boolean = false;
-  let unsubscribeReadyState: (() => void) | null = null;
 
   // Use cart helpers for product properties
   $: productIsSoldByWeight = isSoldByWeight(product);
@@ -82,38 +77,15 @@
   }
 
   onMount(() => {
-    if ($cartService) {
-      // Subscribe to ready state
-      unsubscribeReadyState = $cartService.ready.subscribe((ready: boolean) => {
-        isServiceReady = ready;
-
-        // If ready, check cart items immediately
-        if (ready) {
-          const items = $cartService.getCartItems();
-          updateItemCount(items);
-        }
-      });
-
-      // Subscribe to cart items
-      unsubscribeCartState = $cartService.subscribe((items: any[]) => {
-        updateItemCount(items);
-      });
-
-      // Initial check if service is already ready
-      if (isServiceReady) {
-        const items = $cartService.getCartItems();
-        updateItemCount(items);
-      }
-    }
+    // Subscribe directly to cart items store
+    unsubscribeCartState = cartItems.subscribe((items: any[]) => {
+      updateItemCount(items);
+    });
   });
 
   onDestroy(() => {
     if (typeof unsubscribeCartState === "function") {
       unsubscribeCartState();
-    }
-
-    if (typeof unsubscribeReadyState === "function") {
-      unsubscribeReadyState();
     }
   });
 
@@ -155,10 +127,7 @@
   // Handle the main "Add" button click
   function handleButtonClick(e: MouseEvent | CustomEvent) {
     e.stopPropagation();
-    if (!$cartService) {
-      console.warn("Cart service not available");
-      return;
-    }
+    // Cart service is always available with store pattern
 
     console.log("ProductCard hash info:", {
       effectiveHash: actionHash || product?.hash,
@@ -185,7 +154,6 @@
   async function handleIncrementClick() {
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
     await CartInteractionService.incrementItem(
-      cartService,
       groupHashBase64,
       productIndex,
       currentAmount,
@@ -196,7 +164,6 @@
   async function handleDecrementClick() {
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
     await CartInteractionService.decrementItem(
-      cartService,
       groupHashBase64,
       productIndex,
       currentAmount,
@@ -207,7 +174,6 @@
   // Add product to cart using centralized service
   async function addProductToCart() {
     await CartInteractionService.addToCart(
-      cartService,
       groupHashBase64,
       productIndex,
       undefined, // note

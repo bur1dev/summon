@@ -8,7 +8,7 @@
 
   // Props
   export let item: any;
-  export let addressCache: Map<any, any>;
+  export let addressCache: Record<string, any>;
   export let agentPubKey: string | undefined;
 
   // Event dispatcher
@@ -66,8 +66,8 @@
 
   {#if item.addressHash || item.deliveryTime}
     <div class="delivery-details">
-      {#if item.addressHash && addressCache.has(item.addressHash)}
-        {@const address = addressCache.get(item.addressHash)}
+      {#if item.addressHash && addressCache[item.addressHash]}
+        {@const address = addressCache[item.addressHash]}
         <div class="delivery-address">
           <div class="delivery-icon">
             <MapPin size={16} />

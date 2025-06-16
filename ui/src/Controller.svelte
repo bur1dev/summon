@@ -18,7 +18,7 @@
   import { currentViewStore, isCartOpenStore } from "./stores/UiOnlyStore";
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
-  import type { CartBusinessService } from "./cart/services/CartBusinessService";
+  import { setDataManager, cartTotal } from "./cart/services/CartBusinessService";
   import { browserNavigationService } from "./services/BrowserNavigationService";
 
   export let roleName = "";
@@ -42,9 +42,7 @@
   // STEP 2: Create centralized DataManager
   const dataManager = new DataManager(productDataService);
 
-  // Get cart service from context
-  const cartService =
-    getContext<Writable<CartBusinessService | null>>("cartService");
+  // Cart service is now store-based, no context needed
 
   // Cart total for header display
   let cartTotalValue = 0;
@@ -82,12 +80,10 @@
     browserNavigationService.setDataManager(dataManager);
 
     // Inject DataManager into cart service
-    if ($cartService && dataManager) {
-      $cartService.setDataManager(dataManager);
-    }
+    setDataManager(dataManager);
 
     // Subscribe to the cartTotal from the cart service
-    const unsubscribe = $cartService?.cartTotal?.subscribe((value) => {
+    const unsubscribe = cartTotal.subscribe((value) => {
       cartTotalValue = value || 0;
     });
 
@@ -126,7 +122,7 @@
         {#if $currentViewStore === "active"}
           <!-- The global scroll container with header and shop view -->
           <div class="global-scroll-container scroll-container">
-            <HeaderContainer cartTotal={cartTotalValue} />
+            <HeaderContainer cartTotalValue={cartTotalValue} />
             <div class="workspace">
               <ShopView bind:this={shopViewComponent} />
             </div>

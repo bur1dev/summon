@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { get, type Writable } from "svelte/store";
-    import type { CartBusinessService } from "../../../cart/services/CartBusinessService";
+    import { get } from "svelte/store";
     import { preferences, savePreference as savePreferenceAPI, deletePreference, updateSavePreference, getPreferenceKey } from "../../services/PreferencesService";
+    import { addToCart } from "../../../cart/services/CartBusinessService";
     import { Save } from "lucide-svelte";
 
-    export let cartServiceStore: Writable<CartBusinessService | null>;
+    // CartBusinessService no longer needed as prop
     export let groupHashBase64: string;
     export let productIndex: number;
     export let quantity: number;
@@ -47,15 +47,8 @@
     }
 
     async function saveInstructions() {
-        const serviceInstance = get(cartServiceStore);
-        if (!serviceInstance) {
-            console.error(
-                "PreferencesSection: saveInstructions called but cartService instance is not available.",
-            );
-            return;
-        }
         try {
-            await serviceInstance.addToCart(
+            await addToCart(
                 groupHashBase64,
                 productIndex,
                 quantity,

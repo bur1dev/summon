@@ -1,7 +1,6 @@
 <script lang="ts">
-    import { onMount, createEventDispatcher, getContext } from "svelte";
-    import { type Address, type AddressService } from "../../services/AddressService";
-    import type { Writable } from "svelte/store";
+    import { onMount, createEventDispatcher } from "svelte";
+    import { type Address, addresses, addressesLoading, loadAddresses, createAddress, deleteAddress, validateAddress } from "../../services/AddressService";
     import AddressForm from "./AddressForm.svelte";
     import AddressList from "./AddressList.svelte";
     import DeleteConfirmationModal from "./DeleteConfirmationModal.svelte";
@@ -15,9 +14,7 @@
     // Event dispatcher
     const dispatch = createEventDispatcher();
 
-    // Get preloaded AddressService from context
-    const addressService = getContext<Writable<AddressService | null>>("addressService");
-    let addresses = new Map<string, Address>();
+    // Direct access to addresses store
 
     // UI state
     let showNewAddressForm = false;
@@ -33,18 +30,8 @@
     let removingAddresses = new Set<string>();
 
     onMount(() => {
-        if ($addressService) {
-            // Subscribe to preloaded addresses (instant)
-            const unsubscribe = $addressService.getAddresses().subscribe((value: Map<string, Address>) => {
-                addresses = value;
-            });
-
-            return () => {
-                unsubscribe();
-            };
-        } else {
-            console.warn("AddressService not available from context");
-        }
+        // Load addresses if needed
+        loadAddresses();
     });
 
     // Handle address selection from AddressList
@@ -56,18 +43,13 @@
 
     // Add new address
     async function handleAddAddress(event: CustomEvent) {
-        if (!$addressService) {
-            validationError = "Address service not available";
-            return;
-        }
-
         isValidating = true;
         validationError = "";
 
         const newAddress = event.detail.address;
 
         // Validate the address using OpenStreetMap
-        const validation = await $addressService.validateAddress(newAddress);
+        const validation = await validateAddress(newAddress);
 
         if (validation.valid) {
             // Update with coordinates
@@ -75,12 +57,12 @@
             newAddress.lng = validation.lng;
 
             // Save the address
-            const result = await $addressService.createAddress(newAddress);
+            const result = await createAddress(newAddress);
 
             if (result.success && result.hash) {
                 // Select the new address
                 selectedAddressHash = result.hash;
-                const address = addresses.get(result.hash);
+                const address = $addresses[result.hash];
                 if (address) {
                     dispatch("select", { addressHash: result.hash, address });
                 }
@@ -153,8 +135,8 @@
 
     // Handle confirmation modal confirm
     async function handleDeleteConfirm() {
-        if (!addressToDelete || !addressHashToDelete || !$addressService) {
-            console.error("Address service not available or no address to delete");
+        if (!addressToDelete || !addressHashToDelete) {
+            console.error("No address to delete");
             return;
         }
 
@@ -174,7 +156,7 @@
         }
 
         // Delete the address
-        const result = await $addressService.deleteAddress(addressHash);
+        const result = await deleteAddress(addressHash);
 
         if (result.success) {
             // If deleted address was selected, clear selection
@@ -219,7 +201,7 @@
         </div>
     {:else}
         <AddressList
-            {addresses}
+            addresses={$addresses}
             {selectedAddressHash}
             {removingAddresses}
             {isEntering}

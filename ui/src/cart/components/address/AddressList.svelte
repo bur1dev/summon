@@ -4,7 +4,7 @@
     import AddressCard from "./AddressCard.svelte";
 
     // Props
-    export let addresses: Map<string, Address>;
+    export let addresses: Record<string, Address>;
     export let selectedAddressHash: string | null = null;
     export let removingAddresses: Set<string> = new Set();
     export let isEntering: boolean = false;
@@ -33,7 +33,7 @@
 </script>
 
 <div class="addresses-container">
-    {#if addresses.size === 0}
+    {#if Object.keys(addresses).length === 0}
         <div class="no-addresses {isFormClosing ? 'slide-out-up' : 'slide-in-down'}">
             <p>You don't have any saved addresses.</p>
             <button
@@ -45,7 +45,7 @@
         </div>
     {:else}
         <div class="address-list">
-            {#each [...addresses.entries()] as [hash, address] (hash)}
+            {#each Object.entries(addresses) as [hash, address] (hash)}
                 <AddressCard
                     {address}
                     addressHash={hash}
@@ -58,7 +58,7 @@
                 />
             {/each}
 
-            {#if addresses.size < 3}
+            {#if Object.keys(addresses).length < 3}
                 <button
                     class="add-address-btn {isEntering
                         ? 'slide-in-right'

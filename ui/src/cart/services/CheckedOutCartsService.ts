@@ -1,12 +1,11 @@
 import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
 import { get } from 'svelte/store';
 import type { ActionHashB64, DecodedProductGroup, CheckoutDetails } from '../types/CartTypes';
-import type { CartBusinessService } from './CartBusinessService';
+import { getCalculationService, restoreCartItems, forceSyncToHolochain } from './CartBusinessService';
 
 export class CheckedOutCartsService {
     constructor(
-        private client: any,
-        private cartBusinessService: CartBusinessService
+        private client: any
     ) {}
 
     // Load checked out carts
@@ -73,9 +72,9 @@ export class CheckedOutCartsService {
 
                 try {
                     // Use ProductDataService if available from cart business service
-                    const calculationService = this.cartBusinessService.getCalculationService();
-                    if (calculationService && calculationService['productDataService']) {
-                        details = await calculationService['productDataService'].getProductByReference(groupHash, product.product_index);
+                    const calculationService = getCalculationService();
+                    if (calculationService && (calculationService as any)['productDataService']) {
+                        details = await (calculationService as any)['productDataService'].getProductByReference(groupHash, product.product_index);
                     } else {
                         // Fallback to direct zome call
                         const groupHashDecoded = decodeHashFromBase64(groupHash);
@@ -171,7 +170,7 @@ export class CheckedOutCartsService {
 
                     if (cart) {
                         // Use the main cart service to restore the cart
-                        await this.cartBusinessService.restoreCartItems(cart);
+                        await restoreCartItems(cart);
 
                         // First call the zome function BEFORE syncing to avoid source chain errors
                         console.log("CALLING zome: return_to_shopping with hash:", cartHash);
@@ -185,7 +184,7 @@ export class CheckedOutCartsService {
                             console.log("SUCCESS: Zome call result:", result);
 
                             // Sync to Holochain after successful zome call
-                            this.cartBusinessService.forceSyncToHolochain();
+                            forceSyncToHolochain();
                         } catch (e) {
                             console.error("ERROR: Zome call failed:", e);
                             throw e;

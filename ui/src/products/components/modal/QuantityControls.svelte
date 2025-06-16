@@ -1,12 +1,10 @@
 <script lang="ts">
-    import { type Writable } from "svelte/store";
-    import type { CartBusinessService } from "../../../cart/services/CartBusinessService";
     import { Plus, Minus } from "lucide-svelte";
     import { CartInteractionService } from "../../../cart/services/CartInteractionService";
     import { getIncrementValue, formatQuantityDisplay } from "../../../cart/utils/cartHelpers";
     import { clickable } from "../../../shared/actions/clickable";
     
-    export let cartServiceStore: Writable<CartBusinessService | null>;
+    // CartBusinessService no longer needed as prop
     export let product: any;
     export let groupHashBase64: string;
     export let productIndex: number;
@@ -31,7 +29,6 @@
         
         if (isInCart) {
             await CartInteractionService.updateQuantity(
-                cartServiceStore,
                 groupHashBase64,
                 productIndex,
                 newQuantity,
@@ -57,7 +54,6 @@
         
         if (isInCart) {
             await CartInteractionService.updateQuantity(
-                cartServiceStore,
                 groupHashBase64,
                 productIndex,
                 newQuantity,

@@ -1,8 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import type { StoreContext } from "../../store";
-  import type { Writable } from "svelte/store";
-  import type { CartBusinessService } from "../../cart/services/CartBusinessService";
+  import { cartTotal, uniqueItemCount } from "../../cart/services/CartBusinessService";
   import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart, Menu } from "lucide-svelte";
   import SearchBar from "../../search/SearchBar.svelte";
@@ -28,29 +27,22 @@
   const { getStore } = getContext<StoreContext>("store");
   const store = getStore();
 
-  // Get cart service store from the context
-  const cartServiceStore =
-    getContext<Writable<CartBusinessService | null>>("cartService");
+  // Cart service is now store-based, no context needed
 
   // Get profiles store from context
   const profilesStore = getContext("profiles-store");
 
   // These now come from the UiStateStore
-  export let cartTotal = 0; // This prop is passed from Controller, but we'll use the cart service value
+  export let cartTotalValue = 0; // This prop is passed from Controller, but we'll use the cart service value
 
   // Get current agent pubkey and encode it
   let myAgentPubKey;
   let myAgentPubKeyB64;
   let avatarLoaded = false;
 
-  // Subscribe to cart total from cart service
-  let unsubscribeCartTotal: (() => void) | null = null;
-  let uniqueItemCount = 0;
-  let unsubscribeUniqueItemCount: (() => void) | null = null;
-
-  // Subscription to the cartServiceStore itself
-  let unsubscribeCartServiceStore: (() => void) | null = null;
-  let currentCartServiceInstance: CartBusinessService | null = null;
+  // Direct reactive access to cart stores
+  $: cartTotalValue = $cartTotal;
+  $: uniqueItemCountValue = $uniqueItemCount;
 
   onMount(() => {
     // Agent pubkey logic
@@ -61,46 +53,7 @@
       console.log("Agent pubkey loaded:", myAgentPubKeyB64);
     }
 
-    // Cart service subscription logic
-    if (cartServiceStore) {
-      unsubscribeCartServiceStore = cartServiceStore.subscribe(
-        (serviceInstance) => {
-          currentCartServiceInstance = serviceInstance;
-
-          // Clean up previous subscriptions to cartTotal and uniqueItemCount
-          if (unsubscribeCartTotal) {
-            unsubscribeCartTotal();
-            unsubscribeCartTotal = null;
-          }
-          if (unsubscribeUniqueItemCount) {
-            unsubscribeUniqueItemCount();
-            unsubscribeUniqueItemCount = null;
-          }
-
-          if (currentCartServiceInstance) {
-            unsubscribeCartTotal =
-              currentCartServiceInstance.cartTotal.subscribe((total) => {
-                cartTotal = total;
-              });
-            unsubscribeUniqueItemCount =
-              currentCartServiceInstance.uniqueItemCount.subscribe((count) => {
-                uniqueItemCount = count;
-              });
-          } else {
-            // Service is not available (e.g., null), reset dependent values
-            cartTotal = 0;
-            uniqueItemCount = 0;
-          }
-        },
-      );
-    }
-
-    return () => {
-      // Cleanup all subscriptions
-      if (unsubscribeCartServiceStore) unsubscribeCartServiceStore();
-      if (unsubscribeCartTotal) unsubscribeCartTotal();
-      if (unsubscribeUniqueItemCount) unsubscribeUniqueItemCount();
-    };
+    // No subscription logic needed with direct store access
   });
 
   $: uiProps = store ? store.uiProps : {};
@@ -178,9 +131,9 @@
       on:click={toggleCart}
       title="Shopping Cart"
     >
-      <span class="item-count">{uniqueItemCount}</span>
+      <span class="item-count">{uniqueItemCountValue}</span>
       <ShoppingCart size={30} color="#ffffff" />
-      <span class="cart-total">${cartTotal.toFixed(2)}</span>
+      <span class="cart-total">${cartTotalValue.toFixed(2)}</span>
     </button>
   </div>
 </div>

@@ -17,281 +17,165 @@ export interface Address {
 // Type alias for base64-encoded action hash
 type ActionHashB64 = string;
 
-export class AddressService {
-    // Store for addresses
-    private addresses = writable<Map<ActionHashB64, Address>>(new Map());
+// Type for the addresses map
+type AddressMap = Record<ActionHashB64, Address>;
 
-    // Store for loading state
-    public loading = writable<boolean>(false);
+// Core stores
+export const addresses = writable<AddressMap>({});
+export const addressesLoading = writable<boolean>(false);
 
-    constructor(private client: any) {
-        console.log("AddressService initialized");
+let client: any = null;
 
-        // Initial loading of addresses
-        this.loadAddresses();
-    }
+// Initialize
+export function setAddressClient(holoClient: any) {
+    client = holoClient;
+    loadAddresses();
+}
 
-    // Load all addresses from Holochain
-    public async loadAddresses() {
-        try {
-            this.loading.set(true);
+// Load addresses
+export async function loadAddresses() {
+    if (!client) return;
+    
+    addressesLoading.set(true);
+    try {
+        const result = await client.callZome({
+            role_name: 'grocery',
+            zome_name: 'cart',
+            fn_name: 'get_addresses',
+            payload: null
+        });
 
-            if (this.client) {
-                console.log("Fetching addresses from Holochain");
-                const result = await this.client.callZome({
-                    role_name: 'grocery',
-                    zome_name: 'cart',
-                    fn_name: 'get_addresses',
-                    payload: null
-                });
-
-                if (Array.isArray(result)) {
-                    const addressMap = new Map<ActionHashB64, Address>();
-
-                    result.forEach(([hash, address]) => {
-                        const hashB64 = encodeHashToBase64(hash);
-                        addressMap.set(hashB64, address);
-                    });
-
-                    this.addresses.set(addressMap);
-                    console.log("Loaded", addressMap.size, "addresses");
-                }
-            }
-        } catch (error) {
-            console.error('Error loading addresses:', error);
-        } finally {
-            this.loading.set(false);
+        if (Array.isArray(result)) {
+            const addressMap: AddressMap = {};
+            result.forEach(([hash, address]) => {
+                addressMap[encodeHashToBase64(hash)] = address;
+            });
+            addresses.set(addressMap);
         }
+    } finally {
+        addressesLoading.set(false);
     }
+}
 
-    // Create a new address
-    public async createAddress(address: Address) {
-        try {
-            if (this.client) {
-                const result = await this.client.callZome({
-                    role_name: 'grocery',
-                    zome_name: 'cart',
-                    fn_name: 'create_address',
-                    payload: address
-                });
+// Create address
+export async function createAddress(address: Address) {
+    if (!client) return { success: false, error: 'Client not available' };
+    
+    try {
+        const result = await client.callZome({
+            role_name: 'grocery',
+            zome_name: 'cart',
+            fn_name: 'create_address',
+            payload: address
+        });
 
-                const hashB64 = encodeHashToBase64(result);
-
-                // Update the local store
-                const addressMap = new Map(get(this.addresses));
-                addressMap.set(hashB64, address);
-                this.addresses.set(addressMap);
-
-                // If this is a default address, update other addresses
-                if (address.is_default) {
-                    this.updateDefaultAddress(hashB64);
-                }
-
-                return { success: true, hash: hashB64 };
-            }
-        } catch (error) {
-            console.error('Error creating address:', error);
-            return { success: false, error };
+        const hashB64 = encodeHashToBase64(result);
+        addresses.update(current => ({ ...current, [hashB64]: address }));
+        
+        if (address.is_default) {
+            updateDefaultAddress(hashB64);
         }
 
-        return { success: false, error: 'Client not available' };
+        return { success: true, hash: hashB64 };
+    } catch (error) {
+        return { success: false, error };
     }
+}
 
-    // Update an existing address
-    public async updateAddress(hashB64: ActionHashB64, address: Address) {
-        try {
-            if (this.client) {
-                const hash = decodeHashFromBase64(hashB64);
+// Update address
+export async function updateAddress(hashB64: ActionHashB64, address: Address) {
+    if (!client) return { success: false, error: 'Client not available' };
+    
+    try {
+        await client.callZome({
+            role_name: 'grocery',
+            zome_name: 'cart',
+            fn_name: 'update_address',
+            payload: [decodeHashFromBase64(hashB64), address]
+        });
 
-                const result = await this.client.callZome({
-                    role_name: 'grocery',
-                    zome_name: 'cart',
-                    fn_name: 'update_address',
-                    payload: [hash, address]
-                });
-
-                // Update the local store
-                const addressMap = new Map(get(this.addresses));
-                addressMap.set(hashB64, address);
-                this.addresses.set(addressMap);
-
-                // If this is a default address, update other addresses
-                if (address.is_default) {
-                    this.updateDefaultAddress(hashB64);
-                }
-
-                return { success: true };
-            }
-        } catch (error) {
-            console.error('Error updating address:', error);
-            return { success: false, error };
+        addresses.update(current => ({ ...current, [hashB64]: address }));
+        
+        if (address.is_default) {
+            updateDefaultAddress(hashB64);
         }
 
-        return { success: false, error: 'Client not available' };
+        return { success: true };
+    } catch (error) {
+        return { success: false, error };
     }
+}
 
-    // Delete an address
-    public async deleteAddress(hashB64: ActionHashB64) {
-        try {
-            if (this.client) {
-                const hash = decodeHashFromBase64(hashB64);
+// Delete address
+export async function deleteAddress(hashB64: ActionHashB64) {
+    if (!client) return { success: false, error: 'Client not available' };
+    
+    try {
+        await client.callZome({
+            role_name: 'grocery',
+            zome_name: 'cart',
+            fn_name: 'delete_address',
+            payload: decodeHashFromBase64(hashB64)
+        });
 
-                await this.client.callZome({
-                    role_name: 'grocery',
-                    zome_name: 'cart',
-                    fn_name: 'delete_address',
-                    payload: hash
-                });
+        addresses.update(current => {
+            const { [hashB64]: deleted, ...remaining } = current;
+            return remaining;
+        });
 
-                // Update the local store
-                const addressMap = new Map(get(this.addresses));
-                addressMap.delete(hashB64);
-                this.addresses.set(addressMap);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error };
+    }
+}
 
-                return { success: true };
+// Get address (for compatibility)
+export function getAddress(hashB64: ActionHashB64) {
+    return get(addresses)[hashB64];
+}
+
+
+// Validate address
+export async function validateAddress(address: Address) {
+    try {
+        const query = encodeURIComponent(`${address.street}, ${address.city}, ${address.state} ${address.zip}`);
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${query}&addressdetails=1`,
+            { headers: { 'Accept': 'application/json', 'User-Agent': 'SummonGrocery/1.0' } }
+        );
+
+        const data = await response.json();
+        if (!data?.length) return { valid: false, message: 'Address could not be validated.' };
+
+        const { lat: latStr, lon: lngStr } = data[0];
+        const lat = parseFloat(latStr);
+        const lng = parseFloat(lngStr);
+        
+        // Distance to Ralphs Encinitas - inline calculation
+        const toRad = (deg: number) => deg * (Math.PI / 180);
+        const R = 3958.8;
+        const dLat = toRad(33.0382 - lat);
+        const dLng = toRad(-117.2613 - lng);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(33.0382)) * Math.sin(dLng / 2) ** 2;
+        const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return distance <= 3 
+            ? { valid: true, lat, lng }
+            : { valid: false, lat, lng, message: `Address is ${distance.toFixed(1)} miles away. We only deliver within 3 miles.` };
+    } catch {
+        return { valid: false, message: 'Error validating address.' };
+    }
+}
+
+// Helper to update default address
+function updateDefaultAddress(defaultHashB64: ActionHashB64) {
+    addresses.update(current => {
+        const updated = { ...current };
+        Object.keys(updated).forEach(hash => {
+            if (hash !== defaultHashB64 && updated[hash].is_default) {
+                updated[hash] = { ...updated[hash], is_default: false };
             }
-        } catch (error) {
-            console.error('Error deleting address:', error);
-            return { success: false, error };
-        }
-
-        return { success: false, error: 'Client not available' };
-    }
-
-    // Get all addresses
-    public getAddresses() {
-        return this.addresses;
-    }
-
-    // Get a specific address
-    public getAddress(hashB64: ActionHashB64) {
-        const addressMap = get(this.addresses);
-        return addressMap.get(hashB64);
-    }
-
-    // Get the default address
-    public getDefaultAddress() {
-        const addressMap = get(this.addresses);
-
-        for (const [hash, address] of addressMap.entries()) {
-            if (address.is_default) {
-                return { hash, address };
-            }
-        }
-
-        // Return the first address if no default
-        if (addressMap.size > 0) {
-            const firstEntry = addressMap.entries().next().value;
-            if (firstEntry) {
-                return { hash: firstEntry[0], address: firstEntry[1] };
-            }
-        }
-
-        return null;
-    }
-
-    // Helper method to mark one address as default and others as non-default
-    private updateDefaultAddress(defaultHashB64: ActionHashB64) {
-        const addressMap = get(this.addresses);
-
-        const updatedMap = new Map(addressMap);
-
-        for (const [hash, address] of updatedMap.entries()) {
-            if (hash !== defaultHashB64 && address.is_default) {
-                updatedMap.set(hash, { ...address, is_default: false });
-            }
-        }
-
-        this.addresses.set(updatedMap);
-    }
-
-    // Validate an address using OpenStreetMap Nominatim API
-    public async validateAddress(address: Address): Promise<{
-        valid: boolean;
-        lat?: number;
-        lng?: number;
-        message?: string;
-    }> {
-        try {
-            // Format the address query
-            const addressQuery = encodeURIComponent(
-                `${address.street}, ${address.city}, ${address.state} ${address.zip}`
-            );
-
-            // Call Nominatim API
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${addressQuery}&addressdetails=1`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'SummonGrocery/1.0' // Be nice to the API
-                    }
-                }
-            );
-
-            const data = await response.json();
-
-            if (data && data.length > 0) {
-                const result = data[0];
-                const lat = parseFloat(result.lat);
-                const lng = parseFloat(result.lon);
-
-                // Calculate distance from Ralphs in Encinitas
-                const ralphsLat = 33.0382;
-                const ralphsLng = -117.2613;
-
-                const distance = this.calculateDistance(
-                    lat, lng, ralphsLat, ralphsLng
-                );
-
-                // Check if within 3 miles
-                if (distance <= 3) {
-                    return {
-                        valid: true,
-                        lat,
-                        lng
-                    };
-                } else {
-                    return {
-                        valid: false,
-                        lat,
-                        lng,
-                        message: `This address is ${distance.toFixed(1)} miles from our store. We only deliver within 3 miles.`
-                    };
-                }
-            } else {
-                return {
-                    valid: false,
-                    message: 'Address could not be validated. Please check and try again.'
-                };
-            }
-        } catch (error) {
-            console.error('Error validating address:', error);
-            return {
-                valid: false,
-                message: 'Error validating address. Please try again later.'
-            };
-        }
-    }
-
-    // Calculate distance between two coordinates in miles
-    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 3958.8; // Earth's radius in miles
-        const dLat = this.deg2rad(lat2 - lat1);
-        const dLon = this.deg2rad(lon2 - lon1);
-
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = R * c;
-
-        return distance;
-    }
-
-    private deg2rad(deg: number): number {
-        return deg * (Math.PI / 180);
-    }
+        });
+        return updated;
+    });
 }

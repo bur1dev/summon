@@ -1,8 +1,5 @@
 <script lang="ts">
     import { PencilLine, Plus, Minus } from "lucide-svelte";
-    import { getContext } from "svelte";
-    import type { Writable } from "svelte/store";
-    import type { CartBusinessService } from "../services/CartBusinessService";
     import { PriceService } from "../../services/PriceService";
     import { CartInteractionService } from "../services/CartInteractionService";
     import { getDisplayUnit } from "../utils/cartHelpers";
@@ -28,9 +25,7 @@
     $: normalizedProductIndex = item?.productIndex || productIndex;
     $: normalizedNote = item?.note || note;
 
-    // Get cart service from context
-    const cartServiceStore =
-        getContext<Writable<CartBusinessService | null>>("cartService");
+    // Cart service is now store-based, no context needed
 
     // State for modal and animation
     let showModal = false;
@@ -62,7 +57,6 @@
         }
 
         await CartInteractionService.decrementItem(
-            cartServiceStore,
             normalizedGroupHash,
             normalizedProductIndex,
             normalizedQuantity,
@@ -73,7 +67,6 @@
 
     const handleIncrementItem = async () => {
         await CartInteractionService.incrementItem(
-            cartServiceStore,
             normalizedGroupHash,
             normalizedProductIndex,
             normalizedQuantity,
@@ -94,7 +87,6 @@
 
         // Then remove from cart
         await CartInteractionService.removeItem(
-            cartServiceStore,
             normalizedGroupHash,
             normalizedProductIndex,
         );
@@ -172,7 +164,7 @@
                     <button
                         class="quantity-btn minus-btn"
                         on:click|stopPropagation={handleDecrementItem}
-                        disabled={!$cartServiceStore}
+                        disabled={false}
                     >
                         <Minus size={16} />
                     </button>
@@ -182,7 +174,7 @@
                     <button
                         class="quantity-btn plus-btn"
                         on:click|stopPropagation={handleIncrementItem}
-                        disabled={!$cartServiceStore}
+                        disabled={false}
                     >
                         <Plus size={16} />
                     </button>
@@ -203,7 +195,7 @@
                 <button
                     class="btn btn-text remove-item"
                     on:click|stopPropagation={handleRemove}
-                    disabled={!$cartServiceStore}
+                    disabled={false}
                 >
                     Remove
                 </button>
@@ -268,7 +260,7 @@
                 </button>
             </div>
             <div class="item-right">
-                {#if $cartServiceStore}
+                {#if true}
                     <div class="quantity-control">
                         <button
                             class="quantity-btn minus-btn"
@@ -308,7 +300,7 @@
                     {/if}
                 </div>
 
-                {#if $cartServiceStore}
+                {#if true}
                     <button
                         class="btn btn-text remove-item"
                         on:click|stopPropagation={handleRemove}

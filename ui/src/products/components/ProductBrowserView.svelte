@@ -3,11 +3,7 @@
     import AllProductsGrid from "./AllProductsGrid.svelte";
     import ProductRow from "./ProductRow.svelte";
     import type { DataManager } from "../../services/DataManager";
-    import {
-        getAllSubcategories,
-        isGridOnlySubcategory,
-        getFilteredProductTypes,
-    } from "../utils/categoryUtils";
+    import { mainCategories } from "../utils/categoryData";
 
     // Props passed from data component
     export let isHomeView: boolean;
@@ -89,7 +85,7 @@
             {/if}
         {/each}
     {:else if selectedCategory && !selectedSubcategory}
-        {#each getAllSubcategories(selectedCategory) as subcategory}
+        {#each (mainCategories.find(c => c.name === selectedCategory)?.subcategories || []) as subcategory}
             {@const identifier = subcategory.name}
             {#if categoryProducts[identifier]}
                 <ProductRow
@@ -124,7 +120,7 @@
             on:productTypeSelect={handleProductTypeSelect}
         />
     {:else if selectedCategory && selectedSubcategory}
-        {#if isGridOnlySubcategory(selectedCategory, selectedSubcategory) || (selectedProductType !== "All" && !isLoadingProductType)}
+        {#if (mainCategories.find(c => c.name === selectedCategory)?.subcategories.find(s => s.name === selectedSubcategory)?.gridOnly === true) || (selectedProductType !== "All" && !isLoadingProductType)}
             <AllProductsGrid
                 {selectedCategory}
                 {selectedSubcategory}
@@ -134,7 +130,7 @@
                 on:productTypeSelect={handleProductTypeSelect}
             />
         {:else if selectedProductType === "All"}
-            {#each getFilteredProductTypes(selectedCategory, selectedSubcategory) as productType}
+            {#each (mainCategories.find(c => c.name === selectedCategory)?.subcategories.find(s => s.name === selectedSubcategory)?.productTypes?.filter(pt => pt !== "All") || []) as productType}
                 {@const identifier = productType}
                 {#if categoryProducts[identifier]}
                     <ProductRow

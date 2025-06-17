@@ -4,21 +4,13 @@
     import { tick } from "svelte";
     import { useResizeObserver } from "../../shared/utils/useResizeObserver";
     import ProductBrowserView from "./ProductBrowserView.svelte";
-    import {
-        getSubcategoryConfig,
-        isGridOnlySubcategory,
-        getFilteredProductTypes,
-        getAllSubcategories,
-    } from "../utils/categoryUtils";
+    import { mainCategories } from "../utils/categoryData";
 
-    // Import the BrowserNavigationService
-    import { browserNavigationService } from "../../services/BrowserNavigationService";
+    // Import NavigationStore for simple navigation
+    import { navigationStore } from "../../stores/NavigationStore";
 
     // Required props
     export let dataManager: DataManager;
-    
-    // Get navigation state from DataManager (after dataManager is declared)
-    const { navigationState } = dataManager;
     export let featuredSubcategories: Array<{
         category: string;
         subcategory: string | null;
@@ -42,18 +34,8 @@
     let loadedSubcategoriesSet = new Set<string>();
     let visibleGroups = new Set();
 
-    // Add state tracking to prevent stale operations
-    let currentNavigationState = {
-        category: null as string | null,
-        subcategory: null as string | null,
-        productType: "All",
-        isHomeView: true,
-        searchMode: false,
-    };
-
     // Ultra-simple navigation ID to prevent race conditions
     let navigationId = 0;
-    let navigationDebounceId: number | null = null;
 
     // Utility for container capacity calculation
     const calculateContainerCapacity = (container: HTMLElement) =>
@@ -77,66 +59,43 @@
 
     export const action = resizeObserver.action;
 
-    // Reactive navigation handling - respond to navigation state changes
-    $: navigationStateValue = $navigationState;
+    // Simple navigation subscription
+    let unsubscribe: (() => void) | null = null;
 
-    $: handleNavigationChange(navigationStateValue);
-
-    // Initialize home view when component is mounted and ready
+    // Initialize navigation subscription
     onMount(async () => {
         // Wait for DOM to be ready
         await tick();
         
-        // If we're supposed to be in home view but haven't loaded it yet
-        if (currentNavigationState.isHomeView && featuredSubcategories.length > 0 && Object.keys(categoryProducts).length === 0) {
-            handleNavigation("home");
-        }
+        // Subscribe to navigation changes
+        unsubscribe = navigationStore.subscribe($nav => {
+            handleNavigationChange($nav);
+        });
     });
 
-    // Handle navigation state changes with debouncing
-    function handleNavigationChange(newState: typeof navigationStateValue) {
-        // Fast navigation state comparison using key concatenation
-        const newStateKey = `${newState.category}|${newState.subcategory}|${newState.productType}|${newState.isHomeView}|${newState.searchMode}`;
-        const currentStateKey = `${currentNavigationState.category}|${currentNavigationState.subcategory}|${currentNavigationState.productType}|${currentNavigationState.isHomeView}|${currentNavigationState.searchMode}`;
-        const hasChanged = newStateKey !== currentStateKey;
+    // Handle navigation state changes
+    function handleNavigationChange(nav: {category: string | null, subcategory: string | null, productType: string | null, searchMode: boolean}) {
+        // Prevent invalid productType without category/subcategory
+        if (nav.productType && (!nav.category || !nav.subcategory)) {
+            console.warn('Invalid nav state: productType without category/subcategory, resetting...');
+            navigationStore.navigate(); // Reset to home
+            return;
+        }
 
-        if (hasChanged) {
-            // Check if this is a major navigation change (category/home/productType)
-            const isMajorChange =
-                newState.category !== currentNavigationState.category ||
-                newState.isHomeView !== currentNavigationState.isHomeView ||
-                newState.searchMode !== currentNavigationState.searchMode ||
-                newState.productType !== currentNavigationState.productType;
-
-            // Clear previous debounce
-            if (navigationDebounceId) {
-                clearTimeout(navigationDebounceId);
+        if (nav.searchMode) {
+            // Search mode - no data loading needed, SearchResults handles its own data
+            return;
+        } else if (!nav.category) {
+            // Home view
+            if (featuredSubcategories.length > 0) {
+                handleNavigation("home");
             }
-
-            // Only debounce minor changes (subcategory/productType within same category)
-            const debounceMs = isMajorChange ? 0 : 10;
-
-            // Update navigation state immediately to prevent stale state issues
-            currentNavigationState = newState;
-
-            navigationDebounceId = setTimeout(() => {
-                // Handle navigation
-                if (newState.searchMode) {
-                    resetState();
-                } else if (
-                    newState.isHomeView &&
-                    featuredSubcategories.length > 0
-                ) {
-                    handleNavigation("home");
-                } else if (newState.category && newState.subcategory) {
-                    handleNavigation("subcategory");
-                } else if (newState.category && !newState.subcategory) {
-                    handleNavigation("category");
-                } else {
-                }
-
-                navigationDebounceId = null;
-            }, debounceMs);
+        } else if (nav.category && nav.subcategory) {
+            // Subcategory view
+            handleNavigation("subcategory");
+        } else if (nav.category && !nav.subcategory) {
+            // Category view
+            handleNavigation("category");
         }
     }
 
@@ -145,9 +104,9 @@
         allCategoryProducts = [];
         resizeObserver.disconnect();
 
-        // Clean up timeouts
-        if (navigationDebounceId) {
-            clearTimeout(navigationDebounceId);
+        // Clean up navigation subscription
+        if (unsubscribe) {
+            unsubscribe();
         }
     });
 
@@ -233,16 +192,16 @@
         startIndex: number,
         capacity: number,
     ) {
-        let category = currentNavigationState.category;
-        let subcategory = currentNavigationState.subcategory;
+        let category = $navigationStore.category;
+        let subcategory = $navigationStore.subcategory;
 
-        if (currentNavigationState.isHomeView && identifier.includes("_")) {
+        if (!$navigationStore.category && identifier.includes("_")) {
             const parts = identifier.split("_");
             category = parts[0];
             subcategory = parts[1];
         } else if (
-            !currentNavigationState.isHomeView &&
-            !currentNavigationState.subcategory
+            !!$navigationStore.category &&
+            !$navigationStore.subcategory
         ) {
             subcategory = identifier;
         }
@@ -251,13 +210,13 @@
 
         try {
             const isInSubcategoryView =
-                currentNavigationState.category &&
-                currentNavigationState.subcategory;
-            const isProductTypeRow =
-                isInSubcategoryView &&
-                getFilteredProductTypes(category, subcategory).includes(
-                    identifier,
-                );
+                $navigationStore.category &&
+                $navigationStore.subcategory;
+            // Check if this is a product type row by looking up the subcategory config
+            const categoryConfig = mainCategories.find(c => c.name === category);
+            const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === subcategory);
+            const productTypes = subcategoryConfig?.productTypes?.filter(pt => pt !== "All") || [];
+            const isProductTypeRow = isInSubcategoryView && productTypes.includes(identifier);
 
             let result;
             if (isProductTypeRow) {
@@ -305,8 +264,8 @@
 
     async function loadProductsForCategory(navId: number) {
         if (
-            !currentNavigationState.category ||
-            currentNavigationState.searchMode
+            !$navigationStore.category ||
+            false
         )
             return;
 
@@ -325,20 +284,19 @@
         containerCapacity = calculateContainerCapacity(mainGridContainer);
 
         if (
-            currentNavigationState.category &&
-            !currentNavigationState.subcategory
+            $navigationStore.category &&
+            !$navigationStore.subcategory
         ) {
             await loadMainCategoryView(containerCapacity, navId);
         } else if (
-            currentNavigationState.category &&
-            currentNavigationState.subcategory
+            $navigationStore.category &&
+            $navigationStore.subcategory
         ) {
             await loadSubcategoryView(containerCapacity, navId);
         }
     }
 
     async function loadHomeView(navId: number) {
-        if (currentNavigationState.searchMode) return;
 
         resetState();
 
@@ -397,20 +355,20 @@
 
     async function loadProductsForProductType(navId: number) {
         if (
-            !currentNavigationState.category ||
-            !currentNavigationState.subcategory ||
-            currentNavigationState.searchMode
+            !$navigationStore.category ||
+            !$navigationStore.subcategory ||
+            false
         )
             return;
 
         try {
-            if (currentNavigationState.productType !== "All") {
+            if ($navigationStore.productType !== "All") {
                 isLoadingProductType = true;
                 
                 const result = await dataManager.loadProductTypeProducts(
-                    currentNavigationState.category,
-                    currentNavigationState.subcategory,
-                    currentNavigationState.productType,
+                    $navigationStore.category,
+                    $navigationStore.subcategory,
+                    $navigationStore.productType,
                     false,
                 );
 
@@ -430,7 +388,7 @@
             }
         } catch (error) {
             console.error(
-                `API Error loading grid for product type ${currentNavigationState.productType}:`,
+                `API Error loading grid for product type ${$navigationStore.productType}:`,
                 error,
             );
             // Only update if this navigation is still current
@@ -443,17 +401,16 @@
     }
 
     async function loadMainCategoryView(capacity: number, navId: number) {
-        if (!currentNavigationState.category) return;
+        if (!$navigationStore.category) return;
 
-        const subcategories = getAllSubcategories(
-            currentNavigationState.category,
-        );
+        const categoryConfig = mainCategories.find(c => c.name === $navigationStore.category);
+        const subcategories = categoryConfig?.subcategories || [];
         const initialSubcategories = subcategories.slice(0, 3);
 
         const initialResults = await Promise.all(
-            initialSubcategories.map(async (sub) => {
+            initialSubcategories.map(async (sub: any) => {
                 return await dataManager.loadSubcategoryProducts(
-                    currentNavigationState.category!,
+                    $navigationStore.category!,
                     sub.name,
                     capacity,
                 );
@@ -482,7 +439,7 @@
         capacity: number,
         navId: number,
     ) {
-        if (!currentNavigationState.category) return;
+        if (!$navigationStore.category) return;
 
         const BATCH_SIZE = 5;
         for (let i = 0; i < remainingSubcategories.length; i += BATCH_SIZE) {
@@ -494,7 +451,7 @@
             const batchResults = await Promise.all(
                 currentBatch.map(async (sub: any) => {
                     return await dataManager.loadSubcategoryProducts(
-                        currentNavigationState.category!,
+                        $navigationStore.category!,
                         sub.name,
                         capacity,
                     );
@@ -511,30 +468,23 @@
 
     async function loadSubcategoryView(capacity: number, navId: number) {
         if (
-            !currentNavigationState.category ||
-            !currentNavigationState.subcategory
+            !$navigationStore.category ||
+            !$navigationStore.subcategory
         )
             return;
 
-        const subcategoryConfig = getSubcategoryConfig(
-            currentNavigationState.category,
-            currentNavigationState.subcategory,
-        );
+        const categoryConfig = mainCategories.find(c => c.name === $navigationStore.category);
+        const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === $navigationStore.subcategory);
         if (!subcategoryConfig) {
             console.error(
-                `Configuration not found for subcategory: ${currentNavigationState.subcategory}`,
+                `Configuration not found for subcategory: ${$navigationStore.subcategory}`,
             );
             return;
         }
 
-        if (
-            isGridOnlySubcategory(
-                currentNavigationState.category,
-                currentNavigationState.subcategory,
-            )
-        ) {
+        if (subcategoryConfig?.gridOnly === true) {
             await loadGridOnlySubcategory(navId);
-        } else if (currentNavigationState.productType === "All") {
+        } else if (!$navigationStore.productType || $navigationStore.productType === "All") {
             await loadProductTypesView(capacity, navId);
         } else {
             await loadProductsForProductType(navId);
@@ -543,14 +493,14 @@
 
     async function loadGridOnlySubcategory(navId: number) {
         if (
-            !currentNavigationState.category ||
-            !currentNavigationState.subcategory
+            !$navigationStore.category ||
+            !$navigationStore.subcategory
         )
             return;
 
         const result = await dataManager.loadProductTypeProducts(
-            currentNavigationState.category,
-            currentNavigationState.subcategory,
+            $navigationStore.category,
+            $navigationStore.subcategory,
             null,
             false,
         );
@@ -569,25 +519,24 @@
 
     async function loadProductTypesView(capacity: number, navId: number) {
         if (
-            !currentNavigationState.category ||
-            !currentNavigationState.subcategory
+            !$navigationStore.category ||
+            !$navigationStore.subcategory
         )
             return;
 
-        const productTypes = getFilteredProductTypes(
-            currentNavigationState.category,
-            currentNavigationState.subcategory,
-        );
+        const categoryConfig = mainCategories.find(c => c.name === $navigationStore.category);
+        const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === $navigationStore.subcategory);
+        const productTypes = subcategoryConfig?.productTypes?.filter((pt: string) => pt !== "All") || [];
 
         const BATCH_SIZE = 5;
         for (let i = 0; i < productTypes.length; i += BATCH_SIZE) {
             const currentBatch = productTypes.slice(i, i + BATCH_SIZE);
 
             const batchResults = await Promise.all(
-                currentBatch.map(async (type) => {
+                currentBatch.map(async (type: string) => {
                     return await dataManager.loadProductTypeProducts(
-                        currentNavigationState.category!,
-                        currentNavigationState.subcategory!,
+                        $navigationStore.category!,
+                        $navigationStore.subcategory!,
                         type,
                         true,
                         capacity,
@@ -604,14 +553,14 @@
     }
 
     async function loadAllCategoryProducts(navId: number) {
-        if (currentNavigationState.subcategory !== null) {
+        if ($navigationStore.subcategory !== null) {
             return;
         }
 
-        if (!currentNavigationState.category) return;
+        if (!$navigationStore.category) return;
 
         const gridData = await dataManager.loadAllCategoryProducts(
-            currentNavigationState.category,
+            $navigationStore.category,
         );
 
         // Only update if this navigation is still current
@@ -688,13 +637,13 @@
                 }
             } else if (
                 type === "productType" &&
-                currentNavigationState.category &&
-                currentNavigationState.subcategory
+                $navigationStore.category &&
+                $navigationStore.subcategory
             ) {
                 try {
                     const total = await dataManager.getTotalProductsForPath(
-                        currentNavigationState.category,
-                        currentNavigationState.subcategory,
+                        $navigationStore.category,
+                        $navigationStore.subcategory,
                         identifier,
                     );
                     totalProducts[identifier] = total;
@@ -784,28 +733,24 @@
         dispatch("reportCategory", event.detail);
     }
 
-    async function handleProductTypeSelect(event: CustomEvent) {
+    function handleProductTypeSelect(event: CustomEvent) {
         const { productType, category, subcategory } = event.detail;
-        await browserNavigationService.navigateToProductType(
-            productType,
-            category,
-            subcategory,
-        );
+        navigationStore.navigate(category, subcategory, productType);
     }
 
-    async function handleViewMore(event: CustomEvent) {
+    function handleViewMore(event: CustomEvent) {
         const { category, subcategory } = event.detail;
-        await browserNavigationService.navigateViewMore(category, subcategory);
+        navigationStore.navigate(category, subcategory);
     }
 
     // mainGridContainer is now passed as a prop to the view component
 </script>
 
 <ProductBrowserView
-    isHomeView={currentNavigationState.isHomeView}
-    selectedCategory={currentNavigationState.category}
-    selectedSubcategory={currentNavigationState.subcategory}
-    selectedProductType={currentNavigationState.productType}
+    isHomeView={!$navigationStore.category}
+    selectedCategory={$navigationStore.category}
+    selectedSubcategory={$navigationStore.subcategory}
+    selectedProductType={$navigationStore.productType || 'All'}
     {categoryProducts}
     {allCategoryProducts}
     {currentRanges}

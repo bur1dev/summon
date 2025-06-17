@@ -19,10 +19,8 @@
     searchMethodStore,
   } from "../../stores/UiOnlyStore";
 
-  // Note: searchMode and searchQuery now come from DataManager navigationState
-
-  // Import navigation service
-  import { browserNavigationService } from "../../services/BrowserNavigationService";
+  // Import NavigationStore for search functionality
+  import { navigationStore } from "../../stores/NavigationStore";
   // Get the store for UI props
   const { getStore } = getContext<StoreContext>("store");
   const store = getStore();
@@ -86,22 +84,18 @@
     <div class="search-container">
       <SearchBar
         {store}
-        on:select={async ({ detail }) => {
-          // Use BrowserNavigationService for navigation state
-          await browserNavigationService.enterSearchMode(detail.originalQuery);
-          
-          // Set UI-only search result data
+        on:select={({ detail }) => {
+          // Enter search mode and set UI-only search result data
+          navigationStore.search(detail.originalQuery);
           $productNameStore = detail.productName;
           $selectedProductHashStore = detail.hash;
           $searchResultsStore = detail.fuseResults || [];
           $isViewAllStore = false;
           $searchMethodStore = "product_selection";
         }}
-        on:viewAll={async ({ detail }) => {
-          // Use BrowserNavigationService for navigation state
-          await browserNavigationService.enterSearchMode(detail.query);
-          
-          // Set UI-only search result data
+        on:viewAll={({ detail }) => {
+          // Enter search mode and set UI-only search result data
+          navigationStore.search(detail.query);
           $searchResultsStore = detail.fuseResults || [];
           $isViewAllStore = detail.isViewAll || false;
           $selectedProductHashStore = null;

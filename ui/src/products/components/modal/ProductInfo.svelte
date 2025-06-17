@@ -2,6 +2,7 @@
     import { createEventDispatcher } from "svelte";
     import { StockService } from "../../../services/StockService";
     import { clickable } from "../../../shared/actions/clickable";
+    import { navigationStore } from "../../../stores/NavigationStore";
     
     const dispatch = createEventDispatcher();
     
@@ -14,21 +15,10 @@
 
     function handleShopAllClick() {
         const productType = product.product_type || product.category;
-
         const categoryToUse = selectedCategory || product.category;
         const subcategoryToUse = selectedSubcategory || product.subcategory;
-
-        if (categoryToUse && subcategoryToUse) {
-            dispatch("productTypeSelect", {
-                category: categoryToUse,
-                subcategory: subcategoryToUse,
-                productType,
-            });
-        } else {
-            dispatch("productTypeSelect", {
-                productType,
-            });
-        }
+        
+        navigationStore.navigate(categoryToUse, subcategoryToUse, productType);
         dispatch("close");
     }
 

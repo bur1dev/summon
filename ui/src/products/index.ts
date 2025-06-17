@@ -4,7 +4,6 @@ export { ProductRowCacheService } from './services/ProductRowCacheService';
 export * from './services/PreferencesService';
 
 export * from './utils/categoryData';
-export * from './utils/categoryUtils';
 
 // Main product components
 export { default as ProductCard } from './components/ProductCard.svelte';

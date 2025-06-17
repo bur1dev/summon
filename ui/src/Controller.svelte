@@ -5,10 +5,9 @@
   import { ProductDataService } from "./products/services/ProductDataService";
   import { ProductRowCacheService } from "./products/services/ProductRowCacheService";
   import { DataManager } from "./services/DataManager";
-  import { setContext, onMount, getContext } from "svelte";
+  import { setContext, onMount } from "svelte";
   import type { AppClient } from "@holochain/client";
   import { encodeHashToBase64 } from "@holochain/client";
-  import type { Writable } from "svelte/store";
 
   import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
   import SlideOutCart from "./cart/components/SlideOutCart.svelte";
@@ -19,7 +18,6 @@
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
   import { setDataManager, cartTotal } from "./cart/services/CartBusinessService";
-  import { browserNavigationService } from "./services/BrowserNavigationService";
 
   export let roleName = "";
   export let client: AppClient;
@@ -75,9 +73,6 @@
 
   onMount(() => {
     store.setUIprops({ showMenu: false });
-
-    // Initialize BrowserNavigationService with DataManager
-    browserNavigationService.setDataManager(dataManager);
 
     // Inject DataManager into cart service
     setDataManager(dataManager);

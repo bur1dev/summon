@@ -1,5 +1,6 @@
 import type { ProductDataService, NavigationParams, NavigationResult } from '../products/services/ProductDataService';
 import { writable, type Readable } from 'svelte/store';
+import { navigationStore } from '../stores/NavigationStore';
 
 /**
  * Centralized Data Manager - Single gateway for all data operations
@@ -7,13 +8,7 @@ import { writable, type Readable } from 'svelte/store';
  * preventing scattered productDataService calls throughout components
  */
 
-interface NavigationState {
-    category: string | null;
-    subcategory: string | null;
-    productType: string;
-    isHomeView: boolean;
-    searchMode: boolean;
-    searchQuery: string;
+interface FilterState {
     sortBy: string;
     selectedBrands: Set<string>;
     selectedOrganic: "all" | "organic" | "non-organic";
@@ -30,42 +25,34 @@ interface NavigationState {
  */
 export class DataManager {
     private productDataService: ProductDataService;
-    private readonly _navigationStore = writable<NavigationState>({
-        category: null,
-        subcategory: null,
-        productType: 'All',
-        isHomeView: true,
-        searchMode: false,
-        searchQuery: '',
+    private readonly _filterStore = writable<FilterState>({
         sortBy: 'best',
         selectedBrands: new Set(),
         selectedOrganic: 'all'
     });
-    public readonly navigationState: Readable<NavigationState> = this._navigationStore;
+    public readonly filterState: Readable<FilterState> = this._filterStore;
 
     constructor(productDataService: ProductDataService) {
         this.productDataService = productDataService;
-    }
-
-    // === NAVIGATION STATE METHODS (for BrowserNavigationService) ===
-    updateNavigationState(updates: Partial<NavigationState>): void {
-        this._navigationStore.update(current => ({
-            ...current,
-            ...updates
-        }));
+        
+        // Subscribe to navigation changes for data fetching
+        navigationStore.subscribe(nav => {
+            // Trigger appropriate data fetches based on nav state
+            // This replaces the complex navigation state management
+        });
     }
 
     // === FILTER STATE METHODS ===
     public setSortBy(sortBy: string): void {
-        this._navigationStore.update(state => ({ ...state, sortBy }));
+        this._filterStore.update(state => ({ ...state, sortBy }));
     }
 
     public setSelectedBrands(brands: Set<string>): void {
-        this._navigationStore.update(state => ({ ...state, selectedBrands: new Set(brands) }));
+        this._filterStore.update(state => ({ ...state, selectedBrands: new Set(brands) }));
     }
 
     public setSelectedOrganic(organic: "all" | "organic" | "non-organic"): void {
-        this._navigationStore.update(state => ({ ...state, selectedOrganic: organic }));
+        this._filterStore.update(state => ({ ...state, selectedOrganic: organic }));
     }
 
     // === PRODUCT REFERENCE METHODS ===

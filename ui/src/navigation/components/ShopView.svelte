@@ -23,18 +23,12 @@
   // Import from data trigger store (keeping sort/filter stores for now)
   // Note: searchMode and searchQuery now come from DataManager navigationState
   
-  // Get DataManager from context and destructure navigationState
+  // Get DataManager from context
   const dataManager = getContext<DataManager>("dataManager");
-  const { navigationState } = dataManager;
 
-  // UPDATED: Import category utilities
-  import {
-    shouldShowProductTypeNav,
-    getFilteredProductTypes,
-  } from "../../products/utils/categoryUtils";
-
-  // Import the BrowserNavigationService
-  import { browserNavigationService } from "../../services/BrowserNavigationService";
+  // Import NavigationStore and category utilities
+  import { navigationStore } from "../../stores/NavigationStore";
+  import { mainCategories } from "../../products/utils/categoryData";
 
   const storeContext = getContext<StoreContext>("store");
   let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
@@ -64,25 +58,12 @@
     }
   }
 
-  async function handleCategorySelect({
+  function handleCategorySelect({
     detail: { category, subcategory },
   }: {
     detail: { category: any; subcategory: any };
   }) {
-    // Use BrowserNavigationService for navigation
-    if (category === null && subcategory === null) {
-      await browserNavigationService.navigateToHome();
-    } else if (subcategory) {
-      await browserNavigationService.navigateToSubcategory(category, subcategory);
-    } else {
-      await browserNavigationService.navigateToCategory(category);
-    }
-
-    // Update UI props if needed
-    if (store && uiProps && $uiProps) {
-      const currentProps = $uiProps as any;
-      store.setUIprops({ ...(currentProps || {}), searchMode: false });
-    }
+    navigationStore.navigate(category, subcategory);
   }
 
 
@@ -111,46 +92,46 @@
     }
   }
 
-  // UPDATED: Use centralized function for product type navigation visibility
-  $: showProductTypeNavigation = shouldShowProductTypeNav(
-    $navigationState.category || "",
-    $navigationState.subcategory || "",
-  );
-
-  // UPDATED: Use centralized function for filtered product types
-  $: filteredProductTypes = getFilteredProductTypes(
-    $navigationState.category || "",
-    $navigationState.subcategory || "",
-  );
+  // Simple inline logic for product type navigation visibility
+  $: {
+    const category = $navigationStore.category || "";
+    const subcategory = $navigationStore.subcategory || "";
+    const categoryConfig = mainCategories.find(c => c.name === category);
+    const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === subcategory);
+    showProductTypeNavigation = !!(subcategoryConfig?.productTypes && subcategoryConfig.productTypes.length > 1 && !subcategoryConfig.gridOnly);
+    filteredProductTypes = subcategoryConfig?.productTypes?.filter(pt => pt !== "All") || [];
+  }
+  
+  let showProductTypeNavigation = false;
+  let filteredProductTypes: string[] = [];
 </script>
 
 <div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
   <div class="main-content">
     {#if store && dataManager}
       <div class="content-wrapper">
-        {#if !$navigationState.searchMode}
-          {#if !$navigationState.isHomeView && $navigationState.category && $navigationState.subcategory}
+        {#if $navigationStore.category && $navigationStore.subcategory && !$navigationStore.searchMode}
             {#if showProductTypeNavigation}
               <div class="product-type-nav">
                 <div class="product-type-container">
                   <button
-                    class="product-type-btn btn btn-toggle {$navigationState.productType ===
+                    class="product-type-btn btn btn-toggle {($navigationStore.productType || 'All') ===
                     'All'
                       ? 'active'
                       : ''}"
                     on:click={() =>
-                      browserNavigationService.navigateToProductType("All")}
+                      navigationStore.navigate($navigationStore.category, $navigationStore.subcategory, null)}
                   >
                     All
                   </button>
                   {#each filteredProductTypes as productType}
                     <button
-                      class="product-type-btn btn btn-toggle {$navigationState.productType ===
+                      class="product-type-btn btn btn-toggle {$navigationStore.productType ===
                       productType
                         ? 'active'
                         : ''}"
                       on:click={() =>
-                        browserNavigationService.navigateToProductType(productType)}
+                        navigationStore.navigate($navigationStore.category, $navigationStore.subcategory, productType)}
                     >
                       {productType}
                     </button>
@@ -158,14 +139,13 @@
                 </div>
               </div>
             {/if}
-          {/if}
         {/if}
 
         <div class="product-sections">
-          {#if $navigationState.searchMode}
+          {#if $navigationStore.searchMode}
             <SearchResults
               {store}
-              query={$navigationState.searchQuery}
+              query={$navigationStore.searchQuery}
               selectedProductHash={$selectedProductHashStore}
               productName={$productNameStore}
               searchResults={$searchResultsStore}
@@ -174,13 +154,9 @@
                 $reportedProductStore = event.detail;
                 $showReportDialogStore = true;
               }}
-              on:productTypeSelect={async (event) => {
+              on:productTypeSelect={(event) => {
                 const { productType, category, subcategory } = event.detail;
-                await browserNavigationService.navigateToProductType(
-                  productType,
-                  category,
-                  subcategory
-                );
+                navigationStore.navigate(category, subcategory, productType);
               }}
             />
           {:else}

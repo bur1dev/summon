@@ -1,96 +1,31 @@
 <script lang="ts">
   import { mainCategories } from "../../products/utils/categoryData";
 
-  // Import DataManager for navigation state
-  import { getContext } from "svelte";
-  import type { DataManager } from "../../services/DataManager";
-  
-  // Get DataManager from context and destructure navigationState
-  const dataManager = getContext<DataManager>("dataManager");
-  const { navigationState } = dataManager;
-  
-  // Import the BrowserNavigationService
-  import { browserNavigationService } from "../../services/BrowserNavigationService";
+  // Import NavigationStore for simple navigation
+  import { navigationStore } from "../../stores/NavigationStore";
   
   // Import clickable action
   import { clickable } from "../../shared/actions/clickable";
 
 
 
-  let currentPage = 0;
-  // let hasMore = false; // Not used, consider removing
-  // let totalProducts = 0; // Not used, consider removing
-
-  let selectedCategory = null; // This is shadowed by the store, consider removing local if not needed
-  let selectedSubcategory = null; // This is shadowed by the store, consider removing local if not needed
   let sidebarElement: HTMLElement;
   let headerElement: HTMLElement;
 
   // Get current navigation state values
-  $: selectedCategory = $navigationState.category;
-  $: selectedSubcategory = $navigationState.subcategory;
+  $: selectedCategory = $navigationStore.category;
+  $: selectedSubcategory = $navigationStore.subcategory;
 
-  async function selectCategory(category: string) {
-    currentPage = 0;
-    
-    // Use BrowserNavigationService for navigation
-    await browserNavigationService.navigateToCategory(category);
-
-    setTimeout(() => {
-      if (sidebarElement && headerElement) {
-        const selectedElement = sidebarElement.querySelector(
-          ".category-item.active",
-        ) as HTMLElement;
-
-        if (selectedElement) {
-          const actualHeaderHeight = headerElement.offsetHeight;
-          const visualGapWanted = parseFloat(
-            getComputedStyle(document.documentElement).getPropertyValue(
-              "--spacing-xs",
-            ),
-          );
-          const selectedElementMarginTop = parseFloat(
-            getComputedStyle(selectedElement).marginTop,
-          );
-
-          // Calculate the scrollTop value for the sidebar
-          // This formula aims to position the top border of 'selectedElement'
-          // exactly 'visualGapWanted' pixels below the bottom border of 'actualHeaderHeight'.
-          const targetPosition = Math.max(
-            0,
-            selectedElement.offsetTop + // Distance from sidebar top to selectedElement's margin top
-              selectedElementMarginTop - // Add element's own margin to get to its border top
-              actualHeaderHeight - // Subtract header height to align with header bottom
-              visualGapWanted, // Subtract desired gap to position below header
-          );
-
-          sidebarElement.scrollTo({
-            top: targetPosition,
-            behavior: "smooth",
-          });
-        }
-      }
-    }, 100);
+  function selectCategory(category: string) {
+    navigationStore.navigate(category);
   }
 
-  async function selectSubcategory(subcategory: string) {
-    currentPage = 0;
-    
-    // Use BrowserNavigationService for navigation
-    const currentCategory = $navigationState.category;
-    if (currentCategory) {
-      await browserNavigationService.navigateToSubcategory(currentCategory, subcategory);
-    }
+  function selectSubcategory(subcategory: string) {
+    navigationStore.navigate($navigationStore.category, subcategory);
   }
 
-  async function goToHome() {
-    // Use BrowserNavigationService for navigation
-    await browserNavigationService.navigateToHome();
-
-    // Scroll to top when going home
-    if (sidebarElement) {
-      sidebarElement.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  function goToHome() {
+    navigationStore.navigate();
   }
 </script>
 

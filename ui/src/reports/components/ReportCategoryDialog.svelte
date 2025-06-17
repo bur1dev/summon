@@ -2,15 +2,12 @@
     import { createEventDispatcher, onMount, onDestroy } from "svelte";
     import { mainCategories } from "../../products/utils/categoryData";
     import { X } from "lucide-svelte";
-    import { getContext } from "svelte";
-    import type { DataManager } from "../../services/DataManager";
     import { clickable } from "../../shared/actions/clickable";
 
     const dispatch = createEventDispatcher();
     
-    // Get DataManager from context for navigation state
-    const dataManager = getContext<DataManager>("dataManager");
-    const { navigationState } = dataManager;
+    // Import NavigationStore for current navigation state
+    import { navigationStore } from "../../stores/NavigationStore";
 
     export let product: any;
     export let isOpen: boolean = false;
@@ -81,7 +78,7 @@
         }
 
         // Get values from navigation state when component mounts
-        unsubscribeNavigation = navigationState.subscribe((navState: any) => {
+        unsubscribeNavigation = navigationStore.subscribe((navState: any) => {
             if (navState.category) {
                 selectedCategory = navState.category;
                 selectedSubcategory = navState.subcategory;

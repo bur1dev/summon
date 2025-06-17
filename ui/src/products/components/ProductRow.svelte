@@ -4,7 +4,7 @@
     import { createEventDispatcher } from "svelte";
     import { ChevronRight } from "lucide-svelte";
     import type { DataManager } from "../../services/DataManager";
-    import { browserNavigationService } from "../../services/BrowserNavigationService";
+    import { navigationStore } from "../../stores/NavigationStore";
     import { clickable } from "../../shared/actions/clickable";
 
     // Required props
@@ -24,14 +24,11 @@
 
     const dispatch = createEventDispatcher();
 
-    // Centralized navigation logic using BrowserNavigationService
-    async function handleViewMore() {
+    function handleViewMore() {
         if (isProductType) {
-            // Navigate to product type view
-            await browserNavigationService.navigateToProductType(identifier, selectedCategory, selectedSubcategory);
+            navigationStore.navigate(selectedCategory, selectedSubcategory, identifier);
         } else {
-            // Navigate to subcategory view
-            await browserNavigationService.navigateViewMore(selectedCategory, selectedSubcategory);
+            navigationStore.navigate(selectedCategory, selectedSubcategory);
         }
     }
 

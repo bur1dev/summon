@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import type { DataManager } from '../services/DataManager';
 
 interface NavigationState {
   category: string | null;
@@ -6,6 +7,12 @@ interface NavigationState {
   productType: string | null;
   searchMode: boolean;
   searchQuery: string;
+}
+
+let dataManager: DataManager | null = null;
+
+export function setNavigationDataManager(dm: DataManager) {
+  dataManager = dm;
 }
 
 function createNavigationStore() {
@@ -27,6 +34,11 @@ function createNavigationStore() {
         searchMode: false,
         searchQuery: ''
       });
+      
+      // Reset filters when switching views
+      if (dataManager) {
+        dataManager.resetFilters();
+      }
       
       // Simple scroll to top
       const scrollContainer = document.querySelector(".global-scroll-container");

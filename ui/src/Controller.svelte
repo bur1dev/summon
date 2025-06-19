@@ -18,6 +18,7 @@
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
   import { setDataManager, cartTotal } from "./cart/services/CartBusinessService";
+  import { setNavigationDataManager } from "./stores/NavigationStore";
 
   export let roleName = "";
   export let client: AppClient;
@@ -76,6 +77,9 @@
 
     // Inject DataManager into cart service
     setDataManager(dataManager);
+    
+    // Inject DataManager into navigation store
+    setNavigationDataManager(dataManager);
 
     // Subscribe to the cartTotal from the cart service
     const unsubscribe = cartTotal.subscribe((value) => {

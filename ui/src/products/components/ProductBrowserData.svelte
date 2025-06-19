@@ -1,4 +1,7 @@
 <script lang="ts">
+    // TODO: ProductBrowserData.svelte doing too much
+    // maybe centralize resizeObserver logic and simplify data fetching?
+    // We have resize observer logic in useVirtualGrid.ts and also useResizeObserver.ts
     import { onDestroy, onMount, createEventDispatcher } from "svelte";
     import type { DataManager } from "../../services/DataManager";
     import { tick } from "svelte";
@@ -66,18 +69,25 @@
     onMount(async () => {
         // Wait for DOM to be ready
         await tick();
-        
+
         // Subscribe to navigation changes
-        unsubscribe = navigationStore.subscribe($nav => {
+        unsubscribe = navigationStore.subscribe(($nav) => {
             handleNavigationChange($nav);
         });
     });
 
     // Handle navigation state changes
-    function handleNavigationChange(nav: {category: string | null, subcategory: string | null, productType: string | null, searchMode: boolean}) {
+    function handleNavigationChange(nav: {
+        category: string | null;
+        subcategory: string | null;
+        productType: string | null;
+        searchMode: boolean;
+    }) {
         // Prevent invalid productType without category/subcategory
         if (nav.productType && (!nav.category || !nav.subcategory)) {
-            console.warn('Invalid nav state: productType without category/subcategory, resetting...');
+            console.warn(
+                "Invalid nav state: productType without category/subcategory, resetting...",
+            );
             navigationStore.navigate(); // Reset to home
             return;
         }
@@ -210,13 +220,19 @@
 
         try {
             const isInSubcategoryView =
-                $navigationStore.category &&
-                $navigationStore.subcategory;
+                $navigationStore.category && $navigationStore.subcategory;
             // Check if this is a product type row by looking up the subcategory config
-            const categoryConfig = mainCategories.find(c => c.name === category);
-            const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === subcategory);
-            const productTypes = subcategoryConfig?.productTypes?.filter(pt => pt !== "All") || [];
-            const isProductTypeRow = isInSubcategoryView && productTypes.includes(identifier);
+            const categoryConfig = mainCategories.find(
+                (c) => c.name === category,
+            );
+            const subcategoryConfig = categoryConfig?.subcategories.find(
+                (s) => s.name === subcategory,
+            );
+            const productTypes =
+                subcategoryConfig?.productTypes?.filter((pt) => pt !== "All") ||
+                [];
+            const isProductTypeRow =
+                isInSubcategoryView && productTypes.includes(identifier);
 
             let result;
             if (isProductTypeRow) {
@@ -263,11 +279,7 @@
     }
 
     async function loadProductsForCategory(navId: number) {
-        if (
-            !$navigationStore.category ||
-            false
-        )
-            return;
+        if (!$navigationStore.category || false) return;
 
         resetState();
 
@@ -283,21 +295,14 @@
 
         containerCapacity = calculateContainerCapacity(mainGridContainer);
 
-        if (
-            $navigationStore.category &&
-            !$navigationStore.subcategory
-        ) {
+        if ($navigationStore.category && !$navigationStore.subcategory) {
             await loadMainCategoryView(containerCapacity, navId);
-        } else if (
-            $navigationStore.category &&
-            $navigationStore.subcategory
-        ) {
+        } else if ($navigationStore.category && $navigationStore.subcategory) {
             await loadSubcategoryView(containerCapacity, navId);
         }
     }
 
     async function loadHomeView(navId: number) {
-
         resetState();
 
         if (!mainGridContainer) {
@@ -364,7 +369,7 @@
         try {
             if ($navigationStore.productType !== "All") {
                 isLoadingProductType = true;
-                
+
                 const result = await dataManager.loadProductTypeProducts(
                     $navigationStore.category,
                     $navigationStore.subcategory,
@@ -403,7 +408,9 @@
     async function loadMainCategoryView(capacity: number, navId: number) {
         if (!$navigationStore.category) return;
 
-        const categoryConfig = mainCategories.find(c => c.name === $navigationStore.category);
+        const categoryConfig = mainCategories.find(
+            (c) => c.name === $navigationStore.category,
+        );
         const subcategories = categoryConfig?.subcategories || [];
         const initialSubcategories = subcategories.slice(0, 3);
 
@@ -467,14 +474,14 @@
     }
 
     async function loadSubcategoryView(capacity: number, navId: number) {
-        if (
-            !$navigationStore.category ||
-            !$navigationStore.subcategory
-        )
-            return;
+        if (!$navigationStore.category || !$navigationStore.subcategory) return;
 
-        const categoryConfig = mainCategories.find(c => c.name === $navigationStore.category);
-        const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === $navigationStore.subcategory);
+        const categoryConfig = mainCategories.find(
+            (c) => c.name === $navigationStore.category,
+        );
+        const subcategoryConfig = categoryConfig?.subcategories.find(
+            (s) => s.name === $navigationStore.subcategory,
+        );
         if (!subcategoryConfig) {
             console.error(
                 `Configuration not found for subcategory: ${$navigationStore.subcategory}`,
@@ -484,7 +491,10 @@
 
         if (subcategoryConfig?.gridOnly === true) {
             await loadGridOnlySubcategory(navId);
-        } else if (!$navigationStore.productType || $navigationStore.productType === "All") {
+        } else if (
+            !$navigationStore.productType ||
+            $navigationStore.productType === "All"
+        ) {
             await loadProductTypesView(capacity, navId);
         } else {
             await loadProductsForProductType(navId);
@@ -492,11 +502,7 @@
     }
 
     async function loadGridOnlySubcategory(navId: number) {
-        if (
-            !$navigationStore.category ||
-            !$navigationStore.subcategory
-        )
-            return;
+        if (!$navigationStore.category || !$navigationStore.subcategory) return;
 
         const result = await dataManager.loadProductTypeProducts(
             $navigationStore.category,
@@ -518,15 +524,18 @@
     }
 
     async function loadProductTypesView(capacity: number, navId: number) {
-        if (
-            !$navigationStore.category ||
-            !$navigationStore.subcategory
-        )
-            return;
+        if (!$navigationStore.category || !$navigationStore.subcategory) return;
 
-        const categoryConfig = mainCategories.find(c => c.name === $navigationStore.category);
-        const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === $navigationStore.subcategory);
-        const productTypes = subcategoryConfig?.productTypes?.filter((pt: string) => pt !== "All") || [];
+        const categoryConfig = mainCategories.find(
+            (c) => c.name === $navigationStore.category,
+        );
+        const subcategoryConfig = categoryConfig?.subcategories.find(
+            (s) => s.name === $navigationStore.subcategory,
+        );
+        const productTypes =
+            subcategoryConfig?.productTypes?.filter(
+                (pt: string) => pt !== "All",
+            ) || [];
 
         const BATCH_SIZE = 5;
         for (let i = 0; i < productTypes.length; i += BATCH_SIZE) {
@@ -750,7 +759,7 @@
     isHomeView={!$navigationStore.category}
     selectedCategory={$navigationStore.category}
     selectedSubcategory={$navigationStore.subcategory}
-    selectedProductType={$navigationStore.productType || 'All'}
+    selectedProductType={$navigationStore.productType || "All"}
     {categoryProducts}
     {allCategoryProducts}
     {currentRanges}

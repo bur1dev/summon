@@ -55,6 +55,14 @@ export class DataManager {
         this._filterStore.update(state => ({ ...state, selectedOrganic: organic }));
     }
 
+    public resetFilters(): void {
+        this._filterStore.set({
+            sortBy: 'best',
+            selectedBrands: new Set(),
+            selectedOrganic: 'all'
+        });
+    }
+
     // === PRODUCT REFERENCE METHODS ===
     async getProductByReference(groupHashB64: string, productIndex: number) {
         return this.productDataService.getProductByReference(groupHashB64, productIndex);

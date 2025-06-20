@@ -6,6 +6,7 @@
     import ProductDetailModal from "../../products/components/modal/ProductDetailModal.svelte";
     import CartItem from "./items/CartItem.svelte";
     import { AnimationService } from "../../services/AnimationService";
+    import { preferences, loadPreference, getPreferenceKey } from "../../products/services/PreferencesService";
 
     // SIMPLIFIED: Props for new CartItem structure
     export let cartItem: any = null; // New: Complete cart item with all data
@@ -31,7 +32,16 @@
         productIndex: 0
     };
     $: quantity = cartItem?.quantity || 0;
-    $: note = cartItem?.note || null;
+    
+    // Preference loading - same pattern as ProductDetailModal
+    $: groupHashBase64 = product?.groupHash;
+    $: productIndex = product?.productIndex;
+    $: preferenceKey = groupHashBase64 && productIndex !== null ? getPreferenceKey(groupHashBase64, productIndex) : null;
+    $: preferenceData = preferenceKey ? ($preferences[preferenceKey] || { preference: null }) : { preference: null };
+    $: masterPreference = preferenceData.preference?.preference?.note;
+    
+    // Display note: session note OR master preference
+    $: note = cartItem?.note || masterPreference || null;
 
     // Cart service is now store-based, no context needed
 
@@ -84,6 +94,11 @@
     const handleInstructionsClick = () => {
         showModal = true;
     };
+    
+    // Load preference when component mounts - same pattern as ProductDetailModal
+    $: if (groupHashBase64 && productIndex !== null) {
+        loadPreference(groupHashBase64, productIndex);
+    }
 </script>
 
 {#if variant === "cart"}

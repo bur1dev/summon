@@ -48,6 +48,8 @@
         checkCartStatus();
     }
 
+
+
     function closeModal() {
         isClosing = true;
         setTimeout(() => {
@@ -111,17 +113,14 @@
             isInCart = true;
             quantity = item.quantity;
             showPreferences = true;
-            if (item.note) {
-                existingNote = item.note;
-                note = item.note;
-            } else {
-                existingNote = "";
-                note = "";
-            }
+            existingNote = item.note || "";
+            note = item.note || "";
         } else {
             isInCart = false;
-            quantity = 1; // Default quantity
+            quantity = 1;
             showPreferences = false;
+            existingNote = "";
+            note = "";
         }
     }
 
@@ -133,18 +132,11 @@
 
         await loadPreference(groupHashBase64, productIndex);
 
-        // If not already in cart and there's a saved preference, pre-populate the note
-        if (
-            !isInCart &&
-            existingPreference &&
-            existingPreference.preference?.note
-        ) {
+        // Set note from master preference if no cart session note
+        if (!isInCart && existingPreference?.preference?.note) {
             note = existingPreference.preference.note;
-            existingNote = existingPreference.preference.note;
-        } else if (!isInCart) {
-            // Clear stale note data if no DHT preference exists
-            note = "";
-            existingNote = "";
+        } else if (isInCart && !existingNote && existingPreference?.preference?.note) {
+            note = existingPreference.preference.note;
         }
     }
 

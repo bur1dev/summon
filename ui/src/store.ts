@@ -10,7 +10,7 @@ import { ProductStore } from "./services/DHTSyncService";
 import type { Product } from "./search/search-types"; // Added import for Product
 
 export class ShopService {
-  constructor(public client: AppClient, public roleName: RoleName, public zomeName = 'products') { }
+  constructor(public client: AppClient, public roleName: RoleName, public zomeName = 'product_catalog') { }
   private callZome(fnName: string, payload: any) {
     return this.client.callZome({
       role_name: this.roleName,
@@ -63,7 +63,7 @@ export class ShopStore {
   constructor(
     protected clientIn: AppClient,
     public roleName: RoleName,
-    public zomeName: string = 'products'
+    public zomeName: string = 'product_catalog'
   ) {
     this.client = clientIn;
     this.dnaHash = null;

@@ -1,18 +1,28 @@
 manifest_version: '1'
 name: summon
-description: null
+description: Split DNA architecture for Summon grocery app
 roles:
-- name: grocery
+- name: products_role
   provisioning:
     strategy: create
     deferred: false
   dna:
-    bundled: ../dnas/grocery/workdir/grocery.dna
+    bundled: ../dnas/products/workdir/products.dna
     modifiers:
       network_seed: null
-      properties:
-        admin_pub_key_str: "uhCAksk61qsIzF-F_O_1YBss60nJlroCf2EqFqtB3UmBdDp57apLM"
-
+      properties: null
+      origin_time: null
     installed_hash: null
     clone_limit: 0
-allow_deferred_memproofs: false
+- name: cart_role  
+  provisioning:
+    strategy: create
+    deferred: false
+  dna:
+    bundled: ../dnas/cart/workdir/cart.dna
+    modifiers:
+      network_seed: null
+      properties: null
+      origin_time: null
+    installed_hash: null
+    clone_limit: 0

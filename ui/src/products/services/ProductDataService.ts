@@ -75,8 +75,8 @@ export class ProductDataService {
 
             // Call the same zome method that the browsing system uses
             const result = await this.store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: "get_product_group",
                 payload: groupHash
             });
@@ -104,8 +104,8 @@ export class ProductDataService {
     ): Promise<number> {
         try {
             const response = await this.store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: "get_all_group_counts_for_path",
                 payload: {
                     category,
@@ -297,8 +297,8 @@ export class ProductDataService {
         const parsed = this.parseIdentifier(params.identifier, params);
 
         const response = await this.store.service.client.callZome({
-            role_name: "grocery",
-            zome_name: "products",
+            role_name: "products_role",
+            zome_name: "product_catalog",
             fn_name: "get_all_group_counts_for_path",
             payload: {
                 category: parsed.category,
@@ -343,8 +343,8 @@ export class ProductDataService {
             const parsed = this.parseIdentifier(params.identifier, params);
 
             const response = await this.store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: "get_products_by_category",
                 payload: {
                     category: parsed.category,
@@ -415,8 +415,8 @@ export class ProductDataService {
                 : category;
 
             const response = await this.store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: fn_name,
                 payload: payload,
             });

@@ -44,7 +44,7 @@ export async function loadFromPrivateEntry(): Promise<CartItem[]> {
     if (!client) return [];
 
     try {
-        const result = await callZome(client, 'cart', 'get_private_cart', null);
+        const result = await callZome(client, 'cart_role', 'cart', 'get_private_cart', null);
 
         if (result?.items) {
             // Direct mapping - no hash decoding needed with new structure
@@ -98,7 +98,7 @@ async function syncToHolochain(cartItems: CartItem[]): Promise<void> {
             last_updated: Date.now()
         };
 
-        await callZome(client, 'cart', 'replace_private_cart', payload);
+        await callZome(client, 'cart_role', 'cart', 'replace_private_cart', payload);
         
         console.log("Cart successfully synced to Holochain");
         localStorage.removeItem('cart');

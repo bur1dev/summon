@@ -40,7 +40,7 @@ export async function loadAddresses() {
     
     addressesLoading.set(true);
     try {
-        const result = await callZome(client, 'cart', 'get_addresses', null);
+        const result = await callZome(client, 'cart_role', 'cart', 'get_addresses', null);
 
         if (Array.isArray(result)) {
             const addressMap: AddressMap = {};
@@ -60,7 +60,7 @@ export async function createAddress(address: Address) {
     if (clientError) return clientError;
     
     try {
-        const result = await callZome(client, 'cart', 'create_address', address);
+        const result = await callZome(client, 'cart_role', 'cart', 'create_address', address);
         const hashB64 = encodeHash(result);
         addresses.update(current => ({ ...current, [hashB64]: address }));
         
@@ -80,7 +80,7 @@ export async function updateAddress(hashB64: ActionHashB64, address: Address) {
     if (clientError) return clientError;
     
     try {
-        await callZome(client, 'cart', 'update_address', [decodeHash(hashB64), address]);
+        await callZome(client, 'cart_role', 'cart', 'update_address', [decodeHash(hashB64), address]);
         addresses.update(current => ({ ...current, [hashB64]: address }));
         
         if (address.is_default) {
@@ -99,7 +99,7 @@ export async function deleteAddress(hashB64: ActionHashB64) {
     if (clientError) return clientError;
     
     try {
-        await callZome(client, 'cart', 'delete_address', decodeHash(hashB64));
+        await callZome(client, 'cart_role', 'cart', 'delete_address', decodeHash(hashB64));
 
         addresses.update(current => {
             const { [hashB64]: deleted, ...remaining } = current;

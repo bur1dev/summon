@@ -42,8 +42,11 @@
     }
 
     function handleNoteInput() {
-        onShowButtonsChange(note !== existingNote);
-        onNoteChangedChange(note !== existingNote);
+        // Show save button if note changed from ANY original state (session note or master preference)
+        const originalNote = existingNote || existingPreference?.preference?.note || "";
+        const hasChanged = note !== originalNote;
+        onShowButtonsChange(hasChanged);
+        onNoteChangedChange(hasChanged);
     }
 
     async function saveInstructions() {
@@ -64,8 +67,13 @@
             onNoteChangedChange(false);
 
             // Save preference if toggle is on
-            if (savePreference && note && note.trim()) {
-                await saveProductPreference();
+            if (savePreference) {
+                if (note && note.trim()) {
+                    await saveProductPreference();
+                } else if (existingPreference) {
+                    // Empty note with remember checked = delete preference
+                    await deleteProductPreference();
+                }
             } else if (!savePreference && existingPreference) {
                 // If toggle is off but preference exists, delete it
                 await deleteProductPreference();

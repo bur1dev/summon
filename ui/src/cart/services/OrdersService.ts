@@ -16,7 +16,7 @@ export async function getOrderAddress(cartHash: ActionHashB64) {
 
     try {
         console.log("Getting address for order:", cartHash);
-        const result = await callZome(client, 'cart', 'get_address_for_order', decodeHash(cartHash));
+        const result = await callZome(client, 'cart_role', 'cart', 'get_address_for_order', decodeHash(cartHash));
         console.log("Retrieved order address:", result);
         return createSuccessResult(result);
     } catch (error) {
@@ -32,7 +32,7 @@ export async function loadOrders() {
 
     try {
         console.log("Loading checked out carts...");
-        const result = await callZome(client, 'cart', 'get_checked_out_carts', null);
+        const result = await callZome(client, 'cart_role', 'cart', 'get_checked_out_carts', null);
         console.log("Loaded checked out carts:", result);
 
         // SIMPLIFIED: Process the results - all data is already here!
@@ -126,7 +126,7 @@ export async function returnToShopping(cartHash: ActionHashB64) {
         }
 
         // Call zome function then sync
-        const result = await callZome(client, 'cart', 'return_to_shopping', decodeHash(cartHash));
+        const result = await callZome(client, 'cart_role', 'cart', 'return_to_shopping', decodeHash(cartHash));
         
         console.log("SUCCESS: Zome call result:", result);
         forceSyncToHolochain();

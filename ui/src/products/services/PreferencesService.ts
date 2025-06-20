@@ -30,8 +30,8 @@ export async function loadPreference(groupHash: string, productIndex: number): P
     
     try {
         const result = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
+            role_name: 'products_role',
+            zome_name: 'product_catalog',
             fn_name: 'get_product_preference_by_product',
             payload: {
                 group_hash: decodeHashFromBase64(groupHash),
@@ -62,8 +62,8 @@ export async function savePreference(groupHash: string, productIndex: number, no
     
     try {
         const hash = await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
+            role_name: 'products_role',
+            zome_name: 'product_catalog',
             fn_name: 'save_product_preference',
             payload: {
                 group_hash: decodeHashFromBase64(groupHash),
@@ -91,8 +91,8 @@ export async function deletePreference(preferenceHash: string, groupHash: string
     
     try {
         await client.callZome({
-            role_name: 'grocery',
-            zome_name: 'cart',
+            role_name: 'products_role',
+            zome_name: 'product_catalog',
             fn_name: 'delete_product_preference',
             payload: decodeHashFromBase64(preferenceHash)
         });

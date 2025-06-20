@@ -24,13 +24,13 @@ export function standardizeHashFormat(groupHash: string): string {
 }
 
 // Standard zome call wrapper
-export async function callZome(client: any, zomeName: string, fnName: string, payload: any) {
+export async function callZome(client: any, roleName: string, zomeName: string, fnName: string, payload: any) {
     if (!client) {
         throw new Error('Holochain client not available');
     }
     
     return await client.callZome({
-        role_name: 'grocery',
+        role_name: roleName,
         zome_name: zomeName,
         fn_name: fnName,
         payload

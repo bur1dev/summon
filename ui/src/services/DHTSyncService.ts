@@ -189,8 +189,8 @@ export class ProductStore {
           try {
             attempts++;
             const records = await this.store.service.client.callZome({
-              role_name: "grocery",
-              zome_name: "products",
+              role_name: "products_role",
+              zome_name: "product_catalog",
               fn_name: "create_product_batch",
               payload: processedBatch,
             });
@@ -314,8 +314,8 @@ export class ProductStore {
     try {
       // Call the DHT to get the record by hash
       const record = await this.store.service.client.callZome({
-        role_name: "grocery",
-        zome_name: "products",
+        role_name: "products_role",
+        zome_name: "product_catalog",
         fn_name: "get_product",
         payload: hash
       });
@@ -547,8 +547,8 @@ export class ProductStore {
 
       try {
         const existingGroupsResponse = await this.store.service.client.callZome({
-          role_name: "grocery",
-          zome_name: "products",
+          role_name: "products_role",
+          zome_name: "product_catalog",
           fn_name: "get_products_by_category", // This gets groups linked to the path
           payload: {
             category: targetPathCategory,
@@ -574,8 +574,8 @@ export class ProductStore {
                 // delete_links_to_product_group takes the group's hash and removes all links pointing TO it
                 // from various category paths. This is what we want.
                 await this.store.service.client.callZome({
-                  role_name: "grocery",
-                  zome_name: "products",
+                  role_name: "products_role",
+                  zome_name: "product_catalog",
                   fn_name: "delete_links_to_product_group",
                   payload: group.signed_action.hashed.hash // Send the ProductGroup's ActionHash
                 });
@@ -607,8 +607,8 @@ export class ProductStore {
               for (const group of existingGroupsResponse.product_groups) {
                 try {
                   await this.store.service.client.callZome({
-                    role_name: "grocery",
-                    zome_name: "products",
+                    role_name: "products_role",
+                    zome_name: "product_catalog",
                     fn_name: "delete_links_to_product_group",
                     payload: group.signed_action.hashed.hash
                   });
@@ -679,8 +679,8 @@ export class ProductStore {
           try {
             console.log(`[LOG] Sync (Selective): Sending batch with ${productBatchForZomeCall.length} products for Zome processing related to path ${typeKey}`);
             const createResult = await this.store.service.client.callZome({
-              role_name: "grocery",
-              zome_name: "products",
+              role_name: "products_role",
+              zome_name: "product_catalog",
               fn_name: "create_product_batch",
               payload: productBatchForZomeCall,
             });

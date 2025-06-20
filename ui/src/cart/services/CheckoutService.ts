@@ -5,8 +5,7 @@ import type { CheckoutDetails } from '../types/CartTypes';
 import { getCartItems, forceSyncToHolochain, clearCart } from './CartBusinessService';
 import { clearSessionPreferences } from '../../products/services/PreferencesService';
 import { mapCartItemsToPayload } from '../utils/cartHelpers';
-import { createAddress, getAddress } from './AddressService';
-import { decodeHash } from '../utils/zomeHelpers';
+import { getAddress } from './AddressService';
 
 // Functional store exports
 export const savedDeliveryDetails = writable<CheckoutDetails>({});
@@ -43,24 +42,19 @@ export async function checkoutCart(details: CheckoutDetails) {
             return { success: false, message: "Address not found in address book" };
         }
         
-        // Create permanent, private address entry for order historical integrity
-        const privateAddressResult = await createAddress(addressData);
-        if (!privateAddressResult.success) {
-            return { success: false, message: `Failed to create private address copy: ${privateAddressResult.message}` };
-        }
+        // Create permanent, private "shipping label" address for order - NOT linked to agent's address book
+        const privateAddressHash = await callZome(client, 'cart_role', 'cart', 'create_order_address_copy', addressData);
+        console.log("Created immutable shipping label address for order:", privateAddressHash);
         
-        const privateAddressHash = privateAddressResult.data.hash;
-        console.log("Created immutable address copy for order:", privateAddressHash);
-        
-        // STEP 2: Checkout cart with private address hash
+        // STEP 2: Checkout cart with private address hash  
         const payload: any = {
-            private_address_hash: decodeHash(privateAddressHash),
+            private_address_hash: privateAddressHash,
             delivery_time: details.deliveryTime || null,
             cart_products: cartProducts
         };
         
         console.log("Checking out cart with private address:", payload);
-        const checkoutResult = await callZome(client, 'cart', 'checkout_cart', payload);
+        const checkoutResult = await callZome(client, 'cart_role', 'cart', 'checkout_cart', payload);
         
         console.log("Checkout result:", checkoutResult);
         await clearCart();

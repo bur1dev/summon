@@ -1,4 +1,4 @@
-use cart_integrity::*;
+use products_integrity::*;
 use hdk::prelude::*;
 
 // Implementation of save_product_preference

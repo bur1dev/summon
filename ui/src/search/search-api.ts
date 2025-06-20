@@ -33,8 +33,8 @@ export class SearchApiClient {
                 };
 
                 const response = await this.store.service.client.callZome({
-                    role_name: "grocery",
-                    zome_name: "products",
+                    role_name: "products_role",
+                    zome_name: "product_catalog",
                     fn_name: "get_products_by_references",
                     payload: [reference],
                 });
@@ -61,8 +61,8 @@ export class SearchApiClient {
                 // Fallback for old-style hashes (backward compatibility)
                 console.warn("Using legacy hash format - this should be updated");
                 const response = await this.store.service.client.callZome({
-                    role_name: "grocery",
-                    zome_name: "products",
+                    role_name: "products_role",
+                    zome_name: "product_catalog",
                     fn_name: "get_products_by_hashes",
                     payload: [hash],
                 });
@@ -95,8 +95,8 @@ export class SearchApiClient {
                 };
 
                 const response = await this.store.service.client.callZome({
-                    role_name: "grocery",
-                    zome_name: "products",
+                    role_name: "products_role",
+                    zome_name: "product_catalog",
                     fn_name: "get_products_by_references",
                     payload: [reference],
                 });
@@ -146,8 +146,8 @@ export class SearchApiClient {
                 // Fallback for old-style hashes
                 console.warn("Using legacy hash format - this should be updated");
                 const response = await this.store.service.client.callZome({
-                    role_name: "grocery",
-                    zome_name: "products",
+                    role_name: "products_role",
+                    zome_name: "product_catalog",
                     fn_name: "get_products_by_hashes",
                     payload: [hash],
                 });
@@ -174,8 +174,8 @@ export class SearchApiClient {
         console.time(logKey);
         try {
             const response = await this.store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: "get_products_by_category",
                 payload: {
                     category,
@@ -242,8 +242,8 @@ export class SearchApiClient {
     ): Promise<Product[]> {
         try {
             const response = await this.store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: "get_products_by_category",
                 payload: {
                     category,
@@ -299,8 +299,8 @@ export class SearchApiClient {
     async getAllCategoryProducts(category: string): Promise<Product[]> {
         try {
             const response = await this.store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: "get_all_category_products",
                 payload: category,
             });

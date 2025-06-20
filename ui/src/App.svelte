@@ -23,7 +23,7 @@
   const appId = import.meta.env.VITE_APP_ID
     ? import.meta.env.VITE_APP_ID
     : "summon";
-  const roleName = "grocery";
+  const roleName = "cart_role";
   const appPort = import.meta.env.VITE_APP_PORT
     ? import.meta.env.VITE_APP_PORT
     : 8888;
@@ -76,7 +76,7 @@
     client = await AppWebsocket.connect(params);
 
     // Initialize ShopStore once client is available
-    shopStoreInstance = new ShopStore(client, roleName);
+    shopStoreInstance = new ShopStore(client, "products_role", "product_catalog");
 
     // Initialize cart service with functional pattern
     setCartServices(client);
@@ -98,7 +98,7 @@
     setPreferencesClient(client);
 
     // Initialize ProfilesStore
-    profilesStore = new ProfilesStore(new ProfilesClient(client, "grocery"), {
+    profilesStore = new ProfilesStore(new ProfilesClient(client, "cart_role"), {
       avatarMode: "avatar-optional",
       minNicknameLength: 2,
       additionalFields: [],
@@ -151,7 +151,7 @@
         </div>
       </div>
     {:else}
-      <Controller {client} {roleName}></Controller>
+      <Controller {client} roleName="cart_role"></Controller>
     {/if}
   </profiles-context>
 {:else}

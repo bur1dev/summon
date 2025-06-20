@@ -428,8 +428,8 @@ export default class SearchCacheService {
             // Single bulk call to get all products
             console.time('[SearchCacheService] Bulk fetch all products');
             const response: { products: ProductGroupRecord[], total: number } = await store.service.client.callZome({
-                role_name: "grocery",
-                zome_name: "products",
+                role_name: "products_role",
+                zome_name: "product_catalog",
                 fn_name: "get_all_products_for_search_index",
                 payload: null,
             });

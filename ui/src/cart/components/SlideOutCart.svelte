@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { getContext, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { Frown } from "lucide-svelte";
   import { cartItems, cartTotal, cartPromoTotal, clearCart as clearCartService } from "../services/CartBusinessService";
-  import type { ProductDataService } from "../../products/services/ProductDataService";
   import CartHeader from "./CartHeader.svelte";
   import UnifiedCartItem from "./UnifiedCartItem.svelte";
   import CheckoutFlow from "./checkout/CheckoutFlow.svelte";
@@ -22,16 +21,11 @@
   // Cart service is now store-based, no context needed
 
 
-  // Get ProductDataService from context (must be at top level)
-  const productDataService =
-    getContext<ProductDataService>("productDataService");
+  // DELETED: ProductDataService no longer needed with new CartItem structure
 
   // State  
   let enrichedCartItems: any[] = [];
   let isLoading = true;
-  
-  // Smart enrichment cache - Map of itemKey -> enrichedItem
-  let enrichmentCache = new Map<string, any>();
   let isShowingCheckoutFlow = false;
   let checkoutError = "";
   let isClosing = false;
@@ -45,81 +39,30 @@
   // Subscribe to cart changes
   let unsubscribe: (() => void) | null = null;
 
-  // Helper function to create unique key for cart items
-  function getItemKey(item: any): string {
-    return `${item.groupHash}_${item.productIndex}`;
-  }
+  // DELETED: getItemKey function no longer needed
 
-  // Smart enrichment function - only fetches new items
-  async function updateEnrichedItems(newCartItems: any[]) {
-    const newEnrichedItems: any[] = [];
-    
-    for (const item of newCartItems) {
-      const itemKey = getItemKey(item);
-      
-      // Check if we already have this item enriched
-      if (enrichmentCache.has(itemKey)) {
-        // Update existing enriched item with new quantity/note
-        const cachedItem = enrichmentCache.get(itemKey)!;
-        const updatedItem = {
-          ...cachedItem,
-          quantity: item.quantity,
-          note: item.note,
-          timestamp: item.timestamp
-        };
-        enrichmentCache.set(itemKey, updatedItem);
-        newEnrichedItems.push(updatedItem);
-      } else {
-        // New item - fetch product details
-        try {
-          const product = await fetchProductDetails(
-            item.groupHash,
-            item.productIndex,
-          );
-          const enrichedItem = {
-            ...item,
-            productDetails: product,
-          };
-          enrichmentCache.set(itemKey, enrichedItem);
-          newEnrichedItems.push(enrichedItem);
-        } catch (e) {
-          console.error(`Failed to load product ${item.groupHash}_${item.productIndex}:`, e);
-          const enrichedItem = {
-            ...item,
-            productDetails: {
-              name: "Unknown Product",
-              price: 0,
-              size: "N/A",
-              image_url: "",
-            },
-          };
-          enrichmentCache.set(itemKey, enrichedItem);
-          newEnrichedItems.push(enrichedItem);
-        }
+  // SIMPLIFIED: No enrichment needed - CartItems already contain all product data
+  function updateEnrichedItems(newCartItems: any[]) {
+    // With the new CartItem structure, all product data is already included
+    // No need for complex enrichment or fetching
+    enrichedCartItems = newCartItems.map(item => ({
+      ...item,
+      // For backward compatibility with UI components that expect productDetails
+      productDetails: {
+        name: item.productName,
+        price: item.priceAtCheckout,
+        image_url: item.productImageUrl
       }
-    }
+    }));
     
-    // Clean up cache for items no longer in cart
-    const currentKeys = new Set(newCartItems.map(getItemKey));
-    for (const cachedKey of enrichmentCache.keys()) {
-      if (!currentKeys.has(cachedKey)) {
-        enrichmentCache.delete(cachedKey);
-      }
-    }
-    
-    enrichedCartItems = newEnrichedItems;
+    isLoading = false;
   }
 
   onMount(() => {
-    // Subscribe directly to cart items store
-    unsubscribe = cartItems.subscribe(async (items) => {
-      // Filter out any invalid items - ones with no groupHash
-      const validItems = (items || []).filter((item) => item && item.groupHash);
-
-      // Use smart enrichment - only fetch new items
-      await updateEnrichedItems(validItems);
-
-      isLoading = false;
+    // SIMPLIFIED: Subscribe directly to cart items store
+    unsubscribe = cartItems.subscribe((items) => {
+      // All cart items are valid with new structure
+      updateEnrichedItems(items || []);
     });
 
     return () => {
@@ -127,30 +70,7 @@
     };
   });
 
-  // Product fetching using ProductDataService
-  async function fetchProductDetails(
-    groupHashB64: string,
-    productIndex: number,
-  ) {
-    if (!groupHashB64) {
-      throw new Error("Missing groupHash");
-    }
-
-    if (!productDataService) {
-      throw new Error("ProductDataService not available");
-    }
-
-    const product = await productDataService.getProductByReference(
-      groupHashB64,
-      productIndex,
-    );
-
-    if (!product) {
-      throw new Error(`Product not found: ${groupHashB64}_${productIndex}`);
-    }
-
-    return product;
-  }
+  // DELETED: fetchProductDetails function - no longer needed with new CartItem structure
 
   // Clear cart
   async function clearCart() {
@@ -197,17 +117,6 @@
     hasTriggeredInitialZipper = false;
   }
 
-
-  // Safe compare function for sorting
-  function safeCompare(a: any, b: any) {
-    // Handle undefined values
-    if (!a && !b) return 0;
-    if (!a) return -1;
-    if (!b) return 1;
-
-    // Compare strings
-    return String(a).localeCompare(String(b));
-  }
 
   // Use PriceService for savings calculation
   $: totalSavings = PriceService.calculateSavings($cartTotal, $cartPromoTotal);
@@ -313,15 +222,9 @@
                   <span class="empty-cart-text">Your cart is empty</span>
                 </div>
               {:else}
-                {#each [...enrichedCartItems]
-                  .filter((item) => item && item.groupHash && item.productDetails)
-                  .sort((a, b) => safeCompare(a.groupHash, b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
+                {#each enrichedCartItems as item (item.productId || `${item.groupHash}_${item.productIndex}`)}
                   <UnifiedCartItem
-                    product={item.productDetails}
-                    quantity={item.quantity}
-                    groupHash={item.groupHash}
-                    productIndex={item.productIndex}
-                    note={item.note}
+                    cartItem={item}
                     variant="cart"
                   />
                 {/each}

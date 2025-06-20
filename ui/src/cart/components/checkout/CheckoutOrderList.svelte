@@ -24,9 +24,9 @@
 <div class="summary-section">
     <h3 class={isEntering ? "slide-in-left" : isExiting ? "slide-out-left" : ""}>Order Details</h3>
     <div class="order-items" bind:this={orderItemsContainer}>
-        {#each [...cartItems].sort((a, b) => a.groupHash.localeCompare(b.groupHash) || a.productIndex - b.productIndex) as item (`${item.groupHash}_${item.productIndex}`)}
+        {#each [...cartItems].sort((a, b) => a.productId.localeCompare(b.productId)) as item (item.productId)}
             <UnifiedCartItem
-                {item}
+                cartItem={item}
                 variant="checkout"
             />
         {/each}

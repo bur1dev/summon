@@ -19,11 +19,24 @@ pub struct CheckedOutCart {
 #[hdk_entry_helper]
 #[derive(Clone)]
 pub struct CartProduct {
-    pub group_hash: ActionHash,    // Reference to ProductGroup
-    pub product_index: u32,        // Index of product within the group
-    pub quantity: f64,             // Changed to f64 to support weight-based products
+    // A unique, permanent string identifier for the product.
+    // This will be created on the frontend as `${group_hash}:${product_index}`.
+    pub product_id: String,
+
+    // --- ALL DATA BELOW IS A SNAPSHOT ---
+    pub product_name: String,
+    pub product_image_url: Option<String>,
+
+    // The price is frozen at the time of adding to the cart. This is the source of truth.
+    pub price_at_checkout: f64,
+    pub promo_price: Option<f64>,
+
+    // --- CART-SPECIFIC DATA (Unchanged) ---
+    pub quantity: f64,
     pub timestamp: u64,
-    pub note: Option<String>,      // Customer note for shopper
+
+    // This field will store any snapshotted product preferences or customer notes.
+    pub note: Option<String>,
 }
 
 // New structure for the private cart (stored as private entry)

@@ -2,11 +2,9 @@ import type { ProductDataService, NavigationParams, NavigationResult } from '../
 import { writable, type Readable } from 'svelte/store';
 import { navigationStore } from '../stores/NavigationStore';
 
-/**
- * Centralized Data Manager - Single gateway for all data operations
- * Step 2: This class becomes the exclusive interface for data fetching,
- * preventing scattered productDataService calls throughout components
- */
+
+// Centralized Data Manager - Single gateway for all data operations
+// TODO: Make data manager the point of fetching data or leave it as is?
 
 interface FilterState {
     sortBy: string;
@@ -34,7 +32,7 @@ export class DataManager {
 
     constructor(productDataService: ProductDataService) {
         this.productDataService = productDataService;
-        
+
         // Subscribe to navigation changes for data fetching
         navigationStore.subscribe(nav => {
             // Trigger appropriate data fetches based on nav state

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { get } from "svelte/store";
     import { preferences, savePreference as savePreferenceAPI, deletePreference, updateSavePreference, getPreferenceKey } from "../../services/PreferencesService";
-    import { addToCart } from "../../../cart/services/CartBusinessService";
+    import { updateQuantity } from "../../../cart/services/CartInteractionService";
     import { Save } from "lucide-svelte";
 
     // CartBusinessService no longer needed as prop
@@ -48,9 +48,14 @@
 
     async function saveInstructions() {
         try {
-            await addToCart(
-                groupHashBase64,
-                productIndex,
+            // Create product object for cart operations
+            const productForCart = {
+                groupHash: groupHashBase64,
+                productIndex: productIndex
+            };
+
+            await updateQuantity(
+                productForCart,
                 quantity,
                 note || undefined,
             );

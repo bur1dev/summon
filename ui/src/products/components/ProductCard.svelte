@@ -11,11 +11,7 @@
   import { StockService } from "../../services/StockService";
   import { cartItems } from "../../cart/services/CartBusinessService";
   import { addProductToCart, incrementItem, decrementItem, getCurrentQuantity } from "../../cart/services/CartInteractionService";
-  import {
-    isSoldByWeight,
-    parseProductHash,
-    getEffectiveHash,
-  } from "../../cart/utils/cartHelpers";
+  import { isSoldByWeight, parseProductHash } from "../../cart/utils/cartHelpers";
 
   export let selectedCategory: string = "";
   export let selectedSubcategory: string = "";
@@ -28,7 +24,7 @@
   // Cart service is now store-based, no context needed
 
   export let product: any;
-  export let actionHash: any = undefined;
+  export const actionHash: any = undefined; // External reference only
 
   // For tracking cart updates
   let itemCount: number = 0;
@@ -45,24 +41,13 @@
   // Use StockService for stock information
   $: stockInfo = StockService.getStockInfo(product);
 
-  // Use cart helpers for hash parsing
-  let groupHashBase64: string = "";
-  let productIndex: number = 0;
+  // Parse product hash using centralized helper
+  $: ({ productId } = parseProductHash(product));
 
-  $: {
-    const effectiveHash = getEffectiveHash(product, actionHash);
-    const parsed = parseProductHash(effectiveHash);
-    groupHashBase64 = parsed.groupHash;
-    productIndex = parsed.productIndex;
-  }
-
-  // Update item count whenever it changes
+  // SIMPLIFIED: Update item count whenever it changes
   function updateItemCount(items: any[]) {
-    const quantity = getCurrentQuantity(
-      items,
-      groupHashBase64,
-      productIndex,
-    );
+    if (!productId) return; // Skip if no valid productId
+    const quantity = getCurrentQuantity(items, productId);
 
     if (quantity > 0) {
       if (productIsSoldByWeight) {
@@ -129,11 +114,7 @@
     e.stopPropagation();
     // Cart service is always available with store pattern
 
-    console.log("ProductCard hash info:", {
-      effectiveHash: actionHash || product?.hash,
-      groupHashBase64,
-      productIndex,
-    });
+    // Product successfully identified for cart operations
 
     handleAddToCart();
   }
@@ -151,34 +132,26 @@
     showProductModal = true;
   }
 
+  // SIMPLIFIED: Cart operations using original product object
   async function handleIncrementClick() {
+    if (!productId) return;
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await incrementItem(
-      groupHashBase64,
-      productIndex,
-      currentAmount,
-      product,
-    );
+    await incrementItem(product, currentAmount);
   }
 
   async function handleDecrementClick() {
+    if (!productId) return;
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await decrementItem(
-      groupHashBase64,
-      productIndex,
-      currentAmount,
-      product,
-    );
+    await decrementItem(product, currentAmount);
   }
 
-  // Add product to cart using centralized service
+  // SIMPLIFIED: Add product to cart
   async function handleAddToCart() {
-    await addProductToCart(
-      groupHashBase64,
-      productIndex,
-      undefined, // note
-      product
-    );
+    if (!productId) {
+      console.error("Cannot add to cart: invalid product hash", product);
+      return;
+    }
+    await addProductToCart(product);
   }
 </script>
 
@@ -209,8 +182,6 @@
 <ProductDetailModal
   bind:isOpen={showProductModal}
   {product}
-  {groupHashBase64}
-  {productIndex}
   {selectedCategory}
   {selectedSubcategory}
   on:addToCart={handleButtonClick}

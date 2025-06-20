@@ -6,8 +6,6 @@
     
     // CartBusinessService no longer needed as prop
     export let product: any;
-    export let groupHashBase64: string;
-    export let productIndex: number;
     export let quantity: number;
     export let isInCart: boolean;
     export let existingNote: string;
@@ -29,11 +27,9 @@
         
         if (isInCart) {
             await updateQuantity(
-                groupHashBase64,
-                productIndex,
+                product,
                 newQuantity,
-                existingNote || undefined,
-                product
+                existingNote || undefined
             );
         }
     }
@@ -54,11 +50,9 @@
         
         if (isInCart) {
             await updateQuantity(
-                groupHashBase64,
-                productIndex,
+                product,
                 newQuantity,
-                existingNote || undefined,
-                product
+                existingNote || undefined
             );
         }
     }

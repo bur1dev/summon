@@ -1,6 +1,5 @@
 // Cart feature exports
 // All services are now functional, not class exports
-export * from './services/CartCalculationService';
 export * from './services/CartInteractionService';
 export * from './services/CartPersistenceService';
 export * from './services/AddressService';

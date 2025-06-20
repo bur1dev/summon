@@ -1,4 +1,3 @@
-import { standardizeHashFormat } from "../utils/zomeHelpers";
 import { writable, derived } from 'svelte/store';
 import type { DataManager } from "../../services/DataManager";
 import { 
@@ -10,12 +9,8 @@ import {
     forceSyncToHolochain as persistenceForceSyncToHolochain, 
     mergeLocalAndHolochainCarts 
 } from "./CartPersistenceService";
-import { 
-    setCalculationDataManager, 
-    calculateCartTotals, 
-    calculateItemDelta 
-} from "./CartCalculationService";
-import type { CartItem, ActionHashB64 } from '../types/CartTypes';
+import type { CartItem } from '../types/CartTypes';
+import { parseProductHash } from '../utils/cartHelpers';
 
 // Service dependencies
 let client: any = null;
@@ -38,10 +33,9 @@ export const hasItems = derived(cartItems, items => items.length > 0);
 let localCartItems: CartItem[] = [];
 
 // Service initialization
-export function setCartServices(holoClient: any, dataManager?: DataManager): void {
+export function setCartServices(holoClient: any, _dataManager?: DataManager): void {
     client = holoClient;
     setPersistenceClient(holoClient);
-    if (dataManager) setCalculationDataManager(dataManager);
 
     cartItems.set([]);
     cartTotal.set(0);
@@ -52,11 +46,10 @@ export function setCartServices(holoClient: any, dataManager?: DataManager): voi
     initialize();
 }
 
-// Set DataManager reference (called from Controller)
-export function setDataManager(dataManager: DataManager): void {
-    setCalculationDataManager(dataManager);
-    // Force immediate recalculation
-    setTimeout(() => recalculateCartTotal(), 0);
+// SIMPLIFIED: DataManager no longer needed for cart calculations (stub for backward compatibility)
+export function setDataManager(_dataManager: DataManager): void {
+    // No-op: Cart service now does simple local calculations instead of complex product lookups
+    // DataManager injection no longer needed in simplified architecture
 }
 
 async function initialize(): Promise<void> {
@@ -71,7 +64,7 @@ async function initialize(): Promise<void> {
         if (localItems.length > 0) {
             localCartItems = localItems;
             cartItems.set(localItems);
-            await recalculateCartTotal();
+            recalculateCartTotal();
         }
 
         if (client) {
@@ -122,7 +115,7 @@ export async function loadCart(): Promise<void> {
             saveToLocalStorage(localCartItems);
 
             // Recalculate cart total after loading items
-            await recalculateCartTotal();
+            recalculateCartTotal();
         } else if (localCartItems.length > 0) {
             // If we have local items but nothing in Holochain, sync to Holochain
             persistenceForceSyncToHolochain(localCartItems);
@@ -134,37 +127,18 @@ export async function loadCart(): Promise<void> {
     cartLoading.set(false);
 }
 
-// Add product to cart (or update quantity)
-export async function addToCart(groupHash: ActionHashB64, productIndex: number, quantity: number = 1, note?: string, product?: any) {
+// Add product to cart - THE ONLY BRIDGE TO PRODUCT CATALOG
+export async function addToCart(product: any, quantity: number = 1, note?: string) {
     if (!client) return { success: false, error: "Service not initialized", local: true };
     
     try {
-        if (!groupHash) {
-            console.error("Cannot add item to cart: missing groupHash");
-            return { success: false, error: "Invalid product reference", local: true };
-        }
-
-        console.log(`Adding to cart: groupHash=${groupHash}, productIndex=${productIndex}, quantity=${quantity}, note=${note}`);
-
-        // Handle different hash formats - standardize to base64
-        const standardizedHash = standardizeHashFormat(groupHash);
-
-        // Get current item quantity for price delta calculation
-        const currentItem = localCartItems.find(item =>
-            item.groupHash === standardizedHash && item.productIndex === productIndex
-        );
-        const oldQuantity = currentItem ? currentItem.quantity : 0;
-        const quantityDelta = quantity - oldQuantity;
-
-        // Update local cart
-        updateLocalCart(standardizedHash, productIndex, quantity, note);
-
-        // Calculate price delta instead of full recalculation
-        await updateCartTotalDelta(standardizedHash, productIndex, quantityDelta, product);
-
-        // Schedule sync to Holochain
-        scheduleSyncToHolochain(localCartItems);
-
+        const validation = validateProductForCart(product);
+        if (!validation.success) return validation;
+        
+        const cartItem = createCartItemFromProduct(product, quantity, note);
+        updateLocalCartState(cartItem);
+        scheduleHolochainSync();
+        
         return { success: true, local: true };
     } catch (error) {
         console.error('Error adding to cart:', error);
@@ -172,26 +146,44 @@ export async function addToCart(groupHash: ActionHashB64, productIndex: number, 
     }
 }
 
-// Update cart total with delta calculation
-async function updateCartTotalDelta(groupHash: ActionHashB64, productIndex: number, quantityDelta: number, product?: any): Promise<void> {
-    if (quantityDelta === 0) return;
-
-    try {
-        const delta = await calculateItemDelta(groupHash, productIndex, quantityDelta, product);
-
-        cartTotal.update(current => {
-            const newTotal = current + delta.regular;
-            return newTotal < 0 ? 0 : newTotal;
-        });
-
-        cartPromoTotal.update(current => {
-            const newTotal = current + delta.promo;
-            return newTotal < 0 ? 0 : newTotal;
-        });
-    } catch (error) {
-        console.error('Error updating cart total delta:', error);
-        recalculateCartTotal();
+function validateProductForCart(product: any) {
+    if (!product) {
+        console.error("Cannot add item to cart: missing product");
+        return { success: false, error: "Invalid product", local: true };
     }
+
+    const { productId } = parseProductHash(product);
+    
+    if (!productId) {
+        console.error("Cannot add item to cart: invalid product hash", product);
+        return { success: false, error: "Invalid product identifier", local: true };
+    }
+    
+    return { success: true, productId };
+}
+
+function createCartItemFromProduct(product: any, quantity: number, note?: string): CartItem {
+    const { productId } = parseProductHash(product);
+    
+    return {
+        productId: productId!,
+        productName: product.name || 'Unknown Product',
+        productImageUrl: product.image_url,
+        priceAtCheckout: product.price || 0, // Frozen regular price at time of adding
+        promoPrice: product.promo_price, // Frozen promo price (if available)
+        quantity,
+        timestamp: Date.now(),
+        note
+    };
+}
+
+function updateLocalCartState(newCartItem: CartItem): void {
+    updateLocalCart(newCartItem);
+    recalculateCartTotal();
+}
+
+function scheduleHolochainSync(): void {
+    scheduleSyncToHolochain(localCartItems);
 }
 
 // Clear cart
@@ -216,15 +208,14 @@ export async function clearCart() {
     }
 }
 
-function updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantity: number, note?: string): void {
+function updateLocalCart(newItem: CartItem): void {
     if (!client) return;
     
-    const currentTime = Date.now();
     const itemIndex = localCartItems.findIndex(item =>
-        item.groupHash === groupHash && item.productIndex === productIndex
+        item.productId === newItem.productId
     );
 
-    if (quantity === 0) {
+    if (newItem.quantity === 0) {
         // Remove item if quantity is 0
         if (itemIndex >= 0) {
             localCartItems.splice(itemIndex, 1);
@@ -232,17 +223,11 @@ function updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantit
     } else {
         // Update existing or add new
         if (itemIndex >= 0) {
-            localCartItems[itemIndex].quantity = quantity;
-            localCartItems[itemIndex].timestamp = currentTime;
-            localCartItems[itemIndex].note = note;
+            localCartItems[itemIndex].quantity = newItem.quantity;
+            localCartItems[itemIndex].timestamp = newItem.timestamp;
+            localCartItems[itemIndex].note = newItem.note;
         } else {
-            localCartItems.push({
-                groupHash,
-                productIndex,
-                quantity,
-                timestamp: currentTime,
-                note
-            });
+            localCartItems.push(newItem);
         }
     }
 
@@ -253,12 +238,20 @@ function updateLocalCart(groupHash: ActionHashB64, productIndex: number, quantit
     saveToLocalStorage(localCartItems);
 }
 
-// Recalculate cart total completely
-async function recalculateCartTotal(): Promise<void> {
+// SIMPLIFIED: Recalculate cart total completely - no more complex zome calls
+function recalculateCartTotal(): void {
     try {
-        const totals = await calculateCartTotals(localCartItems);
-        cartTotal.set(totals.regular);
-        cartPromoTotal.set(totals.promo);
+        // Calculate both regular and promo totals
+        const regularTotal = localCartItems.reduce((sum, item) => 
+            sum + (item.priceAtCheckout * item.quantity), 0
+        );
+        
+        const promoTotal = localCartItems.reduce((sum, item) => 
+            sum + ((item.promoPrice || item.priceAtCheckout) * item.quantity), 0
+        );
+        
+        cartTotal.set(regularTotal);
+        cartPromoTotal.set(promoTotal);
     } catch (error) {
         console.error('Error recalculating cart total:', error);
     }
@@ -282,7 +275,7 @@ export function getClient(): any {
     return client;
 }
 
-// Restore cart items from checked-out cart (used by CheckedOutCartsService)
+// SIMPLIFIED: Restore cart items from checked-out cart (used by OrdersService)
 export async function restoreCartItems(cart: any): Promise<void> {
     if (!client) return;
     
@@ -291,12 +284,15 @@ export async function restoreCartItems(cart: any): Promise<void> {
     // Clear existing cart
     localCartItems = [];
 
-    // Add each product
+    // Add each product - all data is already in the cart.products
     for (const product of cart.products) {
-        if (product && product.groupHash) {
+        if (product && product.productId) {
             localCartItems.push({
-                groupHash: product.groupHash,
-                productIndex: product.productIndex,
+                productId: product.productId,
+                productName: product.productName || product.product_name,
+                productImageUrl: product.productImageUrl || product.product_image_url,
+                priceAtCheckout: product.priceAtCheckout || product.price_at_checkout,
+                promoPrice: product.promoPrice || product.promo_price,
                 quantity: product.quantity,
                 timestamp: Date.now(),
                 note: product.note
@@ -311,7 +307,7 @@ export async function restoreCartItems(cart: any): Promise<void> {
     saveToLocalStorage(localCartItems);
 
     // Recalculate total
-    await recalculateCartTotal();
+    recalculateCartTotal();
 }
 
 // Force sync to Holochain (used after zome calls)

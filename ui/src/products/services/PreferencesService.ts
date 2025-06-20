@@ -111,6 +111,10 @@ export function updateSavePreference(groupHash: string, productIndex: number, va
     updatePreference(key, { savePreference: value });
 }
 
+export function clearSessionPreferences(): void {
+    preferences.set({});
+}
+
 // Helper to update preference state
 function updatePreference(key: string, updates: Partial<PreferenceState>) {
     preferences.update(prefs => ({

@@ -7,23 +7,31 @@
     import CartItem from "./items/CartItem.svelte";
     import { AnimationService } from "../../services/AnimationService";
 
-    // Props
-    export let product: any = null;
-    export let quantity: number = 0;
-    export let groupHash: string = "";
-    export let productIndex: number = 0;
-    export let note: string | null = null;
+    // SIMPLIFIED: Props for new CartItem structure
+    export let cartItem: any = null; // New: Complete cart item with all data
     export let variant: "cart" | "checkout" = "cart"; // Layout control
 
-    // For checkout variant, we receive the item differently
-    export let item: any = null; // Only used for checkout variant
-
-    // Normalize the data - checkout passes data differently
-    $: normalizedProduct = item?.productDetails || product;
-    $: normalizedQuantity = item?.quantity || quantity;
-    $: normalizedGroupHash = item?.groupHash || groupHash;
-    $: normalizedProductIndex = item?.productIndex || productIndex;
-    $: normalizedNote = item?.note || note;
+    // SIMPLIFIED: All data comes from cartItem now
+    $: product = cartItem ? {
+        name: cartItem.productName,
+        image_url: cartItem.productImageUrl,
+        price: cartItem.priceAtCheckout,
+        promo_price: cartItem.promoPrice || cartItem.priceAtCheckout, // Use promo price if available
+        sold_by: "UNIT", // Default to unit, could be enhanced later
+        // Reconstruct groupHash and productIndex from productId for backward compatibility
+        groupHash: cartItem.productId?.split(':')[0],
+        productIndex: parseInt(cartItem.productId?.split(':')[1] || '0')
+    } : {
+        name: "Unknown Product",
+        image_url: null,
+        price: 0,
+        promo_price: 0,
+        sold_by: "UNIT",
+        groupHash: "",
+        productIndex: 0
+    };
+    $: quantity = cartItem?.quantity || 0;
+    $: note = cartItem?.note || null;
 
     // Cart service is now store-based, no context needed
 
@@ -34,19 +42,16 @@
     let checkoutItemElement: HTMLElement;
 
     // Use cart helpers for product properties
-    $: displayUnit = getDisplayUnit(normalizedProduct);
+    $: displayUnit = getDisplayUnit(product);
 
-    // Use PriceService for calculations
-    $: itemTotals = PriceService.calculateItemTotal(
-        normalizedProduct,
-        normalizedQuantity,
-    );
-    $: hasPromo = PriceService.hasPromoPrice(normalizedProduct);
+    // SIMPLIFIED: Use PriceService for calculations with frozen price
+    $: itemTotals = PriceService.calculateItemTotal(product, quantity);
+    $: hasPromo = PriceService.hasPromoPrice(product);
 
-    // Cart interactions using centralized service - optimistic UI
+    // SIMPLIFIED: Cart interactions using product object
     const handleDecrementItem = async () => {
         // If decrementing to 0, trigger removal animation
-        if (normalizedQuantity === 1) {
+        if (quantity === 1) {
             isRemoving = true;
             const element =
                 variant === "cart" ? cartItemElement : checkoutItemElement;
@@ -55,23 +60,11 @@
             }
         }
 
-        await decrementItem(
-            normalizedGroupHash,
-            normalizedProductIndex,
-            normalizedQuantity,
-            normalizedProduct,
-            normalizedNote || undefined,
-        );
+        await decrementItem(product, quantity, note || undefined);
     };
 
     const handleIncrementItem = async () => {
-        await incrementItem(
-            normalizedGroupHash,
-            normalizedProductIndex,
-            normalizedQuantity,
-            normalizedProduct,
-            normalizedNote || undefined,
-        );
+        await incrementItem(product, quantity, note || undefined);
     };
 
     const handleRemove = async () => {
@@ -85,10 +78,7 @@
         }
 
         // Then remove from cart
-        await removeItem(
-            normalizedGroupHash,
-            normalizedProductIndex,
-        );
+        await removeItem(product);
     };
 
     const handleInstructionsClick = () => {
@@ -100,47 +90,47 @@
     <!-- Cart variant - uses existing CartItem wrapper and component structure -->
     <CartItem
         bind:element={cartItemElement}
-        id={`${normalizedGroupHash}_${normalizedProductIndex}`}
+        id={cartItem?.productId || "unknown"}
         class={isRemoving ? "item-removing" : ""}
     >
         <div class="cart-item-content">
             <!-- Product Display Section -->
             <div class="cart-item-img">
-                {#if normalizedProduct?.image_url}
+                {#if product?.image_url}
                     <img
-                        src={normalizedProduct.image_url}
-                        alt={normalizedProduct.name || "Product"}
+                        src={product.image_url}
+                        alt={product.name || "Product"}
                     />
                 {/if}
             </div>
 
             <div class="cart-item-left">
                 <div class="cart-item-name">
-                    {normalizedProduct?.name || "Unknown Product"}
+                    {product?.name || "Unknown Product"}
                 </div>
 
                 <!-- Price display using PriceService -->
                 <div class="cart-item-price">
                     <span
                         >{PriceService.formatPriceWithUnit(
-                            normalizedProduct?.price || 0,
-                            normalizedProduct?.sold_by,
+                            product?.price || 0,
+                            product?.sold_by,
                         )}</span
                     >
                     {#if hasPromo}
                         <span class="price-separator">/</span>
                         <span class="promo-price">
                             {PriceService.formatPriceWithUnit(
-                                normalizedProduct.promo_price,
-                                normalizedProduct?.sold_by,
+                                product.promo_price,
+                                product?.sold_by,
                             )}
                         </span>
                     {/if}
                 </div>
 
-                {#if normalizedNote}
+                {#if note}
                     <div class="cart-item-note">
-                        Shopper note: {normalizedNote}
+                        Shopper note: {note}
                     </div>
                 {/if}
                 <button
@@ -149,7 +139,7 @@
                 >
                     <PencilLine size={16} />
                     <span
-                        >{normalizedNote && normalizedNote.trim().length > 0
+                        >{note && note.trim().length > 0
                             ? "Edit instructions"
                             : "Add instructions"}</span
                     >
@@ -167,7 +157,7 @@
                         <Minus size={16} />
                     </button>
                     <span class="quantity-display"
-                        >{normalizedQuantity} {displayUnit}</span
+                        >{quantity} {displayUnit}</span
                     >
                     <button
                         class="quantity-btn plus-btn"
@@ -187,6 +177,13 @@
                         <span class="total-promo"
                             >{PriceService.formatTotal(itemTotals.promo)}</span
                         >
+                        {#if itemTotals.savings > 0}
+                            <span class="total-savings"
+                                >You save {PriceService.formatSavings(
+                                    itemTotals.savings,
+                                )}</span
+                            >
+                        {/if}
                     {/if}
                 </div>
 
@@ -207,10 +204,10 @@
         class="order-item cart-item {isRemoving ? 'item-removing' : ''}"
     >
         <div class="item-image">
-            {#if normalizedProduct?.image_url}
+            {#if product?.image_url}
                 <img
-                    src={normalizedProduct.image_url}
-                    alt={normalizedProduct?.name || "Product"}
+                    src={product.image_url}
+                    alt={product?.name || "Product"}
                 />
             {/if}
         </div>
@@ -218,31 +215,31 @@
         <div class="item-content">
             <div class="item-left">
                 <div class="item-name">
-                    {normalizedProduct?.name || "Unknown Product"}
+                    {product?.name || "Unknown Product"}
                 </div>
 
                 <!-- Price display using PriceService -->
                 <div class="item-quantity-price">
                     <span class="item-unit-price">
                         {PriceService.formatPriceWithUnit(
-                            normalizedProduct?.price || 0,
-                            normalizedProduct?.sold_by,
+                            product?.price || 0,
+                            product?.sold_by,
                         )}
                     </span>
                     {#if hasPromo}
                         <span class="price-separator">/</span>
                         <span class="item-unit-price promo-price">
                             {PriceService.formatPriceWithUnit(
-                                normalizedProduct.promo_price,
-                                normalizedProduct?.sold_by,
+                                product.promo_price,
+                                product?.sold_by,
                             )}
                         </span>
                     {/if}
                 </div>
 
-                {#if normalizedNote}
+                {#if note}
                     <div class="item-note">
-                        Shopper note: {normalizedNote}
+                        Shopper note: {note}
                     </div>
                 {/if}
                 <button
@@ -251,7 +248,7 @@
                 >
                     <PencilLine size={14} />
                     <span
-                        >{normalizedNote
+                        >{note
                             ? "Edit instructions"
                             : "Add instructions"}</span
                     >
@@ -266,7 +263,7 @@
                         <Minus size={14} />
                     </button>
                     <span class="quantity-display">
-                        {normalizedQuantity}
+                        {quantity}
                         {displayUnit}
                     </span>
                     <button
@@ -310,9 +307,7 @@
 <!-- ProductDetailModal for preference editing - same for both variants -->
 <ProductDetailModal
     bind:isOpen={showModal}
-    product={normalizedProduct}
-    groupHashBase64={normalizedGroupHash}
-    productIndex={normalizedProductIndex}
+    product={product}
     forceShowPreferences={true}
 />
 
@@ -405,6 +400,13 @@
     .total-promo {
         font-size: var(--font-size-sm);
         color: var(--primary);
+        font-weight: var(--font-weight-semibold);
+        display: block;
+    }
+
+    .total-savings {
+        font-size: var(--font-size-sm);
+        color: var(--success);
         font-weight: var(--font-weight-semibold);
         display: block;
     }

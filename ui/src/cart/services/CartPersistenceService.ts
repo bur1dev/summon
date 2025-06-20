@@ -1,12 +1,6 @@
-import { encodeHash, callZome } from '../utils/zomeHelpers';
-
-interface CartItem {
-    groupHash: string;
-    productIndex: number;
-    quantity: number;
-    timestamp: number;
-    note?: string;
-}
+import { callZome } from '../utils/zomeHelpers';
+import type { CartItem } from '../types/CartTypes';
+import { mapCartItemsToPayload } from '../utils/cartHelpers';
 
 let client: any = null;
 let syncTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -45,7 +39,7 @@ export function saveToLocalStorage(cartItems: CartItem[]): void {
     }
 }
 
-// Load cart from Holochain private entry
+// SIMPLIFIED: Load cart from Holochain private entry - no hash decoding needed
 export async function loadFromPrivateEntry(): Promise<CartItem[]> {
     if (!client) return [];
 
@@ -53,15 +47,19 @@ export async function loadFromPrivateEntry(): Promise<CartItem[]> {
         const result = await callZome(client, 'cart', 'get_private_cart', null);
 
         if (result?.items) {
+            // Direct mapping - no hash decoding needed with new structure
             return result.items
                 .map((item: any) => ({
-                    groupHash: encodeHash(item.group_hash),
-                    productIndex: item.product_index,
+                    productId: item.product_id,
+                    productName: item.product_name,
+                    productImageUrl: item.product_image_url,
+                    priceAtCheckout: item.price_at_checkout,
+                    promoPrice: item.promo_price,
                     quantity: item.quantity,
                     timestamp: item.timestamp,
                     note: item.note
                 }))
-                .filter((item: any) => item?.groupHash && item.productIndex !== undefined);
+                .filter((item: any) => item?.productId && item.quantity > 0);
         }
         return [];
     } catch (error) {
@@ -87,16 +85,20 @@ export async function forceSyncToHolochain(cartItems: CartItem[]): Promise<void>
     }
 }
 
-// Sync cart to Holochain
+// SIMPLIFIED: Sync cart to Holochain - direct mapping, no hash encoding
 async function syncToHolochain(cartItems: CartItem[]): Promise<void> {
     if (!client) return;
 
     try {
-        console.log("Syncing cart to Holochain:", cartItems);
-        await callZome(client, 'cart', 'replace_private_cart', { 
-            items: cartItems, 
-            last_updated: Date.now() 
-        });
+        // Syncing cart to Holochain
+        
+        // Direct mapping to backend structure - no hash encoding needed
+        const payload = {
+            items: mapCartItemsToPayload(cartItems),
+            last_updated: Date.now()
+        };
+
+        await callZome(client, 'cart', 'replace_private_cart', payload);
         
         console.log("Cart successfully synced to Holochain");
         localStorage.removeItem('cart');
@@ -107,13 +109,13 @@ async function syncToHolochain(cartItems: CartItem[]): Promise<void> {
     }
 }
 
-// Merge local and Holochain carts
+// SIMPLIFIED: Merge local and Holochain carts using productId
 export function mergeLocalAndHolochainCarts(localItems: CartItem[], holochainItems: CartItem[]): CartItem[] {
     const itemMap = new Map<string, CartItem>();
     
     // Add all items, newer timestamp wins
     [...localItems, ...holochainItems].forEach(item => {
-        const key = `${item.groupHash}_${item.productIndex}`;
+        const key = item.productId;
         const existing = itemMap.get(key);
         if (!existing || item.timestamp > existing.timestamp) {
             itemMap.set(key, item);
@@ -123,4 +125,3 @@ export function mergeLocalAndHolochainCarts(localItems: CartItem[], holochainIte
     // Return items with quantity > 0
     return Array.from(itemMap.values()).filter(item => item.quantity > 0);
 }
-

@@ -6,15 +6,7 @@ use crate::CheckedOutCartWithHash;
 use crate::AddToPrivateCartInput;
 use crate::ReplacePrivateCartInput;
 
-// Helper function to decode a base64 string to ActionHash
-fn decode_base64_to_hash(base64_string: &str) -> ExternResult<ActionHash> {
-    // First convert to ActionHashB64
-    let hash_b64 = ActionHashB64::from_b64_str(base64_string)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Error creating ActionHashB64: {}", e))))?;
-    
-    // Then convert to ActionHash
-    Ok(ActionHash::from(hash_b64))
-}
+// Helper function removed - no longer needed with new CartProduct structure
 
 
 // Implementation of replace_private_cart - NEW function to replace entire cart with single operation
@@ -25,29 +17,17 @@ pub(crate) fn replace_private_cart_impl(input: ReplacePrivateCartInput) -> Exter
     let agent_pub_key = agent_info()?.agent_initial_pubkey;
     warn!("Agent pubkey: {:?}", agent_pub_key);
     
-    // Convert each item from input format to CartProduct
-    let mut cart_items = Vec::new();
-    
-    for item in input.items {
-        // Decode the base64 hash string to ActionHash
-        match decode_base64_to_hash(&item.group_hash) {
-            Ok(hash) => {
-                warn!("Successfully decoded hash: {}", item.group_hash);
-                
-                cart_items.push(CartProduct {
-                    group_hash: hash,
-                    product_index: item.product_index,
-                    quantity: item.quantity,
-                    timestamp: item.timestamp,
-                    note: item.note,
-                });
-            },
-            Err(e) => {
-                warn!("Error decoding hash {}: {:?}", item.group_hash, e);
-                continue; // Skip invalid items
-            }
-        };
-    }
+    // Convert input items directly to CartProduct - no hash decoding needed
+    let cart_items: Vec<CartProduct> = input.items.into_iter().map(|item| CartProduct {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        product_image_url: item.product_image_url,
+        price_at_checkout: item.price_at_checkout,
+        promo_price: item.promo_price,
+        quantity: item.quantity,
+        timestamp: item.timestamp,
+        note: item.note,
+    }).collect();
     
     warn!("Converted {} cart items", cart_items.len());
     
@@ -172,26 +152,29 @@ pub(crate) fn add_to_private_cart_impl(input: AddToPrivateCartInput) -> ExternRe
     let mut cart = get_private_cart_impl()?;
     let current_time = sys_time()?.as_micros() as u64;
 
-    // Find if the item already exists in the cart
+    // Find if the item already exists in the cart using product_id
     let item_index = cart.items.iter().position(|item|
-        item.group_hash == input.group_hash && item.product_index == input.product_index
+        item.product_id == input.product_id
     );
 
     if input.quantity == 0.0 {
-    // Remove item if quantity is 0
-    if let Some(index) = item_index {
-        cart.items.remove(index);
-    }
-} else {
-        // Update item if it exists or add a new one
+        // Remove item if quantity is 0
+        if let Some(index) = item_index {
+            cart.items.remove(index);
+        }
+    } else {
+        // Update item if it exists or add a new one with full product snapshot
         if let Some(index) = item_index {
             cart.items[index].quantity = input.quantity;
             cart.items[index].timestamp = current_time;
             cart.items[index].note = input.note;
         } else {
             cart.items.push(CartProduct {
-                group_hash: input.group_hash,
-                product_index: input.product_index,
+                product_id: input.product_id,
+                product_name: input.product_name,
+                product_image_url: input.product_image_url,
+                price_at_checkout: input.price_at_checkout,
+                promo_price: input.promo_price,
                 quantity: input.quantity,
                 timestamp: current_time,
                 note: input.note,

@@ -7,20 +7,19 @@
     export let isEntering = true;
     export let isExiting = false;
 
-    // Calculate totals with tax using PriceService
+    // Calculate totals with tax using CartItem data directly
     $: {
         let regularTotal = 0;
         let promoTotal = 0;
 
         cartItems.forEach((item: any) => {
-            const product = item.productDetails;
-            if (product) {
-                const totals = PriceService.calculateItemTotal(
-                    product,
-                    item.quantity,
-                );
-                regularTotal += totals.regular;
-                promoTotal += totals.promo;
+            if (item) {
+                // Use CartItem data directly - prices are already frozen
+                const itemRegularTotal = item.priceAtCheckout * item.quantity;
+                const itemPromoTotal = (item.promoPrice || item.priceAtCheckout) * item.quantity;
+                
+                regularTotal += itemRegularTotal;
+                promoTotal += itemPromoTotal;
             }
         });
 
@@ -28,7 +27,7 @@
         itemsPromoTotal = promoTotal;
         estimatedTax = Math.round(itemsPromoTotal * 0.0775 * 100) / 100; // 7.75% CA sales tax on promo prices
         subtotal = itemsPromoTotal + estimatedTax;
-        totalSavings = PriceService.calculateSavings(regularTotal, promoTotal);
+        totalSavings = regularTotal - promoTotal; // Direct calculation
     }
 
     // Variables for price calculation

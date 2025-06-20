@@ -7,18 +7,22 @@ mod preference;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AddToPrivateCartInput {
-    pub group_hash: ActionHash,
-    pub product_index: u32,
+    pub product_id: String,
+    pub product_name: String,
+    pub product_image_url: Option<String>,
+    pub price_at_checkout: f64,
+    pub promo_price: Option<f64>,
     pub quantity: f64,
     pub note: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CartItemInput {
-    #[serde(rename = "groupHash")]
-    pub group_hash: String,
-    #[serde(rename = "productIndex")]
-    pub product_index: u32,
+    pub product_id: String,
+    pub product_name: String,
+    pub product_image_url: Option<String>,
+    pub price_at_checkout: f64,
+    pub promo_price: Option<f64>,
     pub quantity: f64,
     pub timestamp: u64,
     pub note: Option<String>,

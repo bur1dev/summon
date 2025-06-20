@@ -48,6 +48,8 @@ cd tests && npm run test  # Vitest integration tests
 **Dual Categorization**: Products can belong to multiple categories via hierarchical links:
 `categories/{category}/subcategories/{sub}/types/{type}`
 
+**Cart Data Architecture**: Cart items store complete product snapshots (name, price, image) at time of addition, eliminating dependencies on product catalog during cart operations.
+
 **Hybrid Data Flow**:
 1. External APIs → Express.js backend → AI categorization → JSON files
 2. JSON → Svelte UI → Holochain DNA (batched writes)
@@ -142,13 +144,14 @@ import { loadOrders } from './services/OrdersService';
 - **Virtual scrolling**: Efficient rendering of large product lists
 - **Multi-layer caching**: Correction maps, embeddings, UI state
 - **Container capacity calculations**: Cached and reused
+- **Product snapshots**: Cart operations use frozen data, eliminating repeated catalog lookups
 
 ## Data Flow Patterns
 
 ### Cart Operations
 ```
-UI Component → CartInteractionService (functional utilities) → CartBusinessService (functional stores) → 
-CartPersistenceService + CartCalculationService (functional exports) → DataManager → Holochain DHT
+UI Component → CartInteractionService (functional utilities) → CartBusinessService (product snapshots) → 
+CartPersistenceService (localStorage + Holochain sync) → Holochain DHT
 ```
 
 ### Preference Operations

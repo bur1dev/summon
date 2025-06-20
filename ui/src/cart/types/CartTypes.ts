@@ -18,8 +18,11 @@ export interface CheckoutDetails {
 export type ActionHashB64 = string;
 
 export interface CartItem {
-    groupHash: ActionHashB64;
-    productIndex: number;
+    productId: string;
+    productName: string;
+    productImageUrl?: string;
+    priceAtCheckout: number; // Frozen regular price
+    promoPrice?: number; // Frozen promo price (if available)
     quantity: number;
     timestamp: number;
     note?: string;

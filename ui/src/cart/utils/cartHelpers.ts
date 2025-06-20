@@ -1,14 +1,7 @@
-import { encodeHashToBase64 } from '@holochain/client';
-
 /**
  * Cart helper utilities to eliminate duplicated logic across components
  * Following the PriceService pattern for centralized utility functions
  */
-
-export interface ParsedProductHash {
-    groupHash: string;
-    productIndex: number;
-}
 
 /**
  * Determines increment value based on product type
@@ -36,85 +29,42 @@ export function isSoldByWeight(product: any): boolean {
 }
 
 /**
- * Parses product hash handling all format variations
- * Supports comma-separated, base64, composite hashes, and objects
+ * Parses product hash to extract groupHash and productIndex
+ * Handles both original products (with hash) and reconstructed products (with groupHash/productIndex)
  */
-export function parseProductHash(hash: any): ParsedProductHash {
-    let groupHashOriginal: string = "";
-    let groupHashBase64: string = "";
-    let productIndex: number = 0;
-
-    if (hash && typeof hash === "string" && hash.includes("_")) {
-        // Format: "hash_index"
-        const lastUnderscoreIndex = hash.lastIndexOf("_");
-        groupHashOriginal = hash.substring(0, lastUnderscoreIndex);
-        productIndex = parseInt(hash.substring(lastUnderscoreIndex + 1)) || 0;
-
-        // Convert comma-separated to base64 if needed
-        if (groupHashOriginal.includes(",")) {
-            try {
-                const byteArray = new Uint8Array(
-                    groupHashOriginal.split(",").map(Number)
-                );
-                groupHashBase64 = encodeHashToBase64(byteArray);
-            } catch (e) {
-                console.error("Error converting hash format:", e);
-                groupHashBase64 = groupHashOriginal;
-            }
-        } else {
-            // Already in base64 format
-            groupHashBase64 = groupHashOriginal;
-        }
-    } else if (hash && typeof hash === "object") {
-        // Check if it's a composite hash from search with groupHash and index
-        if (hash.groupHash && typeof hash.index === "number") {
-            // It's a composite hash - extract components
-            if (typeof hash.groupHash === "string") {
-                // GroupHash is already a string (likely base64)
-                groupHashOriginal = hash.groupHash;
-                groupHashBase64 = hash.groupHash;
-            } else {
-                // GroupHash is a Uint8Array
-                groupHashOriginal = String(hash.groupHash);
-                groupHashBase64 = encodeHashToBase64(hash.groupHash);
-            }
-            // Use the index from composite hash
-            productIndex = hash.index;
-        } else {
-            // Fallback for backward compatibility - treat as Uint8Array
-            groupHashOriginal = String(hash);
-            groupHashBase64 = encodeHashToBase64(hash);
-            productIndex = 0; // Assume index 0 if not specified
-        }
-    } else if (hash && typeof hash === "string" && !hash.includes("_")) {
-        // It's already a base64 string
-        groupHashOriginal = hash;
-        groupHashBase64 = hash;
-        productIndex = 0;
+export function parseProductHash(product: any): { groupHash: string | null, productIndex: number | null, productId: string | null } {
+    // Handle cart items (already parsed)
+    if (product?.groupHash && typeof product?.productIndex === 'number') {
+        return createParsedHash(product.groupHash, product.productIndex);
     }
-
-    return {
-        groupHash: groupHashBase64,
-        productIndex
-    };
+    
+    // Handle original products
+    return parseFromHashProperty(product?.hash);
 }
 
-/**
- * Gets the effective hash from various possible hash sources
- */
-export function getEffectiveHash(product: any, actionHash?: any): any {
-    return actionHash ||
-           product?.hash ||
-           product?.action_hash ||
-           product?.entry_hash ||
-           product?.actionHash;
+function createParsedHash(groupHash: string, productIndex: number) {
+    const productId = `${groupHash}:${productIndex}`;
+    return { groupHash, productIndex, productId };
 }
 
-/**
- * Creates a unique key for cart item tracking
- */
-export function getCartItemKey(groupHash: string, productIndex: number): string {
-    return `${groupHash}_${productIndex}`;
+function parseFromHashProperty(hash: string | undefined) {
+    if (!hash) {
+        return { groupHash: null, productIndex: null, productId: null };
+    }
+    
+    const hashParts = hash.split('_');
+    if (hashParts.length < 2) {
+        return { groupHash: null, productIndex: null, productId: null };
+    }
+    
+    const productIndex = parseInt(hashParts[hashParts.length - 1]);
+    const groupHash = hashParts.slice(0, -1).join('_');
+    
+    if (!groupHash || isNaN(productIndex)) {
+        return { groupHash: null, productIndex: null, productId: null };
+    }
+    
+    return createParsedHash(groupHash, productIndex);
 }
 
 /**
@@ -123,4 +73,21 @@ export function getCartItemKey(groupHash: string, productIndex: number): string 
 export function formatQuantityDisplay(quantity: number, product: any): string {
     const unit = getDisplayUnit(product);
     return `${quantity} ${unit}`;
+}
+
+/**
+ * Maps CartItem objects to payload format for Holochain operations
+ * Eliminates duplicate mapping logic across services
+ */
+export function mapCartItemsToPayload(cartItems: any[]) {
+    return cartItems.map(item => ({
+        product_id: item.productId,
+        product_name: item.productName,
+        product_image_url: item.productImageUrl,
+        price_at_checkout: item.priceAtCheckout,
+        promo_price: item.promoPrice,
+        quantity: item.quantity,
+        timestamp: item.timestamp,
+        note: item.note
+    }));
 }

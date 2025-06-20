@@ -1,6 +1,6 @@
 import { encodeHash, decodeHash, callZome } from '../utils/zomeHelpers';
 import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
-import type { ActionHashB64, DecodedProductGroup } from '../types/CartTypes';
+import type { ActionHashB64 } from '../types/CartTypes';
 import { getClient, restoreCartItems, forceSyncToHolochain } from './CartBusinessService';
 
 let client: any = null;
@@ -9,7 +9,7 @@ export function setOrdersClient(holoClient: any) {
     client = holoClient;
 }
 
-// Load orders
+// SIMPLIFIED: Load orders - no product lookups needed!
 export async function loadOrders() {
     const clientError = validateClient(client, 'loading checked out carts');
     if (clientError) return clientError;
@@ -19,8 +19,8 @@ export async function loadOrders() {
         const result = await callZome(client, 'cart', 'get_checked_out_carts', null);
         console.log("Loaded checked out carts:", result);
 
-        // Process the results to make them easier to use in the UI
-        const processedCarts = await processOrders(result);
+        // SIMPLIFIED: Process the results - all data is already here!
+        const processedCarts = processOrders(result);
         return createSuccessResult(processedCarts);
     } catch (error) {
         console.error('Error loading checked out carts:', error);
@@ -28,27 +28,7 @@ export async function loadOrders() {
     }
 }
 
-// Helper: Get product details with direct zome call fallback
-async function getProductDetails(product: any) {
-    if (!product?.group_hash) return null;
-    
-    const groupHash = encodeHash(product.group_hash);
-    
-    // Direct zome call for product details
-    try {
-        const result = await callZome(client, 'products', 'get_product_group', decodeHash(groupHash));
-        
-        if (result) {
-            const { decode } = await import("@msgpack/msgpack");
-            const group = decode(result.entry.Present.entry) as DecodedProductGroup;
-            return group?.products?.[product.product_index] || null;
-        }
-    } catch (error) {
-        console.error(`Direct zome call failed for ${groupHash}:${product.product_index}`, error);
-    }
-    
-    return null;
-}
+// DELETED: getProductDetails function - no longer needed!
 
 // Helper: Format delivery time
 function formatDeliveryTime(delivery_time: any) {
@@ -64,33 +44,35 @@ function formatDeliveryTime(delivery_time: any) {
     };
 }
 
-// Process orders to add product details and delivery info
-async function processOrders(carts: any[]) {
+// DRASTICALLY SIMPLIFIED: Process orders - simple data transformation loop
+function processOrders(carts: any[]) {
     console.log("Processing checked out carts from Holochain:", carts);
 
-    return Promise.all(carts.map(async (cart) => {
+    return carts.map((cart) => {
         const cartHash = encodeHash(cart.cart_hash);
         const { id, products, total, created_at, status, address_hash, delivery_instructions, delivery_time } = cart.cart;
 
-        // Get product details
-        const productsWithDetails = await Promise.all(products.map(async (product: any) => {
-            if (!product?.group_hash) {
-                return { groupHash: "", productIndex: 0, quantity: 0, details: null, note: null };
+        // SIMPLIFIED: All product data is already in the cart.products array!
+        const productsWithDetails = products.map((product: any) => ({
+            productId: product.product_id,
+            productName: product.product_name,
+            productImageUrl: product.product_image_url,
+            priceAtCheckout: product.price_at_checkout,
+            promoPrice: product.promo_price,
+            quantity: product.quantity,
+            note: product.note,
+            // For backward compatibility with UI that might expect these fields:
+            details: {
+                name: product.product_name,
+                image_url: product.product_image_url,
+                price: product.price_at_checkout,
+                promo_price: product.promo_price
             }
-
-            const details = await getProductDetails(product);
-            return {
-                groupHash: encodeHash(product.group_hash),
-                productIndex: product.product_index,
-                quantity: product.quantity,
-                details,
-                note: product.note
-            };
         }));
 
-        // Calculate total
+        // SIMPLIFIED: Calculate total from frozen prices (already in cart)
         const calculatedTotal = productsWithDetails.reduce((sum, p) => 
-            sum + (p.details?.price * p.quantity || 0), 0);
+            sum + (p.priceAtCheckout * p.quantity), 0);
 
         return {
             id,
@@ -103,10 +85,10 @@ async function processOrders(carts: any[]) {
             deliveryInstructions: delivery_instructions,
             deliveryTime: formatDeliveryTime(delivery_time)
         };
-    }));
+    });
 }
 
-// Return to shopping
+// SIMPLIFIED: Return to shopping - faster and more reliable
 export async function returnToShopping(cartHash: ActionHashB64) {
     const clientError = validateClient(client, 'return to shopping');
     if (clientError) return clientError;
@@ -114,7 +96,7 @@ export async function returnToShopping(cartHash: ActionHashB64) {
     try {
         console.log("START: returnToShopping for hash:", cartHash);
         
-        // Find and restore cart
+        // SIMPLIFIED: Find and restore cart - no complex lookups needed
         const cartsResult = await loadOrders();
         if (!cartsResult.success || !Array.isArray(cartsResult.data)) {
             throw new Error("Failed to load orders for cart restoration");
@@ -122,6 +104,7 @@ export async function returnToShopping(cartHash: ActionHashB64) {
 
         const cart = cartsResult.data.find(c => c.cartHash === cartHash);
         if (cart) {
+            // All product data is already available for restoration
             await restoreCartItems(cart);
         }
 

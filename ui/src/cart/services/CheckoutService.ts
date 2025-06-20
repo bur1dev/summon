@@ -1,10 +1,12 @@
-import { decodeHash, callZome } from '../utils/zomeHelpers';
+import { callZome } from '../utils/zomeHelpers';
 import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
 import { writable, get } from 'svelte/store';
 import type { CheckoutDetails } from '../types/CartTypes';
 import { getCartItems, forceSyncToHolochain, clearCart } from './CartBusinessService';
+import { clearSessionPreferences } from '../../products/services/PreferencesService';
+import { mapCartItemsToPayload } from '../utils/cartHelpers';
 
-// Store and service references
+// Functional store exports
 export const savedDeliveryDetails = writable<CheckoutDetails>({});
 let client: any = null;
 
@@ -13,7 +15,7 @@ export function setCheckoutServices(holoClient: any) {
     client = holoClient;
 }
 
-// Checkout cart with delivery details
+// SIMPLIFIED: Checkout cart with delivery details - no hash decoding needed
 export async function checkoutCart(details: CheckoutDetails) {
     const clientError = validateClient(client, 'checkout cart');
     if (clientError) return { success: false, message: clientError.message };
@@ -22,32 +24,14 @@ export async function checkoutCart(details: CheckoutDetails) {
         await forceSyncToHolochain();
         const localCartItems = getCartItems();
         
-        const cartProducts = localCartItems.map(item => {
-            try {
-                const groupHash = decodeHash(item.groupHash);
-                return {
-                    group_hash: groupHash,
-                    product_index: item.productIndex,
-                    quantity: item.quantity,
-                    timestamp: item.timestamp,
-                    note: item.note
-                };
-            } catch (e) {
-                console.error(`Invalid group hash format: ${item.groupHash}`, e);
-                return null;
-            }
-        }).filter(Boolean);
+        // SIMPLIFIED: Direct mapping from CartItem to backend structure
+        const cartProducts = mapCartItemsToPayload(localCartItems);
         
         if (cartProducts.length === 0) return { success: false, message: "Cart is empty" };
         
+        // SIMPLIFIED: No hash decoding needed for address
         const payload: any = {
-            address_hash: details.addressHash ? (() => {
-                try {
-                    return decodeHash(details.addressHash);
-                } catch {
-                    throw new Error('Invalid address hash format');
-                }
-            })() : null,
+            address_hash: details.addressHash || null,
             delivery_instructions: details.deliveryInstructions || null,
             delivery_time: details.deliveryTime || null,
             cart_products: cartProducts
@@ -58,6 +42,7 @@ export async function checkoutCart(details: CheckoutDetails) {
         
         console.log("Checkout result:", checkoutResult);
         await clearCart();
+        clearSessionPreferences(); // Clear temporary preference data
         savedDeliveryDetails.set({});
         
         return createSuccessResult(checkoutResult);

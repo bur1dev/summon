@@ -1,15 +1,13 @@
 <script lang="ts">
     import {
         createEventDispatcher,
-        getContext,
         onMount,
         onDestroy,
     } from "svelte";
-    import { get } from "svelte/store"; // Import get
     import { cartItems, getCartItems } from "../../../cart/services/CartBusinessService";
     import { updateQuantity, findCartItem } from "../../../cart/services/CartInteractionService";
     import { preferences, loadPreference, getPreferenceKey } from "../../services/PreferencesService";
-    import { derived } from "svelte/store";
+    import { parseProductHash } from "../../../cart/utils/cartHelpers";
     import ProductModalHeader from "./ProductModalHeader.svelte";
     import ProductImage from "./ProductImage.svelte";
     import ProductInfo from "./ProductInfo.svelte";
@@ -18,12 +16,9 @@
     import PreferencesSection from "./PreferencesSection.svelte";
 
     const dispatch = createEventDispatcher();
-    // Cart service is now store-based, no context needed
 
     export let isOpen: boolean = false;
     export let product: any;
-    export let groupHashBase64: string;
-    export let productIndex: number;
     export let forceShowPreferences: boolean = false;
 
     export let selectedCategory: string = "";
@@ -31,7 +26,6 @@
 
     let quantity: number = 1;
     let isInCart: boolean = false;
-    let unsubscribeCartState: (() => void) | null = null;
     let note: string = "";
     let existingNote: string = "";
     let showPreferences: boolean = false;
@@ -40,12 +34,19 @@
     let isClosing: boolean = false;
     let isTransitioning: boolean = false; // Flag to track button state transitions
 
-    // Ultra-simple reactive preference access - massive code reduction!
-    $: preferenceKey = getPreferenceKey(groupHashBase64, productIndex);
-    $: preferenceData = $preferences[preferenceKey] || { loading: false, preference: null, savePreference: false };
-    $: savePreference = preferenceData.savePreference;
+    // Parse product hash to get consistent data
+    $: ({ groupHash: groupHashBase64, productIndex, productId } = parseProductHash(product));
+    
+    // SIMPLIFIED: Ultra-simple reactive preference access - massive code reduction!
+    $: preferenceKey = groupHashBase64 && productIndex !== null ? getPreferenceKey(groupHashBase64, productIndex) : null;
+    $: preferenceData = preferenceKey ? ($preferences[preferenceKey] || { loading: false, preference: null, savePreference: false }) : { loading: false, preference: null, savePreference: false };
     $: existingPreference = preferenceData.preference;
     $: loadingPreference = preferenceData.loading;
+
+    // Reactive cart status checking - replaces manual subscription
+    $: if ($cartItems) {
+        checkCartStatus();
+    }
 
     function closeModal() {
         isClosing = true;
@@ -76,11 +77,9 @@
             isTransitioning = true; // Start transition animation
 
             const success = await updateQuantity(
-                groupHashBase64,
-                productIndex,
-                quantity,
-                existingNote || undefined,
                 product,
+                quantity,
+                existingNote || undefined
             );
 
             if (!success) {
@@ -102,13 +101,11 @@
     }
 
     function checkCartStatus() {
-        // Use centralized service to get cart data
+        // SIMPLIFIED: Use centralized service to get cart data
+        if (!productId) return;
+        
         const items = getCartItems();
-        const item = findCartItem(
-            items,
-            groupHashBase64,
-            productIndex,
-        );
+        const item = findCartItem(items, productId);
 
         if (item) {
             isInCart = true;
@@ -130,7 +127,7 @@
 
     // Load product preferences using service
     async function loadProductPreference() {
-        if (!groupHashBase64 || productIndex === undefined) {
+        if (!groupHashBase64 || productIndex === null) {
             return;
         }
 
@@ -144,6 +141,10 @@
         ) {
             note = existingPreference.preference.note;
             existingNote = existingPreference.preference.note;
+        } else if (!isInCart) {
+            // Clear stale note data if no DHT preference exists
+            note = "";
+            existingNote = "";
         }
     }
 
@@ -177,13 +178,6 @@
             loadProductPreference();
         }
 
-        // Subscribe directly to cart items store
-        unsubscribeCartState = cartItems.subscribe((_cartItemsFromService) => {
-            // This callback is triggered when cart items change.
-            // Re-run checkCartStatus to update the modal's view of the cart.
-            checkCartStatus();
-        });
-        
         // Initial check
         checkCartStatus();
         if (isOpen) {
@@ -193,10 +187,6 @@
 
     onDestroy(() => {
         document.body.style.overflow = "";
-        if (unsubscribeCartState) {
-            unsubscribeCartState(); // Unsubscribe from cart items store
-        }
-        // No additional cleanup needed with direct store access
     });
 
     $: if (isOpen) {
@@ -243,8 +233,6 @@
 
                         <QuantityControls
                             {product}
-                            {groupHashBase64}
-                            {productIndex}
                             {quantity}
                             {isInCart}
                             {existingNote}
@@ -265,15 +253,16 @@
                     </div>
                 </div>
 
-                <PreferencesSection
-                    {groupHashBase64}
-                    {productIndex}
-                    {quantity}
-                    bind:note
-                    {existingNote}
-                    {showPreferences}
-                    bind:showButtons
-                    bind:noteChanged
+                {#if groupHashBase64 && productIndex !== null}
+                    <PreferencesSection
+                        groupHashBase64={groupHashBase64}
+                        productIndex={productIndex}
+                        {quantity}
+                        bind:note
+                        {existingNote}
+                        {showPreferences}
+                        bind:showButtons
+                        bind:noteChanged
                     {existingPreference}
                     {loadingPreference}
                     onNoteChange={(newNote) => {
@@ -290,6 +279,7 @@
                     }}
                     onSave={closeModal}
                 />
+                {/if}
             </div>
         </div>
     </div>

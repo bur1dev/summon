@@ -38,7 +38,12 @@ export function parseProductHash(product: any): { groupHash: string | null, prod
         return createParsedHash(product.groupHash, product.productIndex);
     }
     
-    // Handle original products
+    // Handle CompositeHash objects from search results
+    if (product?.hash && typeof product.hash === 'object' && product.hash.groupHash && typeof product.hash.index === 'number') {
+        return createParsedHash(product.hash.groupHash, product.hash.index);
+    }
+    
+    // Handle original products with string hash
     return parseFromHashProperty(product?.hash);
 }
 
@@ -47,8 +52,18 @@ function createParsedHash(groupHash: string, productIndex: number) {
     return { groupHash, productIndex, productId };
 }
 
-function parseFromHashProperty(hash: string | undefined) {
+function parseFromHashProperty(hash: string | undefined | any) {
     if (!hash) {
+        return { groupHash: null, productIndex: null, productId: null };
+    }
+    
+    // Handle CompositeHash objects that may have slipped through
+    if (typeof hash === 'object' && hash.groupHash && typeof hash.index === 'number') {
+        return createParsedHash(hash.groupHash, hash.index);
+    }
+    
+    // Handle string hash format
+    if (typeof hash !== 'string') {
         return { groupHash: null, productIndex: null, productId: null };
     }
     

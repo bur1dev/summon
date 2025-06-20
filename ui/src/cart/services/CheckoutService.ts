@@ -5,6 +5,8 @@ import type { CheckoutDetails } from '../types/CartTypes';
 import { getCartItems, forceSyncToHolochain, clearCart } from './CartBusinessService';
 import { clearSessionPreferences } from '../../products/services/PreferencesService';
 import { mapCartItemsToPayload } from '../utils/cartHelpers';
+import { createAddress, getAddress } from './AddressService';
+import { decodeHash } from '../utils/zomeHelpers';
 
 // Functional store exports
 export const savedDeliveryDetails = writable<CheckoutDetails>({});
@@ -15,7 +17,8 @@ export function setCheckoutServices(holoClient: any) {
     client = holoClient;
 }
 
-// SIMPLIFIED: Checkout cart with delivery details - no hash decoding needed
+
+// SECURE: Two-step checkout process with private address
 export async function checkoutCart(details: CheckoutDetails) {
     const clientError = validateClient(client, 'checkout cart');
     if (clientError) return { success: false, message: clientError.message };
@@ -24,20 +27,39 @@ export async function checkoutCart(details: CheckoutDetails) {
         await forceSyncToHolochain();
         const localCartItems = getCartItems();
         
-        // SIMPLIFIED: Direct mapping from CartItem to backend structure
+        // Map cart items to backend structure
         const cartProducts = mapCartItemsToPayload(localCartItems);
         
         if (cartProducts.length === 0) return { success: false, message: "Cart is empty" };
         
-        // SIMPLIFIED: No hash decoding needed for address
+        if (!details.addressHash) {
+            return { success: false, message: "Address is required" };
+        }
+        
+        // STEP 1: Create immutable private address copy for this order
+        // Get address data from user's address book
+        const addressData = getAddress(details.addressHash);
+        if (!addressData) {
+            return { success: false, message: "Address not found in address book" };
+        }
+        
+        // Create permanent, private address entry for order historical integrity
+        const privateAddressResult = await createAddress(addressData);
+        if (!privateAddressResult.success) {
+            return { success: false, message: `Failed to create private address copy: ${privateAddressResult.message}` };
+        }
+        
+        const privateAddressHash = privateAddressResult.data.hash;
+        console.log("Created immutable address copy for order:", privateAddressHash);
+        
+        // STEP 2: Checkout cart with private address hash
         const payload: any = {
-            address_hash: details.addressHash || null,
-            delivery_instructions: details.deliveryInstructions || null,
+            private_address_hash: decodeHash(privateAddressHash),
             delivery_time: details.deliveryTime || null,
             cart_products: cartProducts
         };
         
-        console.log("Checking out cart with details:", payload);
+        console.log("Checking out cart with private address:", payload);
         const checkoutResult = await callZome(client, 'cart', 'checkout_cart', payload);
         
         console.log("Checkout result:", checkoutResult);

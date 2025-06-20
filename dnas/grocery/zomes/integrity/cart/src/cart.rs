@@ -9,11 +9,11 @@ pub struct CheckedOutCart {
     pub products: Vec<CartProduct>,
     pub total: f64,
     pub created_at: u64,
-    pub status: String, // "processing", "completed", "returned"
-    // New fields for delivery
-    pub address_hash: Option<ActionHash>,
-    pub delivery_instructions: Option<String>,
+    pub status: String, // "processing", "completed", "returned", "claimed", "awaiting_shopper"
     pub delivery_time: Option<DeliveryTimeSlot>,
+    // New fields for secure workflow
+    pub customer_pub_key: AgentPubKey,
+    pub general_location: Option<String>,
 }
 
 #[hdk_entry_helper]

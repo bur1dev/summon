@@ -1,12 +1,28 @@
 import { encodeHash, decodeHash, callZome } from '../utils/zomeHelpers';
 import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
 import type { ActionHashB64 } from '../types/CartTypes';
-import { getClient, restoreCartItems, forceSyncToHolochain } from './CartBusinessService';
+import { restoreCartItems, forceSyncToHolochain } from './CartBusinessService';
 
 let client: any = null;
 
 export function setOrdersClient(holoClient: any) {
     client = holoClient;
+}
+
+// Get address for a specific order (secure private address retrieval)
+export async function getOrderAddress(cartHash: ActionHashB64) {
+    const clientError = validateClient(client, 'get order address');
+    if (clientError) return clientError;
+
+    try {
+        console.log("Getting address for order:", cartHash);
+        const result = await callZome(client, 'cart', 'get_address_for_order', decodeHash(cartHash));
+        console.log("Retrieved order address:", result);
+        return createSuccessResult(result);
+    } catch (error) {
+        console.error('Error getting order address:', error);
+        return createErrorResult(error);
+    }
 }
 
 // SIMPLIFIED: Load orders - no product lookups needed!
@@ -44,15 +60,15 @@ function formatDeliveryTime(delivery_time: any) {
     };
 }
 
-// DRASTICALLY SIMPLIFIED: Process orders - simple data transformation loop
+// SECURE: Process orders - no address data in public cart entries
 function processOrders(carts: any[]) {
     console.log("Processing checked out carts from Holochain:", carts);
 
     return carts.map((cart) => {
         const cartHash = encodeHash(cart.cart_hash);
-        const { id, products, total, created_at, status, address_hash, delivery_instructions, delivery_time } = cart.cart;
+        const { id, products, total, created_at, status, delivery_time } = cart.cart;
 
-        // SIMPLIFIED: All product data is already in the cart.products array!
+        // All product data is already in the cart.products array!
         const productsWithDetails = products.map((product: any) => ({
             productId: product.product_id,
             productName: product.product_name,
@@ -70,8 +86,8 @@ function processOrders(carts: any[]) {
             }
         }));
 
-        // SIMPLIFIED: Calculate total from frozen prices (already in cart)
-        const calculatedTotal = productsWithDetails.reduce((sum, p) => 
+        // Calculate total from frozen prices (already in cart)
+        const calculatedTotal = productsWithDetails.reduce((sum: number, p: any) => 
             sum + (p.priceAtCheckout * p.quantity), 0);
 
         return {
@@ -81,8 +97,9 @@ function processOrders(carts: any[]) {
             total: calculatedTotal > 0 ? calculatedTotal : total,
             createdAt: new Date(created_at / 1000).toLocaleString(),
             status,
-            addressHash: address_hash ? encodeHash(address_hash) : null,
-            deliveryInstructions: delivery_instructions,
+            // Address is now retrieved securely via getOrderAddress() when needed
+            addressHash: null, // No longer stored in public cart entry
+            deliveryInstructions: null, // Removed for privacy 
             deliveryTime: formatDeliveryTime(delivery_time)
         };
     });

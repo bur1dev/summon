@@ -44,8 +44,7 @@ pub struct CheckedOutCartWithHash {
 // Extended checkout input with delivery details and cart products
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CheckoutCartInput {
-    pub address_hash: Option<ActionHash>,
-    pub delivery_instructions: Option<String>,
+    pub private_address_hash: ActionHash,
     pub delivery_time: Option<DeliveryTimeSlot>,
     pub cart_products: Option<Vec<CartProduct>>, // Added to pass cart products
 }
@@ -149,4 +148,10 @@ pub fn update_product_preference(input: (ActionHash, ProductPreference)) -> Exte
 #[hdk_extern]
 pub fn delete_product_preference(action_hash: ActionHash) -> ExternResult<ActionHash> {
     preference::delete_product_preference_impl(action_hash)
+}
+
+// NEW: Customer address retrieval for orders
+#[hdk_extern]
+pub fn get_address_for_order(order_hash: ActionHash) -> ExternResult<Address> {
+    cart::get_address_for_order_impl(order_hash)
 }

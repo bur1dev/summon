@@ -64,10 +64,10 @@
     </div>
   </div>
 
-  {#if item.addressHash || item.deliveryTime}
+  {#if addressCache[item.cartHash] || item.deliveryTime}
     <div class="delivery-details">
-      {#if item.addressHash && addressCache[item.addressHash]}
-        {@const address = addressCache[item.addressHash]}
+      {#if addressCache[item.cartHash]}
+        {@const address = addressCache[item.cartHash]}
         <div class="delivery-address">
           <div class="delivery-icon">
             <MapPin size={16} />

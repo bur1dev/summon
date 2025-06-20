@@ -209,7 +209,7 @@ pub(crate) fn add_to_private_cart_impl(input: AddToPrivateCartInput) -> ExternRe
     Ok(())
 }
 
-// Implementation of checkout_cart - creates public order entry
+// Implementation of checkout_cart - creates public order entry with private address link
 pub(crate) fn checkout_cart_impl(input: CheckoutCartInput) -> ExternResult<ActionHash> {
     let agent_pub_key = agent_info()?.agent_initial_pubkey;
     let current_time = sys_time()?.as_micros() as u64;
@@ -225,16 +225,16 @@ pub(crate) fn checkout_cart_impl(input: CheckoutCartInput) -> ExternResult<Actio
         )));
     }
 
-    // Create a checked out cart entry (public order)
+    // Create a checked out cart entry (public order) with private address link
     let checked_out_cart = CheckedOutCart {
         id: current_time.to_string(),
         products: cart_products,
         total: 0.0, // Frontend calculates total
         created_at: current_time,
-        status: "processing".to_string(),
-        address_hash: input.address_hash,
-        delivery_instructions: input.delivery_instructions,
+        status: "processing".to_string(), // Standard processing status
         delivery_time: input.delivery_time,
+        customer_pub_key: agent_pub_key.clone(), // Keep for future shopper workflow
+        general_location: None, // Not needed for customer-only workflow
     };
     warn!("checkout_cart_impl: Creating CheckedOutCart with status: {}", checked_out_cart.status);
 
@@ -249,6 +249,15 @@ pub(crate) fn checkout_cart_impl(input: CheckoutCartInput) -> ExternResult<Actio
         LinkTypes::AgentToCheckedOutCart,
         LinkTag::new("customer"),
     )?;
+
+    // Create private link from order to address (key security feature)
+    create_link(
+        cart_hash.clone(),
+        input.private_address_hash,
+        LinkTypes::OrderToPrivateAddress,
+        LinkTag::new(""),
+    )?;
+    warn!("checkout_cart_impl: Created private link from order to address");
 
     // Clear the private cart after successful checkout
     let empty_cart = PrivateCart {
@@ -435,4 +444,49 @@ pub(crate) fn return_to_shopping_impl(cart_hash: ActionHash) -> ExternResult<()>
     
     warn!("Return to shopping completed successfully");
     Ok(())
+}
+
+// Implementation of get_address_for_order - customer retrieves their own delivery address
+pub(crate) fn get_address_for_order_impl(order_hash: ActionHash) -> ExternResult<Address> {
+    let agent_pub_key = agent_info()?.agent_initial_pubkey;
+    warn!("get_address_for_order_impl: Customer {:?} retrieving address for order {:?}", agent_pub_key, order_hash);
+    
+    // First, verify this order belongs to the current customer
+    let order = match get_checked_out_cart_impl(order_hash.clone())? {
+        Some(order) => order,
+        None => return Err(wasm_error!(WasmErrorInner::Guest("Order not found".to_string()))),
+    };
+    
+    if order.customer_pub_key != agent_pub_key {
+        return Err(wasm_error!(WasmErrorInner::Guest("Order does not belong to this customer".to_string())));
+    }
+    
+    // Get links from order to private address
+    let links = get_links(
+        GetLinksInputBuilder::try_new(order_hash.clone(), LinkTypes::OrderToPrivateAddress)?.build(),
+    )?;
+    
+    if links.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("No address found for this order".to_string())));
+    }
+    
+    // Get the address from the first link
+    let address_link = &links[0];
+    if let Some(address_hash) = address_link.target.clone().into_action_hash() {
+        match get(address_hash, GetOptions::default())? {
+            Some(record) => {
+                let address: Address = record
+                    .entry()
+                    .to_app_option()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize address: {}", e))))?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Expected address entry".to_string())))?;
+                
+                warn!("get_address_for_order_impl: Successfully retrieved address for customer");
+                Ok(address)
+            }
+            None => Err(wasm_error!(WasmErrorInner::Guest("Address record not found".to_string()))),
+        }
+    } else {
+        Err(wasm_error!(WasmErrorInner::Guest("Invalid address hash in link".to_string())))
+    }
 }

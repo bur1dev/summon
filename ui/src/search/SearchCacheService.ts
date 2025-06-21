@@ -1,6 +1,10 @@
 import { decode, DecodeError } from "@msgpack/msgpack";
 import { encodeHashToBase64 } from "@holochain/client"; // Removed HolochainClient import
 
+// Quantization utilities for embedding compression
+const quantizeEmbedding = (f32: Float32Array) => new Int8Array(f32.map(v => Math.round(v * 127)));
+const dequantizeEmbedding = (i8: Int8Array) => new Float32Array(i8.map(v => v / 127));
+
 // SearchCacheService.ts
 
 // Data structure from Holochain zome call (before processing)
@@ -312,7 +316,9 @@ export default class SearchCacheService {
 
                                 if (storedProduct.embeddingBuffer) {
                                     try {
-                                        fullyProcessedProduct.embedding = new Float32Array(storedProduct.embeddingBuffer);
+                                        // Dequantize embedding from storage
+                                        const quantized = new Int8Array(storedProduct.embeddingBuffer);
+                                        fullyProcessedProduct.embedding = dequantizeEmbedding(quantized);
                                         arrayBufferCount++;
                                         delete (fullyProcessedProduct as any).embeddingBuffer; // Remove after conversion
                                     } catch (err) {
@@ -668,7 +674,6 @@ export default class SearchCacheService {
     private static async updateCache(products: ProcessedProduct[]): Promise<void> {
         try {
             let productsWithTypedEmbeddings = 0;
-            let productsWithArrayEmbeddings = 0; // Should be 0 if all are Float32Array
             let totalBufferSize = 0;
 
             if (!this.dbPromise) {
@@ -717,11 +722,9 @@ export default class SearchCacheService {
 
                     if (product.embedding instanceof Float32Array && product.embedding.length > 0) {
                         try {
-                            // Explicitly create a new ArrayBuffer and copy data
-                            const sourceBuffer = product.embedding.buffer;
-                            const newBuffer = new ArrayBuffer(sourceBuffer.byteLength);
-                            new Uint8Array(newBuffer).set(new Uint8Array(sourceBuffer));
-                            storableProduct.embeddingBuffer = newBuffer;
+                            // Quantize embedding for storage (75% size reduction)
+                            const quantized = quantizeEmbedding(product.embedding);
+                            storableProduct.embeddingBuffer = quantized.buffer;
 
                             productsWithTypedEmbeddings++;
                             totalBufferSize += storableProduct.embeddingBuffer.byteLength;
@@ -773,7 +776,7 @@ export default class SearchCacheService {
             });
 
             console.log(`[SearchCacheService] Cached ${products.length} products. ` +
-                `${productsWithTypedEmbeddings} have typed embeddings. ` + // productsWithArrayEmbeddings removed as it should be 0
+                `${productsWithTypedEmbeddings} have quantized embeddings. ` +
                 `Total buffer size: ${(totalBufferSize / (1024 * 1024)).toFixed(2)}MB`);
         } catch (error) {
             console.error('[SearchCacheService] Error updating IndexedDB cache:', error);

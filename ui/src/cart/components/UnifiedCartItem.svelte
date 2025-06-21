@@ -144,7 +144,7 @@
                 </div>
 
                 {#if note}
-                    <div class="cart-item-note">
+                    <div class="shopper-note">
                         Shopper note: {note}
                     </div>
                 {/if}
@@ -253,7 +253,7 @@
                 </div>
 
                 {#if note}
-                    <div class="item-note">
+                    <div class="shopper-note">
                         Shopper note: {note}
                     </div>
                 {/if}
@@ -377,7 +377,7 @@
         color: var(--text-secondary);
     }
 
-    .cart-item-note {
+    .shopper-note {
         font-size: var(--font-size-sm);
         color: var(--text-secondary);
         margin-bottom: 4px;
@@ -385,6 +385,7 @@
         max-width: 100%;
         word-wrap: break-word;
         overflow-wrap: break-word;
+        word-break: break-all;
         white-space: pre-wrap;
         hyphens: auto;
         background-color: var(--surface);
@@ -489,21 +490,6 @@
         color: var(--text-secondary);
     }
 
-    .item-note {
-        font-size: var(--font-size-sm);
-        color: var(--text-secondary);
-        margin-top: 4px;
-        margin-bottom: 4px;
-        max-width: 100%;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        hyphens: auto;
-        display: block;
-        background-color: var(--surface);
-        padding: 4px var(--spacing-xs);
-        border-radius: 4px;
-        border-left: var(--border-width) solid var(--primary);
-    }
 
     .item-right {
         display: flex;

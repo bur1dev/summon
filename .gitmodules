@@ -1,0 +1,3 @@
+[submodule "dnas-submodule"]
+	path = dnas-submodule
+	url = https://github.com/bur1dev/summon-dnas.git

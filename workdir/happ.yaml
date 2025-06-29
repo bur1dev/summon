@@ -7,7 +7,7 @@ roles:
     strategy: create
     deferred: false
   dna:
-    bundled: ../dnas-submodule/products/workdir/products.dna
+    bundled: ../dnas/products/workdir/products.dna
     modifiers:
       network_seed: null
       properties: null
@@ -19,7 +19,7 @@ roles:
     strategy: create
     deferred: false
   dna:
-    bundled: ../dnas-submodule/cart/workdir/cart.dna
+    bundled: ../dnas/cart/workdir/cart.dna
     modifiers:
       network_seed: null
       properties: null

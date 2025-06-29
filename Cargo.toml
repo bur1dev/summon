@@ -5,7 +5,7 @@ opt-level = "z"
 opt-level = "z"
 
 [workspace]
-members = ["dnas-submodule/*/zomes/coordinator/*", "dnas-submodule/*/zomes/integrity/*"]
+members = ["dnas/*/zomes/coordinator/*", "dnas/*/zomes/integrity/*"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -16,10 +16,10 @@ mio = "0.8"
 serde = "1.0"
 
 [workspace.dependencies.profiles]
-path = "dnas-submodule/cart/zomes/coordinator/profiles"
+path = "dnas/cart/zomes/coordinator/profiles"
 
 [workspace.dependencies.profiles_integrity]
-path = "dnas-submodule/cart/zomes/integrity/profiles"
+path = "dnas/cart/zomes/integrity/profiles"
 
 [workspace.dependencies.tokio]
 features = ["full"]

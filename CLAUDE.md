@@ -16,7 +16,7 @@ npm test             # Run tests
 
 # Build & Package
 npm run build:zomes  # Build Rust zomes to WebAssembly
-npm run build:happ   # Package complete Holochain app (uses dnas-submodule/)
+npm run build:happ   # Package complete Holochain app (uses dnas/)
 npm run package      # Package web app for distribution
 
 # Component Development
@@ -25,29 +25,29 @@ cd ui && npm run check    # Svelte type checking
 cd backend && npm run dev # Nodemon with auto-reload
 cd tests && npm run test  # Vitest integration tests
 
-# Git Submodule Management
-git submodule update --init --recursive  # Initialize submodules
-git submodule update --remote           # Update submodule to latest
+# DNA Symlink Management
+ln -sf ../summon-dnas dnas              # Create/update symlink to DNA source
+ls -la dnas                             # Verify symlink is correct
 ```
 
 ## Architecture Overview
 
 ### Repository Structure ✅ MULTI-REPO ARCHITECTURE
-**Git Submodule Architecture** for clean separation:
+**Symlink Architecture** for clean separation:
 - **summon-dnas** (GitHub: bur1dev/summon-dnas) - Backend DNA source code only
-- **summon** (This repo) - Customer app with UI, backend, and dnas-submodule/ 
-- **Future: summon-shopper-app** - Tauri mobile app (will also use summon-dnas submodule)
+- **summon** (This repo) - Customer app with UI, backend, and dnas/ 
+- **Future: summon-shopper-app** - Tauri mobile app (will also use summon-dnas symlink)
 
 **Local Structure:**
 ```
 summon/
-├── dnas-submodule/          # Git submodule → summon-dnas repository
+├── dnas/          # Symlink → ../summon-dnas repository
 │   ├── cart/               # Cart DNA source code
 │   └── products/           # Products DNA source code  
 ├── ui/                     # Svelte frontend
 ├── backend/                # Express.js backend
-├── workdir/happ.yaml       # References dnas-submodule/ paths
-└── package.json            # build:happ uses dnas-submodule/ paths
+├── workdir/happ.yaml       # References dnas/ paths
+└── package.json            # build:happ uses dnas/ paths
 ```
 
 ### Holochain DNA Structure ✅ SPLIT COMPLETED

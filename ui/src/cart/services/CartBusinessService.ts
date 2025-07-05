@@ -165,8 +165,11 @@ function validateProductForCart(product: any) {
 function createCartItemFromProduct(product: any, quantity: number, note?: string): CartItem {
     const { productId } = parseProductHash(product);
     
+    console.log(`[LOG] UPC Data: Adding product "${product.name}" with UPC: ${product.upc || 'MISSING'}`);
+    
     return {
         productId: productId!,
+        upc: product.upc || null,
         productName: product.name || 'Unknown Product',
         productImageUrl: product.image_url,
         priceAtCheckout: product.price || 0, // Frozen regular price at time of adding
@@ -289,6 +292,7 @@ export async function restoreCartItems(cart: any): Promise<void> {
         if (product && product.productId) {
             localCartItems.push({
                 productId: product.productId,
+                upc: product.upc || null,
                 productName: product.productName || product.product_name,
                 productImageUrl: product.productImageUrl || product.product_image_url,
                 priceAtCheckout: product.priceAtCheckout || product.price_at_checkout,

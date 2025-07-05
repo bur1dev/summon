@@ -26,6 +26,11 @@
             product.details?.price || 0
           ).toFixed(2)}
         </div>
+        {#if product.note}
+          <div class="shopper-note">
+            Shopper note: {product.note}
+          </div>
+        {/if}
       </div>
       <div class="product-price">
         ${(
@@ -96,5 +101,23 @@
     font-size: var(--font-size-md);
     margin-left: var(--spacing-sm);
     color: var(--text-primary);
+  }
+
+  .shopper-note {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-top: 4px;
+    width: 100%;
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-all;
+    white-space: pre-wrap;
+    hyphens: auto;
+    background-color: var(--surface);
+    padding: 4px var(--spacing-xs);
+    border-radius: 4px;
+    border-left: var(--border-width) solid var(--primary);
+    box-sizing: border-box;
   }
 </style>

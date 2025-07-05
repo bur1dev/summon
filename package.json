@@ -11,7 +11,7 @@
     "x": "hc s clean && npm run build:happ && UI_PORT=8888 concurrently \"npm start -w ui\" \"npm run start:happ\" \"hc playground\"",
     "network": "hc s clean && npm run build:happ && UI_PORT=8888 concurrently \"npm start -w ui\" \"npm run launch:happ\"",
     "test": "npm run build:zomes && hc app pack workdir --recursive && npm t -w tests",
-    "launch:happ": "hc-spin -n $AGENTS workdir/summon.happ --ui-port $UI_PORT",
+    "launch:happ": "WASM_LOG=warn hc-spin -n $AGENTS workdir/summon.happ --ui-port $UI_PORT",
     "package": "npm run build:happ && hc web-app pack workdir --recursive",
     "start:happ": "echo \"starting with admin $VITE_ADMIN_PORT\" && RUST_LOG=warn echo \"pass\" | hc s -f=$VITE_ADMIN_PORT --piped generate workdir/summon.happ --run=$VITE_APP_PORT -a summon",
     "build:happ": "npm run build:zomes && hc dna pack dnas/products/workdir && hc dna pack dnas/cart/workdir && hc app pack workdir",

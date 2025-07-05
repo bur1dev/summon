@@ -19,6 +19,7 @@ export type ActionHashB64 = string;
 
 export interface CartItem {
     productId: string;
+    upc?: string;
     productName: string;
     productImageUrl?: string;
     priceAtCheckout: number; // Frozen regular price

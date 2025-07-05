@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import { ShoppingCart, X } from "lucide-svelte";
-  import { loadOrders, returnToShopping as returnOrderToShopping, getOrderAddress } from "../../services/OrdersService";
+  import { loadOrders, returnToShopping as returnOrderToShopping } from "../../services/OrdersService";
   import { currentViewStore } from "../../../stores/UiOnlyStore";
   import OrderCard from "./OrderCard.svelte";
 
@@ -15,7 +15,6 @@
   let checkedOutCarts: any[] = [];
   let errorMessage = "";
   let isClosing = false;
-  let addressCache: Record<string, any> = {}; // Cache for securely fetched addresses
 
   onMount(() => {
 
@@ -40,9 +39,6 @@
       if (result.success) {
         checkedOutCarts = result.data || [];
         console.log("Loaded checked out carts:", checkedOutCarts);
-        
-        // Fetch addresses securely for each order
-        await loadOrderAddresses();
       } else {
         console.error("Error loading checked out carts:", result.message);
         errorMessage = "Error loading checked out carts: " + result.message;
@@ -59,26 +55,6 @@
     }
   }
 
-  // Securely fetch addresses for all orders
-  async function loadOrderAddresses() {
-    const newAddressCache: Record<string, any> = {};
-    
-    for (const cart of checkedOutCarts) {
-      try {
-        const addressResult = await getOrderAddress(cart.cartHash);
-        if (addressResult.success) {
-          newAddressCache[cart.cartHash] = addressResult.data;
-          console.log(`Loaded address for order ${cart.cartHash}`);
-        } else {
-          console.warn(`Failed to load address for order ${cart.cartHash}:`, addressResult.message);
-        }
-      } catch (error) {
-        console.warn(`Error loading address for order ${cart.cartHash}:`, error);
-      }
-    }
-    
-    addressCache = newAddressCache;
-  }
 
   // Function to return a cart to shopping
   async function returnToShopping(item: any) {
@@ -142,7 +118,6 @@
         {#each checkedOutCarts as item}
           <OrderCard 
             {item} 
-            addressCache={addressCache} 
             agentPubKey={store?.myAgentPubKeyB64}
             on:returnToShopping={() => returnToShopping(item)}
           />

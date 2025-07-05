@@ -17,10 +17,10 @@ export function setCheckoutServices(holoClient: any) {
 }
 
 
-// SECURE: Two-step checkout process with private address
+// SIMPLIFIED: Single-step checkout with public address
 export async function checkoutCart(details: CheckoutDetails) {
     const clientError = validateClient(client, 'checkout cart');
-    if (clientError) return { success: false, message: clientError.message };
+    if (clientError) return clientError;
     
     try {
         await forceSyncToHolochain();
@@ -29,32 +29,28 @@ export async function checkoutCart(details: CheckoutDetails) {
         // Map cart items to backend structure
         const cartProducts = mapCartItemsToPayload(localCartItems);
         
-        if (cartProducts.length === 0) return { success: false, message: "Cart is empty" };
+        if (cartProducts.length === 0) return createErrorResult("Cart is empty");
         
         if (!details.addressHash) {
-            return { success: false, message: "Address is required" };
+            return createErrorResult("Address is required");
         }
         
-        // STEP 1: Create immutable private address copy for this order
         // Get address data from user's address book
         const addressData = getAddress(details.addressHash);
         if (!addressData) {
-            return { success: false, message: "Address not found in address book" };
+            return createErrorResult("Address not found in address book");
         }
         
-        // Create permanent, private "shipping label" address for order - NOT linked to agent's address book
-        const privateAddressHash = await callZome(client, 'cart_role', 'cart', 'create_order_address_copy', addressData);
-        console.log("Created immutable shipping label address for order:", privateAddressHash);
-        
-        // STEP 2: Checkout cart with private address hash  
+        // Single-step checkout with address included directly
         const payload: any = {
-            private_address_hash: privateAddressHash,
+            delivery_address: addressData,
             delivery_time: details.deliveryTime || null,
+            delivery_instructions: details.deliveryInstructions || null,
             cart_products: cartProducts
         };
         
-        console.log("Checking out cart with private address:", payload);
-        const checkoutResult = await callZome(client, 'cart_role', 'cart', 'checkout_cart', payload);
+        console.log("Checking out cart with public address:", payload);
+        const checkoutResult = await callZome(client, 'cart', 'cart', 'checkout_cart', payload);
         
         console.log("Checkout result:", checkoutResult);
         await clearCart();

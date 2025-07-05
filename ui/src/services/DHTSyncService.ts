@@ -159,6 +159,12 @@ export class ProductStore {
 
         console.log(`[LOG] Load Saved Data: Processing Product Type ${processedTypes}/${productTypesCount}: "${productTypeFromFile || 'None'}" (${productList.length} products)`);
 
+        // Log first product UPC data for verification
+        if (productList.length > 0) {
+          const firstProduct = productList[0];
+          console.log(`[LOG] UPC Data: First product "${firstProduct.name || firstProduct.description}" has UPC: ${firstProduct.upc || 'MISSING'}`);
+        }
+
         const processedBatch = productList.map((product: any) => ({ // product is now known to be from an array
           product: {
             name: product.description || "",
@@ -172,6 +178,7 @@ export class ProductStore {
             image_url: product.image_url || null,
             sold_by: product.sold_by || null,
             productId: product.productId,
+            upc: product.upc || null,
             embedding: product.embedding || null,
             brand: product.brand || null, // Add brand
             is_organic: product.is_organic || false, // Add is_organic

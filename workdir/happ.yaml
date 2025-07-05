@@ -11,10 +11,9 @@ roles:
     modifiers:
       network_seed: null
       properties: null
-      origin_time: null
     installed_hash: null
     clone_limit: 0
-- name: cart_role  
+- name: cart  
   provisioning:
     strategy: create
     deferred: false
@@ -23,6 +22,5 @@ roles:
     modifiers:
       network_seed: null
       properties: null
-      origin_time: null
     installed_hash: null
     clone_limit: 0

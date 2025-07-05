@@ -97,6 +97,7 @@ export function formatQuantityDisplay(quantity: number, product: any): string {
 export function mapCartItemsToPayload(cartItems: any[]) {
     return cartItems.map(item => ({
         product_id: item.productId,
+        upc: item.upc || null,
         product_name: item.productName,
         product_image_url: item.productImageUrl,
         price_at_checkout: item.priceAtCheckout,

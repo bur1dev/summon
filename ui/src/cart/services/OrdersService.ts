@@ -9,21 +9,6 @@ export function setOrdersClient(holoClient: any) {
     client = holoClient;
 }
 
-// Get address for a specific order (secure private address retrieval)
-export async function getOrderAddress(cartHash: ActionHashB64) {
-    const clientError = validateClient(client, 'get order address');
-    if (clientError) return clientError;
-
-    try {
-        console.log("Getting address for order:", cartHash);
-        const result = await callZome(client, 'cart_role', 'cart', 'get_address_for_order', decodeHash(cartHash));
-        console.log("Retrieved order address:", result);
-        return createSuccessResult(result);
-    } catch (error) {
-        console.error('Error getting order address:', error);
-        return createErrorResult(error);
-    }
-}
 
 // SIMPLIFIED: Load orders - no product lookups needed!
 export async function loadOrders() {
@@ -32,7 +17,7 @@ export async function loadOrders() {
 
     try {
         console.log("Loading checked out carts...");
-        const result = await callZome(client, 'cart_role', 'cart', 'get_checked_out_carts', null);
+        const result = await callZome(client, 'cart', 'cart', 'get_checked_out_carts', null);
         console.log("Loaded checked out carts:", result);
 
         // SIMPLIFIED: Process the results - all data is already here!
@@ -44,7 +29,6 @@ export async function loadOrders() {
     }
 }
 
-// DELETED: getProductDetails function - no longer needed!
 
 // Helper: Format delivery time
 function formatDeliveryTime(delivery_time: any) {
@@ -60,13 +44,13 @@ function formatDeliveryTime(delivery_time: any) {
     };
 }
 
-// SECURE: Process orders - no address data in public cart entries
+// SIMPLIFIED: Process orders - address data now included in public cart entries
 function processOrders(carts: any[]) {
     console.log("Processing checked out carts from Holochain:", carts);
 
     return carts.map((cart) => {
         const cartHash = encodeHash(cart.cart_hash);
-        const { id, products, total, created_at, status, delivery_time } = cart.cart;
+        const { id, products, total, created_at, status, delivery_time, delivery_address, delivery_instructions } = cart.cart;
 
         // All product data is already in the cart.products array!
         const productsWithDetails = products.map((product: any) => ({
@@ -97,9 +81,9 @@ function processOrders(carts: any[]) {
             total: calculatedTotal > 0 ? calculatedTotal : total,
             createdAt: new Date(created_at / 1000).toLocaleString(),
             status,
-            // Address is now retrieved securely via getOrderAddress() when needed
-            addressHash: null, // No longer stored in public cart entry
-            deliveryInstructions: null, // Removed for privacy 
+            // Address is now available directly in cart entry
+            deliveryAddress: delivery_address,
+            deliveryInstructions: delivery_instructions,
             deliveryTime: formatDeliveryTime(delivery_time)
         };
     });
@@ -126,7 +110,7 @@ export async function returnToShopping(cartHash: ActionHashB64) {
         }
 
         // Call zome function then sync
-        const result = await callZome(client, 'cart_role', 'cart', 'return_to_shopping', decodeHash(cartHash));
+        const result = await callZome(client, 'cart', 'cart', 'return_to_shopping', decodeHash(cartHash));
         
         console.log("SUCCESS: Zome call result:", result);
         forceSyncToHolochain();

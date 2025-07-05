@@ -57,7 +57,7 @@ summon/
 - **Integrity Zome**: `product_catalog_integrity` - Product, ProductGroup, and ProductPreference entries
 - **Coordinator Zome**: `product_catalog` - Product storage, search, categorization, and preference management
 
-**Cart DNA** (`cart_role`):
+**Cart DNA** (`cart`):
 - **Integrity Zomes**: `cart_integrity`, `profiles_integrity` - Cart operations and user profiles  
 - **Coordinator Zomes**: `cart`, `profiles` - Shopping cart, checkout, delivery scheduling, and user management
 
@@ -311,8 +311,8 @@ cd product-categorization && pip install -r requirements.txt  # Python deps
 ### Role & Zome Mapping ✅
 **CRITICAL MAPPING** for all frontend calls:
 - **products_role** + **product_catalog** zome: Product operations & preferences
-- **cart_role** + **cart** zome: Shopping cart & address operations  
-- **cart_role** + **profiles** zome: User profile operations
+- **cart** + **cart** zome: Shopping cart & address operations  
+- **cart** + **profiles** zome: User profile operations
 
 ### Frontend Service Updates ✅
 All service files updated with correct role routing:
@@ -324,11 +324,11 @@ All service files updated with correct role routing:
 - `search-api.ts`: All calls use `products_role` + `product_catalog`
 - `PreferencesService.ts`: Uses `products_role` + `product_catalog`
 
-**Cart/Address/Profiles → cart_role**:
-- `CartPersistenceService.ts`: Uses `cart_role` + `cart`
-- `AddressService.ts`: Uses `cart_role` + `cart`
-- `CheckoutService.ts`: Uses `cart_role` + `cart`
-- `OrdersService.ts`: Uses `cart_role` + `cart`
+**Cart/Address/Profiles → cart**:
+- `CartPersistenceService.ts`: Uses `cart` + `cart`
+- `AddressService.ts`: Uses `cart` + `cart`
+- `CheckoutService.ts`: Uses `cart` + `cart`
+- `OrdersService.ts`: Uses `cart` + `cart`
 
 ### Build System ✅
 ```json
@@ -378,36 +378,32 @@ The Product Preference feature implements a sophisticated dual-layer architectur
 - ✅ Correct role routing for all preference calls
 - ✅ Clean service boundaries with no cross-dependencies
 
-### Secure Address System Architecture ✅
+### Current Address & Delivery Instructions System ✅
 
-#### Dual-Address Pattern
-**Address Book (Reusable Addresses)**:
-- **Storage**: `Address` entries in cart_dna linked via `AgentToAddress`
-- **Purpose**: User's personal address management (Home, Work, etc.)
-- **Access**: Via `AddressService.ts` (CRUD operations)
+**Current Implementation**:
+- **Storage**: Delivery addresses and instructions are included directly in public `CheckedOutCart` entries
+- **Visibility**: Customer addresses are visible to shoppers in the DHT
+- **Purpose**: Simplified implementation for initial development and testing
 
-**Order Address Copies (Immutable Shipping Labels)**:
-- **Storage**: Private `Address` entries linked via `OrderToPrivateAddress` 
-- **Purpose**: Immutable shipping addresses for specific orders
-- **Creation**: `create_order_address_copy_impl()` during checkout
+**Delivery Instructions Architecture ✅**:
+- **Frontend Capture**: `AddressSelector.svelte` textarea captures delivery instructions
+- **Checkout Flow**: `CheckoutService.ts` includes `delivery_instructions` in payload
+- **Backend Storage**: `CheckoutCartInput` and `CheckedOutCart` structs store `delivery_instructions: Option<String>`
+- **Order Display**: `OrderCard.svelte` displays instructions in OrdersView
+- **Data Flow**: Complete end-to-end flow from capture to display working correctly
 
-#### Security Features
-- **Address Privacy**: Orders use immutable address copies, customer address changes don't affect historical orders
-- **Clean Separation**: Address book management vs order address storage completely separate
-- **Access Control**: `get_address_for_order_impl()` verifies order ownership before returning address
-
-#### Service Architecture
-- **AddressService.ts**: Functional pattern, address book CRUD
-- **CheckoutService.ts**: Creates private address copies during checkout
-- **OrdersService.ts**: Secure address retrieval with `getOrderAddress()`
+**⚠️ FUTURE REQUIREMENT**: This approach needs to be changed for production:
+- **Privacy Concern**: Customer addresses should not be publicly visible in the DHT
+- **Security Issue**: Current implementation exposes personal information to all network participants
+- **Required Change**: Implement proper address privacy system before production deployment
 
 ## Critical Reminders for Future Development
 
 ### Frontend Development
 - **ALWAYS** use correct role names:
   - `products_role` + `product_catalog` for products and preferences
-  - `cart_role` + `cart` for cart and addresses
-  - `cart_role` + `profiles` for user profiles
+  - `cart` + `cart` for cart and addresses
+  - `cart` + `profiles` for user profiles
 - **RESTART conductor** after DNA changes
 - **Use orchestrator components** like PreferencesSection.svelte for cross-DNA operations
 
@@ -417,7 +413,7 @@ The Product Preference feature implements a sophisticated dual-layer architectur
 - **Build both DNAs** when making changes: `npm run build:happ`
 
 ### Common Pitfalls to Avoid
-- Using old "grocery" role name (causes "no cell found" errors)
+- Using old "grocery" or "cart_role" role names (causes "no cell found" errors)
 - Calling wrong zome names (products vs product_catalog)
 - Forgetting to rebuild DNAs after manifest changes
 - Adding preference logic back to cart_dna

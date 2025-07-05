@@ -23,7 +23,7 @@
   const appId = import.meta.env.VITE_APP_ID
     ? import.meta.env.VITE_APP_ID
     : "summon";
-  const roleName = "cart_role";
+  const roleName = "cart";
   const appPort = import.meta.env.VITE_APP_PORT
     ? import.meta.env.VITE_APP_PORT
     : 8888;
@@ -74,6 +74,36 @@
     const params: AppWebsocketConnectionOptions = { url: new URL(url) };
     if (tokenResp) params.token = tokenResp.token;
     client = await AppWebsocket.connect(params);
+    
+    // 🔥 SUMMON DNA HASH VERIFICATION 🔥
+    try {
+      const appInfo = await client.appInfo();
+      if (appInfo?.cell_info) {
+        console.log("🔥 SUMMON DNA HASH VERIFICATION 🔥");
+        console.log("📡 App ID:", appInfo.installed_app_id);
+        console.log("📡 Cells:", appInfo.cell_info);
+        
+        Object.entries(appInfo.cell_info).forEach(([roleName, cellInfo]) => {
+          console.log(`📡 Role: ${roleName}`, cellInfo);
+          if (Array.isArray(cellInfo) && cellInfo.length > 0) {
+            const cell = cellInfo[0];
+            console.log(`📡 Cell structure:`, cell);
+            if (cell.type === 'provisioned' && cell.value?.cell_id) {
+              const dnaHash = cell.value.cell_id[0];
+              const agentHash = cell.value.cell_id[1];
+              console.log(`🔥 SUMMON DNA HASH (${roleName}): ${dnaHash}`);
+              console.log(`🔥 SUMMON AGENT HASH (${roleName}): ${agentHash}`);
+            } else {
+              console.log(`📡 Cell is not provisioned or missing cell_id:`, Object.keys(cell));
+            }
+          } else {
+            console.log(`📡 No cells in role ${roleName}:`, cellInfo);
+          }
+        });
+      }
+    } catch (error) {
+      console.error("🔥 SUMMON: Failed to log DNA hash:", error);
+    }
 
     // Initialize ShopStore once client is available
     shopStoreInstance = new ShopStore(client, "products_role", "product_catalog");
@@ -98,7 +128,7 @@
     setPreferencesClient(client);
 
     // Initialize ProfilesStore
-    profilesStore = new ProfilesStore(new ProfilesClient(client, "cart_role"), {
+    profilesStore = new ProfilesStore(new ProfilesClient(client, "cart"), {
       avatarMode: "avatar-optional",
       minNicknameLength: 2,
       additionalFields: [],
@@ -151,7 +181,7 @@
         </div>
       </div>
     {:else}
-      <Controller {client} roleName="cart_role"></Controller>
+      <Controller {client} roleName="cart"></Controller>
     {/if}
   </profiles-context>
 {:else}

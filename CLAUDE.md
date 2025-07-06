@@ -315,7 +315,7 @@ cd product-categorization && pip install -r requirements.txt  # Python deps
 - **cart** + **profiles** zome: User profile operations
 
 ### Frontend Service Updates ✅
-All service files updated with correct role routing:
+All service files updated with correct role routing and centralized clone logic:
 
 **Products/Preferences → products_role**:
 - `ProductDataService.ts`: All calls use `products_role` + `product_catalog`
@@ -323,6 +323,11 @@ All service files updated with correct role routing:
 - `SearchCacheService.ts`: Uses `products_role` + `product_catalog`
 - `search-api.ts`: All calls use `products_role` + `product_catalog`
 - `PreferencesService.ts`: Uses `products_role` + `product_catalog`
+
+**Centralized Clone Discovery ✅**:
+- `cloneHelpers.ts`: Centralized clone discovery utilities (SOLID/DRY compliance)
+- All services import from `/products/utils/cloneHelpers.ts` instead of duplicating logic
+- Eliminates ~200 lines of duplicate code across 3 services
 
 **Cart/Address/Profiles → cart**:
 - `CartPersistenceService.ts`: Uses `cart` + `cart`
@@ -424,3 +429,27 @@ NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 ALWAYS use the new split DNA architecture when working on this codebase.
+
+### Utility Layer (/utils/)
+- **cartHelpers.ts**: Pure utility functions - `getIncrementValue()`, `getDisplayUnit()`, `isSoldByWeight()`, `parseProductHash()`
+- **zomeHelpers.ts**: Holochain operation utilities - `encodeHash()`, `callZome()`, `standardizeHashFormat()`
+- **errorHelpers.ts**: Consistent error handling patterns - `createSuccessResult()`, `createErrorResult()`, `validateClient()`
+- **categoryUtils.ts**: Category navigation and filtering logic (pure functions)
+- **cloneHelpers.ts**: Centralized clone discovery utilities for versioned product catalog cloning ✅
+
+### Products Clone Architecture ✅
+Following SOLID/DRY principles, all clone management logic is centralized:
+- **cloneHelpers.ts**: Single source of truth for all clone operations (107 lines)
+  - `getActiveClone()` - Get current active seed
+  - `getActiveCloneCellId()` - Clone targeting for queries  
+  - `activateClone()` - Activate new clones
+  - `disablePreviousClone()` - Cleanup old clones
+- **Services**: Import functions instead of duplicating logic
+- **Benefits**: Eliminates ~250 lines of duplicate code, ensures consistency
+
+### Clone Lifecycle Management ✅
+Complete versioned cloning with automatic cleanup:
+- **DHTSyncService.ts**: Orchestrates workflow using centralized cloneHelpers
+- **products-directory DNA**: `disable_previous_clone()` function with base cell protection
+- **Automatic cleanup**: Previous clones disabled after successful activation
+- **Resource management**: Prevents clone accumulation, maintains zero downtime

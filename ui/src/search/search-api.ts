@@ -2,6 +2,7 @@ import { decodeProducts } from "./search-utils";
 import type { Product } from "./search-types";
 import { decode } from "@msgpack/msgpack";
 import type { DecodedProductGroupEntry } from "./search-utils";
+import { getActiveCloneCellId } from "../products/utils/cloneHelpers";
 
 
 
@@ -13,6 +14,13 @@ export class SearchApiClient {
 
     constructor(store: any) {
         this.store = store;
+    }
+
+    // Get the cell_id for targeting the current active clone
+    private async getActiveCloneCellId(): Promise<any> {
+        const cellId = await getActiveCloneCellId(this.store.service.client);
+        console.log("🔎 [SEARCH API] ✅ Targeting clone cell:", cellId);
+        return cellId;
     }
 
     /**
@@ -32,8 +40,9 @@ export class SearchApiClient {
                     index: hash.index
                 };
 
+                const cellId = await this.getActiveCloneCellId();
                 const response = await this.store.service.client.callZome({
-                    role_name: "products_role",
+                    cell_id: cellId,
                     zome_name: "product_catalog",
                     fn_name: "get_products_by_references",
                     payload: [reference],
@@ -60,8 +69,9 @@ export class SearchApiClient {
             } else {
                 // Fallback for old-style hashes (backward compatibility)
                 console.warn("Using legacy hash format - this should be updated");
+                const cellId = await this.getActiveCloneCellId();
                 const response = await this.store.service.client.callZome({
-                    role_name: "products_role",
+                    cell_id: cellId,
                     zome_name: "product_catalog",
                     fn_name: "get_products_by_hashes",
                     payload: [hash],
@@ -94,8 +104,9 @@ export class SearchApiClient {
                     index: hash.index
                 };
 
+                const cellId = await this.getActiveCloneCellId();
                 const response = await this.store.service.client.callZome({
-                    role_name: "products_role",
+                    cell_id: cellId,
                     zome_name: "product_catalog",
                     fn_name: "get_products_by_references",
                     payload: [reference],
@@ -145,8 +156,9 @@ export class SearchApiClient {
             } else {
                 // Fallback for old-style hashes
                 console.warn("Using legacy hash format - this should be updated");
+                const cellId = await this.getActiveCloneCellId();
                 const response = await this.store.service.client.callZome({
-                    role_name: "products_role",
+                    cell_id: cellId,
                     zome_name: "product_catalog",
                     fn_name: "get_products_by_hashes",
                     payload: [hash],
@@ -173,8 +185,9 @@ export class SearchApiClient {
         const logKey = `api-getProductsByType-${category}-${subcategory || 'none'}-${productType || 'none'}`;
         console.time(logKey);
         try {
+            const cellId = await this.getActiveCloneCellId();
             const response = await this.store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_products_by_category",
                 payload: {
@@ -241,8 +254,9 @@ export class SearchApiClient {
         limit: number = 20
     ): Promise<Product[]> {
         try {
+            const cellId = await this.getActiveCloneCellId();
             const response = await this.store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_products_by_category",
                 payload: {
@@ -298,8 +312,9 @@ export class SearchApiClient {
      */
     async getAllCategoryProducts(category: string): Promise<Product[]> {
         try {
+            const cellId = await this.getActiveCloneCellId();
             const response = await this.store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_all_category_products",
                 payload: category,

@@ -2,6 +2,7 @@ import { decode } from "@msgpack/msgpack";
 import { encodeHashToBase64, decodeHashFromBase64, type HoloHash } from "@holochain/client";
 import type { DecodedProductGroupEntry } from "../../search/search-utils";
 import type { ProductRowCacheService } from "./ProductRowCacheService";
+import { getActiveCloneCellId } from "../utils/cloneHelpers";
 
 interface RawProductFromDHT {
     name: string;
@@ -67,15 +68,25 @@ export class ProductDataService {
         this.cache = cache;
     }
 
+    // Get the cell_id for targeting the current active clone
+    private async getActiveCloneCellId(): Promise<any> {
+        const cellId = await getActiveCloneCellId(this.store.service.client);
+        console.log("[ProductDataService] ✅ Targeting clone cell:", cellId);
+        return cellId;
+    }
+
     // NEW: Method to get a single product by group hash and index for cart
     async getProductByReference(groupHashB64: string, productIndex: number): Promise<RawProductFromDHT | null> {
         try {
             // Just decode directly - no transformations needed
             const groupHash = decodeHashFromBase64(groupHashB64);
 
+            // Get active clone cell_id for targeting
+            const cellId = await this.getActiveCloneCellId();
+
             // Call the same zome method that the browsing system uses
             const result = await this.store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_product_group",
                 payload: groupHash
@@ -103,8 +114,9 @@ export class ProductDataService {
         productType?: string
     ): Promise<number> {
         try {
+            const cellId = await this.getActiveCloneCellId();
             const response = await this.store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_all_group_counts_for_path",
                 payload: {
@@ -296,7 +308,9 @@ export class ProductDataService {
 
         const parsed = this.parseIdentifier(params.identifier, params);
 
+        const cellId = await this.getActiveCloneCellId();
         const response = await this.store.service.client.callZome({
+            cell_id: cellId,
             role_name: "products_role",
             zome_name: "product_catalog",
             fn_name: "get_all_group_counts_for_path",
@@ -342,8 +356,9 @@ export class ProductDataService {
         try {
             const parsed = this.parseIdentifier(params.identifier, params);
 
+            const cellId = await this.getActiveCloneCellId();
             const response = await this.store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_products_by_category",
                 payload: {
@@ -414,8 +429,9 @@ export class ProductDataService {
                 }
                 : category;
 
+            const cellId = await this.getActiveCloneCellId();
             const response = await this.store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: fn_name,
                 payload: payload,

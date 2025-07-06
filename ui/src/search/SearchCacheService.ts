@@ -1,5 +1,6 @@
 import { decode, DecodeError } from "@msgpack/msgpack";
 import { encodeHashToBase64 } from "@holochain/client"; // Removed HolochainClient import
+import { getActiveCloneCellId } from "../products/utils/cloneHelpers";
 
 // Quantization utilities for embedding compression
 const quantizeEmbedding = (f32: Float32Array) => new Int8Array(f32.map(v => Math.round(v * 127)));
@@ -145,11 +146,14 @@ interface HolochainStore {
     service: {
         client: {
             callZome: (args: {
-                role_name: string;
+                cell_id?: any;
+                role_name?: string;
                 zome_name: string;
                 fn_name: string;
                 payload: any;
             }) => Promise<any>;
+            appInfo: () => Promise<any>;
+            myPubKey: any;
         };
     };
 }
@@ -204,6 +208,13 @@ export default class SearchCacheService {
         brands: {},
         reverseBrands: {}
     };
+
+    // Get the cell_id for targeting the current active clone
+    private static async getActiveCloneCellId(store: HolochainStore): Promise<any> {
+        const cellId = await getActiveCloneCellId(store.service.client);
+        console.log("[SearchCacheService] ✅ Building search cache from clone cell:", cellId);
+        return cellId;
+    }
 
     // Open database connection
     private static openDatabase(): Promise<IDBDatabase> {
@@ -433,8 +444,9 @@ export default class SearchCacheService {
 
             // Single bulk call to get all products
             console.time('[SearchCacheService] Bulk fetch all products');
+            const cellId = await this.getActiveCloneCellId(store);
             const response: { products: ProductGroupRecord[], total: number } = await store.service.client.callZome({
-                role_name: "products_role",
+                cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_all_products_for_search_index",
                 payload: null,

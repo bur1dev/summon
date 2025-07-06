@@ -1,7 +1,21 @@
 manifest_version: '1'
 name: summon
-description: Split DNA architecture for Summon grocery app
+description: Split DNA architecture for Summon grocery app with versioned product catalog cloning
 roles:
+# The new, permanent directory DNA - never cloned
+- name: products_directory
+  provisioning:
+    strategy: create
+    deferred: false
+  dna:
+    bundled: ../dnas/products-directory/workdir/products_directory.dna
+    modifiers:
+      network_seed: null
+      properties: null
+    installed_hash: null
+    clone_limit: 0
+
+# The existing products DNA - now configured for cloning
 - name: products_role
   provisioning:
     strategy: create
@@ -12,7 +26,9 @@ roles:
       network_seed: null
       properties: null
     installed_hash: null
-    clone_limit: 0
+    clone_limit: 10  # Allow up to 10 versions to exist simultaneously
+
+# Cart DNA remains unchanged
 - name: cart  
   provisioning:
     strategy: create

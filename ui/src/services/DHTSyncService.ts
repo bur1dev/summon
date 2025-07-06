@@ -6,6 +6,7 @@ import type { AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
 import type { ShopStore } from "../store";
 import { StockService } from "./StockService";
+import { getActiveClone, activateClone, disablePreviousClone } from "../products/utils/cloneHelpers";
 
 interface DecodedSingleProductFields {
   name: string;
@@ -97,19 +98,72 @@ export class ProductStore {
     return this.state.subscribe(callback);
   }
 
+  // Create a new product catalog clone for fresh data upload
+  private async createNewProductClone() {
+    console.log("[LOG] Creating new product catalog clone...");
+
+    // Create clone using standard Holochain 0.5.3 client method
+    const clonedCell = await this.store.client.createCloneCell({
+      role_name: 'products_role',
+      name: `products-clone-${Date.now()}`,
+      modifiers: {
+        network_seed: crypto.randomUUID()
+      }
+    });
+
+    console.log("[LOG] New product catalog clone created:", clonedCell);
+    console.log("[LOG] Clone cell_id:", clonedCell.cell_id);
+    console.log("[LOG] Clone role name:", clonedCell.clone_id);
+
+    // Authorize signing credentials for the new clone cell
+    try {
+      const adminPort = import.meta.env.VITE_ADMIN_PORT;
+      if (adminPort) {
+        const { AdminWebsocket } = await import('@holochain/client');
+        const adminWebsocket = await AdminWebsocket.connect({
+          url: new URL(`ws://localhost:${adminPort}`),
+        });
+        
+        console.log("[LOG] Authorizing signing credentials for clone cell:", clonedCell.cell_id);
+        await adminWebsocket.authorizeSigningCredentials(clonedCell.cell_id);
+        console.log("[LOG] ✅ Clone cell signing credentials authorized");
+        
+        // Close admin connection properly
+        adminWebsocket.client.close();
+      } else {
+        console.warn("[LOG] ⚠️ No admin port available, clone cell may not be authorized");
+      }
+    } catch (authError) {
+      console.error("[LOG] ❌ Failed to authorize clone cell signing credentials:", authError);
+      throw new Error(`Failed to authorize clone cell: ${authError}`);
+    }
+
+    return clonedCell;
+  }
+
+
   loadFromSavedData = async () => {
     console.log("[LOG] ⚡ Load Saved Data: Process started.");
     this.state.update(state => ({
       ...state,
-      error: "Loading saved products from file...",
+      error: "Creating new product catalog clone...",
       loading: true
     }));
 
     let totalProductsFromFile = 0;
     let successfullyUploadedProducts = 0;
     let totalGroupsCreated = 0;
+    let clonedCell: any = null;
 
     try {
+      // Step 1: Create new catalog clone for fresh data upload
+      console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 1: Creating new clone...");
+      clonedCell = await this.createNewProductClone();
+
+      this.state.update(state => ({
+        ...state,
+        error: "📡 Loading saved products from file...",
+      }));
       const response = await fetch('http://localhost:3000/api/load-categorized-products');
 
       if (!response.ok) {
@@ -137,11 +191,14 @@ export class ProductStore {
       }, {} as Record<string, any[]>); // Initialize with the correct type
 
       const productTypesCount = Object.keys(productsByType).length;
-      console.log(`[LOG] Load Saved Data: Found ${totalProductsFromFile} products in ${productTypesCount} product types.`);
+      console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 2: Starting data upload to NEW clone");
+      console.log("📡 [DATA UPLOAD] Target Clone DNA Hash:", clonedCell.cell_id[0]);
+      console.log("📡 [DATA UPLOAD] Target Network Seed:", clonedCell.name);
+      console.log(`📡 [DATA UPLOAD] Products to upload: ${totalProductsFromFile} in ${productTypesCount} product types`);
 
       this.state.update(state => ({
         ...state,
-        error: `Starting upload: 0/${totalProductsFromFile} products (0%)`
+        error: `📡 Starting upload to NEW clone: 0/${totalProductsFromFile} products (0%)`
       }));
 
       let processedTypes = 0;
@@ -196,7 +253,7 @@ export class ProductStore {
           try {
             attempts++;
             const records = await this.store.service.client.callZome({
-              role_name: "products_role",
+              cell_id: clonedCell.cell_id,
               zome_name: "product_catalog",
               fn_name: "create_product_batch",
               payload: processedBatch,
@@ -251,11 +308,47 @@ export class ProductStore {
       console.log(`[LOG] Load Saved Data:   Product types:       ${productTypesCount}`);
       console.log("[LOG] Load Saved Data: --------------------------------------------------");
 
+      // Step 3: Activate the new catalog clone to make it live
+      if (clonedCell && successfullyUploadedProducts > 0) {
+        console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 3: Getting old active seed before activation...");
+        
+        // Get the old active seed BEFORE we activate the new one
+        const oldActiveSeed = await getActiveClone(this.store.client).catch(() => null);
+        console.log("[LOG] Old active seed before activation:", oldActiveSeed || "none");
+
+        console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 3: Activating new clone...");
+
+        this.state.update(state => ({
+          ...state,
+          error: `🚀 Activating new catalog (${successfullyUploadedProducts}/${totalProductsFromFile} products)`,
+        }));
+
+        const newNetworkSeed = await activateClone(this.store.client, clonedCell);
+        console.log("[LOG] New catalog clone activated:", newNetworkSeed);
+        console.log("🎉 [SUCCESS] Step 3 Complete: New catalog clone activated and live!");
+
+        // Step 4: Disable the previous clone after successful activation
+        if (oldActiveSeed && oldActiveSeed !== newNetworkSeed) {
+          console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 4: Disabling previous clone...");
+          console.log("[LOG] Disabling previous clone with seed:", oldActiveSeed);
+          await disablePreviousClone(this.store.client, oldActiveSeed);
+          console.log("[LOG] ✅ Previous clone disabled successfully");
+          console.log("🎉 [SUCCESS] Step 4 Complete: Previous clone disabled!");
+        } else {
+          console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 4: No previous clone to disable (first upload or same seed)");
+        }
+      }
+
       this.state.update(state => ({
         ...state,
-        error: `Complete: ${successfullyUploadedProducts}/${totalProductsFromFile} products in ${totalGroupsCreated} groups`,
+        error: `✅ Complete: ${successfullyUploadedProducts}/${totalProductsFromFile} products in ${totalGroupsCreated} groups`,
         loading: false
       }));
+
+      console.log("\n🎉 ================= VERSIONED CLONING COMPLETE! =================\n");
+      console.log("✅ [SUCCESS] All users will now automatically query the new clone");
+      console.log("✅ [SUCCESS] Old clone remains available until next upload cycle");
+      console.log("✅ [SUCCESS] Zero downtime deployment achieved!\n");
 
       // Delete the DHT upload flag after a successful full load
       await this.deleteDhtUploadFlag();

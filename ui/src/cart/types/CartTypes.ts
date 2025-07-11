@@ -24,6 +24,7 @@ export interface CartItem {
     productImageUrl?: string;
     priceAtCheckout: number; // Frozen regular price
     promoPrice?: number; // Frozen promo price (if available)
+    soldBy?: string; // "UNIT" or "WEIGHT" - needed for correct increment/decrement behavior
     quantity: number;
     timestamp: number;
     note?: string;

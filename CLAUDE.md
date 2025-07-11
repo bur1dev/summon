@@ -68,7 +68,13 @@ summon/
 **Dual Categorization**: Products can belong to multiple categories via hierarchical links:
 `categories/{category}/subcategories/{sub}/types/{type}`
 
-**Cart Data Architecture**: Cart items store complete product snapshots (name, price, image) at time of addition, eliminating dependencies on product catalog during cart operations.
+**Cart Data Architecture**: Complete PUBLIC DHT system using individual entries for all cart operations:
+- **CartProduct entries**: Individual entries with product snapshots, aggregated by frontend
+- **SessionStatus entries**: Track cart state ("Shopping" vs "Checkout") 
+- **Address entries**: Public delivery addresses linked to cart sessions
+- **DeliveryTimeSlot entries**: Delivery scheduling with date/time
+- **DeliveryInstructions entries**: Customer delivery notes
+- **Single public path**: All entries linked to `active_carts` path for universal access
 
 **Preference Architecture**: Dual-layer preference system with clean separation:
 - **Transactional Notes**: Stored in `CartProduct.note` (cart_dna) - temporary, session-specific
@@ -84,15 +90,14 @@ summon/
 
 ### Core Services (Svelte + TypeScript)
 - **DataManager**: Centralized state management and business logic gateway
-- **CartBusinessService**: Core cart state management (~350 lines) with reactive stores
+- **CartBusinessService**: Core cart state management (~240 lines) with reactive stores using PUBLIC DHT entries
 - **CartInteractionService**: Functional cart operation utilities - eliminates duplicated cart patterns
-- **CartCalculationService**: Mathematical operations for cart totals and validation
-- **CartPersistenceService**: localStorage + Holochain synchronization with merge strategies
 - **BrowserNavigationService**: Single source of truth for navigation state
 - **PreferencesService**: Product preference management using idiomatic Svelte stores
-- **CheckoutService**: Checkout workflow and delivery time slot generation (~150 lines)
+- **CheckoutService**: Complete checkout workflow with delivery time slot generation and DHT storage (~187 lines)
 - **OrdersService**: Order history and cart restoration (functional pattern)
-- **AddressService**: Delivery address management
+- **AddressService**: Delivery address management (profiles DNA)
+- **CartAddressService**: Public cart address coordination (cart DNA)
 - **PriceService**: Single source of truth for price formatting and calculations (static utility)
 - **ProductDataService**: Product loading with caching (accessed via DataManager)
 - **EmbeddingService**: Local semantic search with transformers.js
@@ -278,18 +283,16 @@ cd product-categorization && pip install -r requirements.txt  # Python deps
 
 ## Cart System Architecture ✅
 
-### Completed Transformations
-- **PreferencesService**: Class → Svelte store (60% code reduction)
-- **AddressService**: Class → Functional pattern (38% code reduction)  
-- **CheckoutService**: Class → Functional pattern (31% code reduction)
-- **CartBusinessService**: Class → Functional stores (40% code reduction)
-- **OrdersService**: Class → Functional pattern (17% code reduction, renamed from CheckedOutCartsService)
-- **CartCalculationService**: Class → Pure functional exports (22% code reduction)
-- **CartPersistenceService**: Class → Pure functional exports (20% code reduction)
-- **CartInteractionService**: Class → Functional utilities with zero legacy code
+### Completed Features ✅
+- **Complete PUBLIC DHT Cart System**: All cart operations use individual DHT entries on public path
+- **Full Checkout Flow**: Address selection → Delivery time → Instructions → Order placement with DHT persistence
+- **Session Status Filtering**: Cart UI dynamically shows/hides based on checkout status
+- **Dual Address System**: Private addresses (profiles DNA) + public cart addresses (cart DNA) 
+- **OrdersView Integration**: Complete order display with decoded delivery data from DHT
+- **Functional Service Architecture**: All services use Svelte stores with direct exports
 
 ### Architecture Status: COMPLETE ✅
-**Pattern**: All cart services follow consistent functional patterns with direct store access and zero context injection. Zero legacy code remaining - complete functional architecture achieved.
+**Cart System**: Complete PUBLIC DHT implementation with individual entries for cart products, session status, addresses, delivery scheduling, and instructions. All data persists to DHT and displays correctly in UI. Zero localStorage dependencies - pure Holochain solution.
 
 ## AI Categorization Pipeline
 **Location**: `/product-categorization/`
@@ -330,10 +333,10 @@ All service files updated with correct role routing and centralized clone logic:
 - Eliminates ~200 lines of duplicate code across 3 services
 
 **Cart/Address/Profiles → cart**:
-- `CartPersistenceService.ts`: Uses `cart` + `cart`
-- `AddressService.ts`: Uses `cart` + `cart`
-- `CheckoutService.ts`: Uses `cart` + `cart`
-- `OrdersService.ts`: Uses `cart` + `cart`
+- `CartBusinessService.ts`: Uses `cart` + `cart` for all cart operations
+- `CartAddressService.ts`: Uses `cart` + `cart` for public delivery addresses
+- `CheckoutService.ts`: Uses `cart` + `cart` for checkout flow and DHT storage
+- `OrdersService.ts`: Uses `cart` + `cart` for order management
 
 ### Build System ✅
 ```json

@@ -138,7 +138,7 @@
                         type="text"
                         id="zip"
                         bind:value={address.zip}
-                        placeholder="92101"
+                        placeholder="92024"
                         inputmode="numeric"
                         maxlength="5"
                         required

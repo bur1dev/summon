@@ -9,7 +9,7 @@
     export let cartItems: any[] = [];
     export let address: Address;
     export let deliveryInstructions: string = "";
-    export let deliveryTime: { date: Date; display: string };
+    export let deliveryTime: { date: Date; display: string } | null = null;
     export let isEntering = true;
     export let isExiting = false;
     
@@ -101,47 +101,88 @@
                 </div>
             </div>
 
-            <div class="summary-section">
-                <div class="section-header">
-                    <h3
-                        class={isEntering
-                            ? "slide-in-left"
-                            : isExiting
-                              ? "slide-out-left"
-                              : ""}
-                    >
-                        Delivery Time
-                    </h3>
+            {#if deliveryTime}
+                <div class="summary-section">
+                    <div class="section-header">
+                        <h3
+                            class={isEntering
+                                ? "slide-in-left"
+                                : isExiting
+                                  ? "slide-out-left"
+                                  : ""}
+                        >
+                            Delivery Time
+                        </h3>
+                        <div
+                            class="edit-button-wrapper {isEntering
+                                ? 'slide-in-right'
+                                : isExiting
+                                  ? 'slide-out-right'
+                                  : ''}"
+                        >
+                            <button class="edit-button" on:click={editDeliveryTime}
+                                >Edit</button
+                            >
+                        </div>
+                    </div>
                     <div
-                        class="edit-button-wrapper {isEntering
-                            ? 'slide-in-right'
+                        class="time-details {isEntering
+                            ? 'slide-in-left'
                             : isExiting
-                              ? 'slide-out-right'
+                              ? 'slide-out-left'
                               : ''}"
                     >
-                        <button class="edit-button" on:click={editDeliveryTime}
-                            >Edit</button
+                        <div class="time-date">
+                            {#if deliveryTime.date}
+                                {new Date(deliveryTime.date).toLocaleDateString("en-US", {
+                                    weekday: "long",
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                })}
+                            {:else}
+                                No date selected
+                            {/if}
+                        </div>
+                        <div class="time-slot">{deliveryTime.display || 'No time selected'}</div>
+                    </div>
+                </div>
+            {:else}
+                <div class="summary-section">
+                    <div class="section-header">
+                        <h3
+                            class={isEntering
+                                ? "slide-in-left"
+                                : isExiting
+                                  ? "slide-out-left"
+                                  : ""}
                         >
+                            Delivery Time
+                        </h3>
+                        <div
+                            class="edit-button-wrapper {isEntering
+                                ? 'slide-in-right'
+                                : isExiting
+                                  ? 'slide-out-right'
+                                  : ''}"
+                        >
+                            <button class="edit-button" on:click={editDeliveryTime}
+                                >Edit</button
+                            >
+                        </div>
+                    </div>
+                    <div
+                        class="time-details {isEntering
+                            ? 'slide-in-left'
+                            : isExiting
+                              ? 'slide-out-left'
+                              : ''}"
+                    >
+                        <div class="time-date">No delivery time selected</div>
+                        <div class="time-slot">Please select a delivery time</div>
                     </div>
                 </div>
-                <div
-                    class="time-details {isEntering
-                        ? 'slide-in-left'
-                        : isExiting
-                          ? 'slide-out-left'
-                          : ''}"
-                >
-                    <div class="time-date">
-                        {deliveryTime.date.toLocaleDateString("en-US", {
-                            weekday: "long",
-                            month: "long",
-                            day: "numeric",
-                            year: "numeric",
-                        })}
-                    </div>
-                    <div class="time-slot">{deliveryTime.display}</div>
-                </div>
-            </div>
+            {/if}
 
             <CheckoutOrderList
                 {cartItems}

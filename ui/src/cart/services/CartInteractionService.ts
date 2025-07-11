@@ -1,5 +1,5 @@
-import { addToCart } from './CartBusinessService';
-import { getIncrementValue } from '../utils/cartHelpers';
+import { addToCart, removeItemFromCart, removeSpecificQuantity, getCartItems } from './CartBusinessService';
+import { getIncrementValue, parseProductHash } from '../utils/cartHelpers';
 
 /**
  * Centralized cart interaction utilities to eliminate duplicated cart logic
@@ -28,13 +28,13 @@ export async function addProductToCart(
  */
 export async function incrementItem(
     product: any,
-    currentQuantity: number,
+    _currentQuantity: number,
     note?: string
 ): Promise<boolean> {
     try {
         const incrementValue = getIncrementValue(product);
-        const newQuantity = currentQuantity + incrementValue;
-        const result = await addToCart(product, newQuantity, note);
+        // ADD individual entries, don't create entry with total quantity
+        const result = await addToCart(product, incrementValue, note);
         return result.success;
     } catch (error) {
         console.error("Error incrementing item:", error);
@@ -49,17 +49,21 @@ export async function incrementItem(
 export async function decrementItem(
     product: any,
     currentQuantity: number,
-    note?: string
+    _note?: string
 ): Promise<boolean> {
     try {
         const incrementValue = getIncrementValue(product);
         const newQuantity = currentQuantity - incrementValue;
         
-        const result = newQuantity > 0 
-            ? await addToCart(product, newQuantity, note)
-            : await addToCart(product, 0, undefined);
-        
-        return result.success;
+        if (newQuantity <= 0) {
+            // Remove all entries for this product
+            const result = await removeItemFromCart(product);
+            return result.success;
+        } else {
+            // Remove some individual entries (equal to incrementValue)
+            const result = await removeSpecificQuantity(product, incrementValue);
+            return result.success;
+        }
     } catch (error) {
         console.error("Error decrementing item:", error);
         return false;
@@ -71,7 +75,7 @@ export async function decrementItem(
  */
 export async function removeItem(product: any): Promise<boolean> {
     try {
-        const result = await addToCart(product, 0, undefined);
+        const result = await removeItemFromCart(product);
         return result.success;
     } catch (error) {
         console.error("Error removing item:", error);
@@ -88,38 +92,34 @@ export async function updateQuantity(
     note?: string
 ): Promise<boolean> {
     try {
-        const result = await addToCart(product, newQuantity, note);
-        return result.success;
+        if (newQuantity <= 0) {
+            // Remove all entries
+            const result = await removeItemFromCart(product);
+            return result.success;
+        }
+        
+        // Get current quantity from aggregated cart
+        const currentItems = getCartItems();
+        const currentItem = currentItems.find(item => item.productId === parseProductHash(product).productId);
+        const currentQuantity = currentItem ? currentItem.quantity : 0;
+        
+        if (newQuantity > currentQuantity) {
+            // Add the difference
+            const quantityToAdd = newQuantity - currentQuantity;
+            const result = await addToCart(product, quantityToAdd, note);
+            return result.success;
+        } else if (newQuantity < currentQuantity) {
+            // Remove the difference  
+            const quantityToRemove = currentQuantity - newQuantity;
+            const result = await removeSpecificQuantity(product, quantityToRemove);
+            return result.success;
+        }
+        
+        // If newQuantity === currentQuantity, do nothing
+        return true;
     } catch (error) {
         console.error("Error updating quantity:", error);
         return false;
     }
 }
 
-/**
- * SIMPLIFIED: Finds cart item by productId (new approach)
- */
-export function findCartItem(cartItems: any[], productId: string): any | null {
-    if (!cartItems || !Array.isArray(cartItems)) return null;
-    
-    return cartItems.find(item => 
-        item && item.productId === productId
-    ) || null;
-}
-
-/**
- * SIMPLIFIED: Gets current quantity for a product in cart using productId
- */
-export function getCurrentQuantity(cartItems: any[], productId: string): number {
-    const item = findCartItem(cartItems, productId);
-    return item ? item.quantity : 0;
-}
-
-/**
- * SIMPLIFIED: Checks if item is in cart using productId
- */
-export function isInCart(cartItems: any[], productId: string): boolean {
-    return findCartItem(cartItems, productId) !== null;
-}
-
-// DELETED: Legacy compatibility functions - all components now use new productId API

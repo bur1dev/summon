@@ -66,13 +66,20 @@ export class ProductDataService {
     constructor(store: any, cache: ProductRowCacheService) {
         this.store = store;
         this.cache = cache;
+        
+        // No initialization needed for simple clone helpers
     }
 
-    // Get the cell_id for targeting the current active clone
+    // Get the cell_id for targeting the current active clone  
     private async getActiveCloneCellId(): Promise<any> {
-        const cellId = await getActiveCloneCellId(this.store.service.client);
-        console.log("[ProductDataService] ✅ Targeting clone cell:", cellId);
-        return cellId;
+        try {
+            const cellId = await getActiveCloneCellId(this.store.service.client);
+            console.log("[ProductDataService] ✅ Targeting clone cell:", cellId);
+            return cellId;
+        } catch (error) {
+            console.error("[ProductDataService] ❌ No active clone available:", error);
+            throw error;
+        }
     }
 
     // NEW: Method to get a single product by group hash and index for cart
@@ -311,7 +318,6 @@ export class ProductDataService {
         const cellId = await this.getActiveCloneCellId();
         const response = await this.store.service.client.callZome({
             cell_id: cellId,
-            role_name: "products_role",
             zome_name: "product_catalog",
             fn_name: "get_all_group_counts_for_path",
             payload: {

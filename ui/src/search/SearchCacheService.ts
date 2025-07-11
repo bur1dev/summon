@@ -212,7 +212,6 @@ export default class SearchCacheService {
     // Get the cell_id for targeting the current active clone
     private static async getActiveCloneCellId(store: HolochainStore): Promise<any> {
         const cellId = await getActiveCloneCellId(store.service.client);
-        console.log("[SearchCacheService] ✅ Building search cache from clone cell:", cellId);
         return cellId;
     }
 
@@ -444,7 +443,15 @@ export default class SearchCacheService {
 
             // Single bulk call to get all products
             console.time('[SearchCacheService] Bulk fetch all products');
-            const cellId = await this.getActiveCloneCellId(store);
+            
+            // CRITICAL FIX: Handle case where no active clone exists yet
+            let cellId;
+            try {
+                cellId = await this.getActiveCloneCellId(store);
+            } catch (error) {
+                console.warn('[SearchCacheService] No active clone available for search index building');
+                return [];
+            }
             const response: { products: ProductGroupRecord[], total: number } = await store.service.client.callZome({
                 cell_id: cellId,
                 zome_name: "product_catalog",

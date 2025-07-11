@@ -16,6 +16,17 @@ holochain_types = "0.3.2"
 mio = "0.8"
 serde = "1.0"
 
+[workspace.dependencies.profiles]
+path = "dnas/profiles/zomes/coordinator/profiles"
+
+[workspace.dependencies.profiles_integrity]
+path = "dnas/profiles/zomes/integrity/profiles"
+
+[workspace.dependencies.address]
+path = "dnas/profiles/zomes/coordinator/address"
+
+[workspace.dependencies.address_integrity]
+path = "dnas/profiles/zomes/integrity/address"
 
 [workspace.dependencies.tokio]
 features = ["full"]

@@ -1,16 +1,8 @@
 import { writable, derived } from 'svelte/store';
-import type { DataManager } from "../../services/DataManager";
-import { 
-    setPersistenceClient, 
-    loadFromLocalStorage, 
-    loadFromPrivateEntry, 
-    saveToLocalStorage, 
-    scheduleSyncToHolochain, 
-    forceSyncToHolochain as persistenceForceSyncToHolochain, 
-    mergeLocalAndHolochainCarts 
-} from "./CartPersistenceService";
 import type { CartItem } from '../types/CartTypes';
-import { parseProductHash } from '../utils/cartHelpers';
+import { parseProductHash, getIncrementValue } from '../utils/cartHelpers';
+import { callZome } from '../utils/zomeHelpers';
+import { getSessionData } from './CheckoutService';
 
 // Service dependencies
 let client: any = null;
@@ -20,7 +12,11 @@ export const cartItems = writable<CartItem[]>([]);
 export const cartTotal = writable(0);
 export const cartPromoTotal = writable(0);
 export const cartReady = writable(false);
-export const cartLoading = writable(true);
+export const cartLoading = writable(false);
+
+// Session status store - centralized session state management
+export const sessionStatus = writable<string>('Shopping');
+export const isCheckoutSession = derived(sessionStatus, status => status === 'Checkout');
 
 // Derived stores for UI
 export const itemCount = derived(cartItems, items =>
@@ -29,164 +25,177 @@ export const itemCount = derived(cartItems, items =>
 export const uniqueItemCount = derived(cartItems, items => items.length);
 export const hasItems = derived(cartItems, items => items.length > 0);
 
-// Local cart management
-let localCartItems: CartItem[] = [];
-
 // Service initialization
-export function setCartServices(holoClient: any, _dataManager?: DataManager): void {
+export function setCartServices(holoClient: any): void {
     client = holoClient;
-    setPersistenceClient(holoClient);
-
-    cartItems.set([]);
-    cartTotal.set(0);
-    cartPromoTotal.set(0);
-    cartLoading.set(true);
-
-    // Initialize asynchronously
-    initialize();
+    loadCart();
+    updateSessionStatus(); // Load initial session status
 }
 
-// SIMPLIFIED: DataManager no longer needed for cart calculations (stub for backward compatibility)
-export function setDataManager(_dataManager: DataManager): void {
-    // No-op: Cart service now does simple local calculations instead of complex product lookups
-    // DataManager injection no longer needed in simplified architecture
+export function setDataManager(_dataManager: any): void {
+    // No-op: DataManager no longer needed for cart calculations
 }
 
-async function initialize(): Promise<void> {
-    if (!client) return;
-    
-    try {
-        cartReady.set(false);
-        cartLoading.set(true);
-
-        // First check localStorage
-        const localItems = await loadFromLocalStorage();
-        if (localItems.length > 0) {
-            localCartItems = localItems;
-            cartItems.set(localItems);
-            recalculateCartTotal();
-        }
-
-        if (client) {
-            // Wait a bit to ensure Holochain connection is ready
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Load cart from Holochain (will merge with local if needed)
-            await loadCart();
-        } else {
-            console.warn("No Holochain client available for cart initialization");
-        }
-
-        // Signal service is ready
-        cartLoading.set(false);
-        cartReady.set(true);
-    } catch (error) {
-        console.error("Cart service initialization failed:", error);
-        cartLoading.set(false);
-        cartReady.set(true);
-    }
-}
-
-// Load cart from Holochain
+// Load cart from backend and aggregate by productId
 export async function loadCart(): Promise<void> {
     if (!client) return;
     
     cartLoading.set(true);
-
+    
     try {
-        const holochainItems = await loadFromPrivateEntry();
-
-        if (holochainItems.length > 0) {
-            if (localCartItems.length > 0) {
-                console.log("Merging Holochain cart with local cart");
-                localCartItems = mergeLocalAndHolochainCarts(
-                    localCartItems,
-                    holochainItems
-                );
-            } else {
-                // No local items, just use Holochain items
-                localCartItems = holochainItems;
-            }
-
-            // Update the svelte store
-            cartItems.set([...localCartItems]);
-
-            // Save to localStorage
-            saveToLocalStorage(localCartItems);
-
-            // Recalculate cart total after loading items
-            recalculateCartTotal();
-        } else if (localCartItems.length > 0) {
-            // If we have local items but nothing in Holochain, sync to Holochain
-            persistenceForceSyncToHolochain(localCartItems);
+        const backendItems = await callZome(client, 'cart', 'cart', 'get_current_items', null);
+        
+        if (backendItems && Array.isArray(backendItems)) {
+            // Convert backend format to CartItem and aggregate by productId
+            const aggregated = aggregateByProductId(backendItems);
+            cartItems.set(aggregated);
+            calculateTotals(aggregated);
+        } else {
+            cartItems.set([]);
+            cartTotal.set(0);
+            cartPromoTotal.set(0);
         }
     } catch (error) {
-        console.error('Error loading cart from Holochain:', error);
+        console.error('Error loading cart:', error);
+        cartItems.set([]);
+        cartTotal.set(0);
+        cartPromoTotal.set(0);
     }
-
+    
     cartLoading.set(false);
+    cartReady.set(true);
 }
 
-// Add product to cart - THE ONLY BRIDGE TO PRODUCT CATALOG
+// Aggregate multiple backend entries by productId (sum quantities)
+function aggregateByProductId(backendItems: any[]): CartItem[] {
+    const aggregated = new Map<string, CartItem>();
+    
+    for (const item of backendItems) {
+        // Backend returns flattened format, not nested under 'product'
+        const existing = aggregated.get(item.product_id);
+        
+        if (existing) {
+            // Sum quantities
+            existing.quantity += item.quantity;
+            existing.timestamp = Math.max(existing.timestamp, item.timestamp);
+        } else {
+            // First occurrence
+            aggregated.set(item.product_id, {
+                productId: item.product_id,
+                upc: item.upc,
+                productName: item.product_name,
+                productImageUrl: item.product_image_url,
+                priceAtCheckout: item.price_at_checkout || 0,
+                promoPrice: item.promo_price,
+                soldBy: item.sold_by || "UNIT",
+                quantity: item.quantity || 1,
+                timestamp: item.timestamp || Date.now(),
+                note: item.note
+            });
+        }
+    }
+    
+    return Array.from(aggregated.values());
+}
+
+// Add product to cart
 export async function addToCart(product: any, quantity: number = 1, note?: string) {
-    if (!client) return { success: false, error: "Service not initialized", local: true };
+    if (!client) return { success: false, error: "Service not initialized" };
     
     try {
-        const validation = validateProductForCart(product);
-        if (!validation.success) return validation;
+        const { productId } = parseProductHash(product);
+        if (!productId) return { success: false, error: "Invalid product" };
         
-        const cartItem = createCartItemFromProduct(product, quantity, note);
-        updateLocalCartState(cartItem);
-        scheduleHolochainSync();
+        // Get increment value for uniform entry sizes
+        const incrementValue = getIncrementValue(product);
         
-        return { success: true, local: true };
+        // Create uniform entries (always 0.25 for WEIGHT, always 1 for UNIT)
+        const cartProduct = {
+            product_id: productId,
+            upc: product.upc,
+            product_name: product.name,
+            product_image_url: product.image_url,
+            price_at_checkout: product.price || 0,
+            promo_price: product.promo_price,
+            sold_by: product.sold_by || "UNIT",
+            quantity: incrementValue, // Always uniform: 0.25 for WEIGHT, 1 for UNIT
+            timestamp: Date.now(),
+            note
+        };
+        
+        // Create multiple entries if needed
+        const entriesToCreate = Math.ceil(quantity / incrementValue);
+        for (let i = 0; i < entriesToCreate; i++) {
+            await callZome(client, 'cart', 'cart', 'add_item', cartProduct);
+        }
+        
+        await loadCart();
+        return { success: true };
     } catch (error) {
         console.error('Error adding to cart:', error);
-        return { success: false, error, local: true };
+        return { success: false, error };
     }
 }
 
-function validateProductForCart(product: any) {
-    if (!product) {
-        console.error("Cannot add item to cart: missing product");
-        return { success: false, error: "Invalid product", local: true };
+// Remove specific quantity of a product from cart
+export async function removeSpecificQuantity(product: any, quantityToRemove: number) {
+    if (!client) return { success: false, error: "Service not initialized" };
+    
+    try {
+        const { productId } = parseProductHash(product);
+        if (!productId) return { success: false, error: "Invalid product" };
+        
+        // Get all backend items and remove specific quantity
+        const backendItems = await callZome(client, 'cart', 'cart', 'get_current_items', null);
+        
+        if (backendItems && Array.isArray(backendItems)) {
+            let removedQuantity = 0;
+            
+            for (const item of backendItems) {
+                if (item.product_id === productId && removedQuantity < quantityToRemove) {
+                    const itemQuantity = item.quantity || 1;
+                    await callZome(client, 'cart', 'cart', 'remove_item', item.action_hash);
+                    removedQuantity += itemQuantity;
+                    
+                    // Stop when we've removed enough
+                    if (removedQuantity >= quantityToRemove) break;
+                }
+            }
+        }
+        
+        await loadCart();
+        return { success: true };
+    } catch (error) {
+        console.error('Error removing specific quantity:', error);
+        return { success: false, error };
     }
+}
 
-    const { productId } = parseProductHash(product);
+// Remove all instances of a product from cart
+export async function removeItemFromCart(product: any) {
+    if (!client) return { success: false, error: "Service not initialized" };
     
-    if (!productId) {
-        console.error("Cannot add item to cart: invalid product hash", product);
-        return { success: false, error: "Invalid product identifier", local: true };
+    try {
+        const { productId } = parseProductHash(product);
+        if (!productId) return { success: false, error: "Invalid product" };
+        
+        // Get all backend items and remove all with matching productId
+        const backendItems = await callZome(client, 'cart', 'cart', 'get_current_items', null);
+        
+        if (backendItems && Array.isArray(backendItems)) {
+            for (const item of backendItems) {
+                if (item.product_id === productId) {
+                    await callZome(client, 'cart', 'cart', 'remove_item', item.action_hash);
+                }
+            }
+        }
+        
+        await loadCart();
+        return { success: true };
+    } catch (error) {
+        console.error('Error removing item:', error);
+        return { success: false, error };
     }
-    
-    return { success: true, productId };
-}
-
-function createCartItemFromProduct(product: any, quantity: number, note?: string): CartItem {
-    const { productId } = parseProductHash(product);
-    
-    console.log(`[LOG] UPC Data: Adding product "${product.name}" with UPC: ${product.upc || 'MISSING'}`);
-    
-    return {
-        productId: productId!,
-        upc: product.upc || null,
-        productName: product.name || 'Unknown Product',
-        productImageUrl: product.image_url,
-        priceAtCheckout: product.price || 0, // Frozen regular price at time of adding
-        promoPrice: product.promo_price, // Frozen promo price (if available)
-        quantity,
-        timestamp: Date.now(),
-        note
-    };
-}
-
-function updateLocalCartState(newCartItem: CartItem): void {
-    updateLocalCart(newCartItem);
-    recalculateCartTotal();
-}
-
-function scheduleHolochainSync(): void {
-    scheduleSyncToHolochain(localCartItems);
 }
 
 // Clear cart
@@ -194,16 +203,15 @@ export async function clearCart() {
     if (!client) return { success: false, error: "Service not initialized" };
     
     try {
-        // Clear local cart immediately
-        localCartItems = [];
-        cartItems.set([]);
-        cartTotal.set(0);
-        cartPromoTotal.set(0);
-        saveToLocalStorage([]);
-
-        // Schedule sync to Holochain
-        scheduleSyncToHolochain([]);
-
+        const backendItems = await callZome(client, 'cart', 'cart', 'get_current_items', null);
+        
+        if (backendItems && Array.isArray(backendItems)) {
+            for (const item of backendItems) {
+                await callZome(client, 'cart', 'cart', 'remove_item', item.action_hash);
+            }
+        }
+        
+        await loadCart();
         return { success: true };
     } catch (error) {
         console.error('Error clearing cart:', error);
@@ -211,112 +219,50 @@ export async function clearCart() {
     }
 }
 
-function updateLocalCart(newItem: CartItem): void {
-    if (!client) return;
+// Calculate totals
+function calculateTotals(items: CartItem[]): void {
+    const regularTotal = items.reduce((sum, item) => sum + (item.priceAtCheckout * item.quantity), 0);
+    const promoTotal = items.reduce((sum, item) => sum + ((item.promoPrice || item.priceAtCheckout) * item.quantity), 0);
     
-    const itemIndex = localCartItems.findIndex(item =>
-        item.productId === newItem.productId
-    );
-
-    if (newItem.quantity === 0) {
-        // Remove item if quantity is 0
-        if (itemIndex >= 0) {
-            localCartItems.splice(itemIndex, 1);
-        }
-    } else {
-        // Update existing or add new
-        if (itemIndex >= 0) {
-            localCartItems[itemIndex].quantity = newItem.quantity;
-            localCartItems[itemIndex].timestamp = newItem.timestamp;
-            localCartItems[itemIndex].note = newItem.note;
-        } else {
-            localCartItems.push(newItem);
-        }
-    }
-
-    // Update the store for UI
-    cartItems.set([...localCartItems]);
-
-    // Save to localStorage
-    saveToLocalStorage(localCartItems);
-}
-
-// SIMPLIFIED: Recalculate cart total completely - no more complex zome calls
-function recalculateCartTotal(): void {
-    try {
-        // Calculate both regular and promo totals
-        const regularTotal = localCartItems.reduce((sum, item) => 
-            sum + (item.priceAtCheckout * item.quantity), 0
-        );
-        
-        const promoTotal = localCartItems.reduce((sum, item) => 
-            sum + ((item.promoPrice || item.priceAtCheckout) * item.quantity), 0
-        );
-        
-        cartTotal.set(regularTotal);
-        cartPromoTotal.set(promoTotal);
-    } catch (error) {
-        console.error('Error recalculating cart total:', error);
-    }
+    cartTotal.set(regularTotal);
+    cartPromoTotal.set(promoTotal);
 }
 
 // Get current cart items
 export function getCartItems(): CartItem[] {
-    return localCartItems;
+    let items: CartItem[] = [];
+    cartItems.subscribe(value => items = value)();
+    return items;
 }
 
 // Subscribe to cart changes
 export function subscribe(callback: (items: CartItem[]) => void) {
-    callback(localCartItems);
     return cartItems.subscribe(callback);
 }
 
-// Helper methods for other services
-
-// Get client for other services (backward compatibility)
+// Get client
 export function getClient(): any {
     return client;
 }
 
-// SIMPLIFIED: Restore cart items from checked-out cart (used by OrdersService)
-export async function restoreCartItems(cart: any): Promise<void> {
+// Update session status from DHT data
+export async function updateSessionStatus(): Promise<void> {
     if (!client) return;
     
-    console.log("Adding products back to cart:", cart.products.length);
-
-    // Clear existing cart
-    localCartItems = [];
-
-    // Add each product - all data is already in the cart.products
-    for (const product of cart.products) {
-        if (product && product.productId) {
-            localCartItems.push({
-                productId: product.productId,
-                upc: product.upc || null,
-                productName: product.productName || product.product_name,
-                productImageUrl: product.productImageUrl || product.product_image_url,
-                priceAtCheckout: product.priceAtCheckout || product.price_at_checkout,
-                promoPrice: product.promoPrice || product.promo_price,
-                quantity: product.quantity,
-                timestamp: Date.now(),
-                note: product.note
-            });
+    try {
+        const result = await getSessionData();
+        if (result.success && result.data.session_status_decoded) {
+            sessionStatus.set(result.data.session_status_decoded);
         }
-    }
-
-    // Update UI
-    cartItems.set([...localCartItems]);
-
-    // Save to localStorage
-    saveToLocalStorage(localCartItems);
-
-    // Recalculate total
-    recalculateCartTotal();
-}
-
-// Force sync to Holochain (used after zome calls)
-export async function forceSyncToHolochain(): Promise<void> {
-    if (client) {
-        await persistenceForceSyncToHolochain(localCartItems);
+    } catch (error) {
+        console.error('Error updating session status:', error);
+        // Default to Shopping on error
+        sessionStatus.set('Shopping');
     }
 }
+
+// Restore cart items (used by OrdersService)
+export async function restoreCartItems(cart: any): Promise<void> {
+    console.log("TODO: Restore cart items", cart);
+}
+

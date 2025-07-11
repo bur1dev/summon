@@ -33,6 +33,16 @@ export function isSoldByWeight(product: any): boolean {
  * Handles both original products (with hash) and reconstructed products (with groupHash/productIndex)
  */
 export function parseProductHash(product: any): { groupHash: string | null, productIndex: number | null, productId: string | null } {
+    // Handle cart items with direct productId
+    if (product?.productId && typeof product.productId === 'string') {
+        const parts = product.productId.split(':');
+        if (parts.length === 2) {
+            const groupHash = parts[0];
+            const productIndex = parseInt(parts[1]);
+            return { groupHash, productIndex, productId: product.productId };
+        }
+    }
+    
     // Handle cart items (already parsed)
     if (product?.groupHash && typeof product?.productIndex === 'number') {
         return createParsedHash(product.groupHash, product.productIndex);

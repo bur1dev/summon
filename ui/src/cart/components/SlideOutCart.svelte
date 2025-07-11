@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Frown } from "lucide-svelte";
-  import { cartItems, cartTotal, cartPromoTotal, clearCart as clearCartService } from "../services/CartBusinessService";
+  import { cartItems, cartTotal, cartPromoTotal, clearCart as clearCartService, isCheckoutSession } from "../services/CartBusinessService";
   import CartHeader from "./CartHeader.svelte";
   import UnifiedCartItem from "./UnifiedCartItem.svelte";
   import CheckoutFlow from "./checkout/CheckoutFlow.svelte";
@@ -70,6 +70,8 @@
     };
   });
 
+  // Reactive session status - no need for manual checks
+
   // DELETED: fetchProductDetails function - no longer needed with new CartItem structure
 
   // Clear cart
@@ -106,6 +108,7 @@
 
   // Handle checkout success
   function handleCheckoutSuccess() {
+    // Cart is now in "Checkout" status - session status will be updated reactively
     closeCart();
   }
 
@@ -172,7 +175,7 @@
                     : 'slide-in-left'}"
                 id="cart-title"
               >
-                Cart ({enrichedCartItems.length} item{enrichedCartItems.length !== 1
+                Cart ({$isCheckoutSession ? 0 : enrichedCartItems.length} item{($isCheckoutSession ? 0 : enrichedCartItems.length) !== 1
                   ? "s"
                   : ""})
               </div>
@@ -201,12 +204,12 @@
                   : 'slide-in-left'}"
             >
               <div class="cart-total-regular">
-                Total: {PriceService.formatTotal($cartTotal)}
+                Total: {PriceService.formatTotal($isCheckoutSession ? 0 : $cartTotal)}
               </div>
               <div class="cart-total-promo">
-                With loyalty card: {PriceService.formatTotal($cartPromoTotal)}
+                With loyalty card: {PriceService.formatTotal($isCheckoutSession ? 0 : $cartPromoTotal)}
               </div>
-              {#if totalSavings > 0}
+              {#if !$isCheckoutSession && totalSavings > 0}
                 <div class="savings-amount">
                   You save: {PriceService.formatSavings(totalSavings)}
                 </div>
@@ -216,10 +219,10 @@
             <div class="cart-items" bind:this={cartContainer}>
               {#if isLoading}
                 <div class="loading">Loading cart items...</div>
-              {:else if enrichedCartItems.length === 0}
+              {:else if $isCheckoutSession || enrichedCartItems.length === 0}
                 <div class="empty-cart">
                   <Frown size={48} class="empty-cart-icon" />
-                  <span class="empty-cart-text">Your cart is empty</span>
+                  <span class="empty-cart-text">{$isCheckoutSession ? "Cart is checked out" : "Your cart is empty"}</span>
                 </div>
               {:else}
                 {#each enrichedCartItems as item (item.productId || `${item.groupHash}_${item.productIndex}`)}
@@ -244,10 +247,10 @@
                 : 'slide-in-up'}">
               <button
                 class="checkout-button btn btn-primary btn-lg"
-                disabled={enrichedCartItems.length === 0}
+                disabled={$isCheckoutSession || enrichedCartItems.length === 0}
                 on:click={startCheckout}
               >
-                Proceed to Checkout
+                {$isCheckoutSession ? "Order Checked Out" : "Proceed to Checkout"}
               </button>
             </div>
           </div>

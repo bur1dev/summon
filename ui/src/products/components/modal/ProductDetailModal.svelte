@@ -4,8 +4,8 @@
         onMount,
         onDestroy,
     } from "svelte";
-    import { cartItems, getCartItems } from "../../../cart/services/CartBusinessService";
-    import { updateQuantity, findCartItem } from "../../../cart/services/CartInteractionService";
+    import { cartItems, getCartItems, isCheckoutSession } from "../../../cart/services/CartBusinessService";
+    import { updateQuantity } from "../../../cart/services/CartInteractionService";
     import { preferences, loadPreference, getPreferenceKey } from "../../services/PreferencesService";
     import { parseProductHash } from "../../../cart/utils/cartHelpers";
     import ProductModalHeader from "./ProductModalHeader.svelte";
@@ -75,6 +75,11 @@
     }
 
     async function addToCart() {
+        if ($isCheckoutSession) {
+            console.log("Cannot add to cart: currently in checkout session");
+            return;
+        }
+        
         try {
             isTransitioning = true; // Start transition animation
 
@@ -107,15 +112,17 @@
         if (!productId) return;
         
         const items = getCartItems();
-        const item = findCartItem(items, productId);
+        const item = items.find(cartItem => cartItem.productId === productId);
 
-        if (item) {
+        if (item && !$isCheckoutSession) {
+            // Show normal cart quantities when not in checkout session
             isInCart = true;
             quantity = item.quantity;
             showPreferences = true;
             existingNote = item.note || "";
             note = item.note || "";
         } else {
+            // Show as not in cart when in checkout session or item not found
             isInCart = false;
             quantity = 1;
             showPreferences = false;

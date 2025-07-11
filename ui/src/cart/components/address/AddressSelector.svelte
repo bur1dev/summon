@@ -1,20 +1,22 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from "svelte";
     import { type Address, addresses, loadAddresses, createAddress, deleteAddress, validateAddress } from "../../services/AddressService";
+    import { selectedCartAddress, selectedCartAddressHash, setDeliveryAddress, updateDeliveryAddress } from "../../services/CartAddressService";
     import AddressForm from "./AddressForm.svelte";
     import AddressList from "./AddressList.svelte";
     import DeleteConfirmationModal from "./DeleteConfirmationModal.svelte";
     import { NotebookPen } from "lucide-svelte";
     import { AnimationService } from "../../../services/AnimationService";
 
-    // Props
-    export let selectedAddressHash: string | null = null;
+    // Props - remove legacy props, use cart address system
     export let deliveryInstructions: string = "";
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
 
-    // Direct access to addresses store
+    // Reactive assignment for current cart address selection
+    $: currentSelectedHash = $selectedCartAddressHash;
+    $: currentSelectedAddress = $selectedCartAddress;
 
     // UI state
     let showNewAddressForm = false;
@@ -34,11 +36,40 @@
         loadAddresses();
     });
 
-    // Handle address selection from AddressList
-    function handleAddressSelect(event: CustomEvent) {
+    // Handle address selection from AddressList - integrate dual address system
+    async function handleAddressSelect(event: CustomEvent) {
         const { addressHash, address } = event.detail;
-        selectedAddressHash = addressHash;
-        dispatch("select", { addressHash, address });
+        
+        // Handle null address (deletion case)
+        if (!address) {
+            console.log('🗑️ SELECTOR: Address selection cleared (deletion)');
+            // Just pass through the null selection, no cart.dna calls needed
+            dispatch("select", { addressHash: null, address: null });
+            return;
+        }
+        
+        console.log('📍 SELECTOR: User selected address from private collection:', `${address.street}, ${address.city}, ${address.state}`);
+        
+        // Check if this is the first address selection or an update
+        if (currentSelectedHash) {
+            console.log('🔄 SELECTOR: Updating existing cart address selection');
+            // Update existing address in cart
+            const result = await updateDeliveryAddress(currentSelectedHash, address);
+            if (result.success) {
+                // Update the selected hash to the profiles hash for UI selection state
+                selectedCartAddressHash.set(addressHash);
+                dispatch("select", { addressHash, address });
+            }
+        } else {
+            console.log('🆕 SELECTOR: First-time cart address selection');
+            // Set address for the first time in cart
+            const result = await setDeliveryAddress(address);
+            if (result.success) {
+                // Update the selected hash to the profiles hash for UI selection state
+                selectedCartAddressHash.set(addressHash);
+                dispatch("select", { addressHash, address });
+            }
+        }
     }
 
     // Add new address
@@ -60,12 +91,9 @@
             const result = await createAddress(newAddress);
 
             if (result.success && result.data?.hash) {
-                // Select the new address
-                selectedAddressHash = result.data.hash;
-                const address = $addresses[result.data.hash];
-                if (address) {
-                    dispatch("select", { addressHash: result.data.hash, address });
-                }
+                // Just notify that address was created - do NOT auto-select in cart
+                console.log('✅ SELECTOR: New address created in private storage only. User must manually select to add to cart.');
+                // Do not dispatch select - let user manually select if they want it in cart
                 // Close form with animation
                 isFormClosing = true;
                 setTimeout(() => {
@@ -159,9 +187,9 @@
         const result = await deleteAddress(addressHash);
 
         if (result.success) {
-            // If deleted address was selected, clear selection
-            if (selectedAddressHash === addressHash) {
-                selectedAddressHash = null;
+            // If deleted address was selected, clear cart selection
+            if (currentSelectedHash === addressHash) {
+                // Clear cart address selection - no backend call needed since address is deleted
                 dispatch("select", { addressHash: null, address: null });
             }
         } else {
@@ -202,7 +230,7 @@
     {:else}
         <AddressList
             addresses={$addresses}
-            {selectedAddressHash}
+            selectedAddressHash={currentSelectedHash}
             {removingAddresses}
             {isEntering}
             {isExiting}
@@ -212,7 +240,7 @@
             on:addNew={handleAddNew}
         />
 
-        {#if selectedAddressHash}
+        {#if currentSelectedHash}
             <div
                 class="instructions-container {isEntering
                     ? 'slide-in-left'

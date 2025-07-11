@@ -614,12 +614,12 @@ export class EmbeddingService {
         }
 
         if (response.type === 'hnswBuildProgress') {
-            console.log(`[Main Thread] HNSW build progress from worker: ${response.data?.progress}% - ${response.data?.message}`);
+
             return;
         }
 
         if (response.type === 'modelLoadingStatusUpdate') { // New type for progress
-            console.log(`[Main Thread] Model loading progress from worker:`, response.data);
+
             return; // Don't treat as a promise fulfillment
         }
 

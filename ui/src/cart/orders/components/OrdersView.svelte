@@ -1,9 +1,47 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import { ShoppingCart, X } from "lucide-svelte";
-  import { loadOrders, returnToShopping as returnOrderToShopping } from "../../services/OrdersService";
+  import { returnToShopping as returnOrderToShopping } from "../../services/OrdersService";
   import { currentViewStore } from "../../../stores/UiOnlyStore";
+  import { cartItems, cartTotal, isCheckoutSession } from "../../services/CartBusinessService";
+  import { getSessionData } from "../../services/CheckoutService";
+  import { PriceService } from "../../../services/PriceService";
   import OrderCard from "./OrderCard.svelte";
+  import { decode } from '@msgpack/msgpack';
+
+  // Helper functions to decode Holochain Records
+  function decodeAddress(addressRecord: any): any | null {
+    try {
+      if (!addressRecord?.entry?.Present?.entry) return null;
+      const entryBytes = new Uint8Array(addressRecord.entry.Present.entry);
+      return decode(entryBytes) as any;
+    } catch (error) {
+      console.error('Error decoding address:', error);
+      return null;
+    }
+  }
+
+  function decodeDeliveryTimeSlot(timeSlotRecord: any): any | null {
+    try {
+      if (!timeSlotRecord?.entry?.Present?.entry) return null;
+      const entryBytes = new Uint8Array(timeSlotRecord.entry.Present.entry);
+      return decode(entryBytes) as any;
+    } catch (error) {
+      console.error('Error decoding delivery time slot:', error);
+      return null;
+    }
+  }
+
+  function decodeDeliveryInstructions(instructionsRecord: any): any | null {
+    try {
+      if (!instructionsRecord?.entry?.Present?.entry) return null;
+      const entryBytes = new Uint8Array(instructionsRecord.entry.Present.entry);
+      return decode(entryBytes) as any;
+    } catch (error) {
+      console.error('Error decoding delivery instructions:', error);
+      return null;
+    }
+  }
 
 
   // Get the store for the client
@@ -12,70 +50,118 @@
 
   // State
   let isLoading = true;
-  let checkedOutCarts: any[] = [];
   let errorMessage = "";
   let isClosing = false;
+  let checkoutOrder: any = null;
 
-  onMount(() => {
-
-    // Load checked out carts
-    loadCheckedOutCarts().catch((error) => {
-      console.error("Error loading checked out carts:", error);
+  // Reactive: Load checkout order when session status changes to checkout
+  $: if ($isCheckoutSession) {
+    loadCheckoutOrder().catch((error) => {
+      console.error("Error loading checkout order:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      errorMessage = "Failed to load checked out carts: " + errorMsg;
+      errorMessage = "Failed to load checkout order: " + errorMsg;
       isLoading = false;
     });
+  } else {
+    // Clear order when not in checkout session
+    checkoutOrder = null;
+    isLoading = false;
+  }
 
-  });
-
-  async function loadCheckedOutCarts() {
+  async function loadCheckoutOrder() {
     try {
+      console.log('🔍 OrdersView: Loading checkout order');
       isLoading = true;
       errorMessage = "";
 
-      // Use functional OrdersService
-      const result = await loadOrders();
-
-      if (result.success) {
-        checkedOutCarts = result.data || [];
-        console.log("Loaded checked out carts:", checkedOutCarts);
+      // Get session data to access delivery details
+      const sessionResult = await getSessionData();
+      
+      if (sessionResult.success) {
+        const sessionData = sessionResult.data;
+        console.log('🛒 OrdersView: Cart items count:', $cartItems.length);
+        console.log('🔍 OrdersView: Session status decoded:', sessionData.session_status_decoded);
+        
+        // Only create checkout order if status is actually "Checkout"
+        if (sessionData.session_status_decoded === 'Checkout') {
+          // Decode the delivery data
+          const decodedAddress = sessionData.address ? decodeAddress(sessionData.address) : null;
+          const decodedTimeSlot = sessionData.delivery_time_slot ? decodeDeliveryTimeSlot(sessionData.delivery_time_slot) : null;
+          const decodedInstructions = sessionData.delivery_instructions ? decodeDeliveryInstructions(sessionData.delivery_instructions) : null;
+            
+          // Format order data to match existing OrderCard component expectations
+          checkoutOrder = {
+            id: 'current-checkout-order',
+            products: $cartItems.map(item => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              note: item.note,
+              details: {
+                name: item.productName,
+                image_url: item.productImageUrl,
+                price: item.priceAtCheckout,
+                promo_price: item.promoPrice
+              }
+            })),
+            total: $cartTotal,
+            createdAt: new Date().toLocaleString(),
+            status: sessionData.session_status_decoded,
+            deliveryAddress: decodedAddress,
+            deliveryTime: decodedTimeSlot ? {
+              date: new Date(decodedTimeSlot.date).toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "long", 
+                day: "numeric",
+                year: "numeric"
+              }),
+              time: decodedTimeSlot.time_slot
+            } : null,
+            deliveryInstructions: decodedInstructions?.instructions || ''
+          };
+          
+          console.log('🎯 OrdersView: checkoutOrder =', checkoutOrder);
+        } else {
+          // Status is not "Checkout", clear the order
+          checkoutOrder = null;
+          console.log('🔄 OrdersView: Session status is not Checkout, clearing order');
+        }
       } else {
-        console.error("Error loading checked out carts:", result.message);
-        errorMessage = "Error loading checked out carts: " + result.message;
-        checkedOutCarts = [];
+        console.error("Error getting session data:", sessionResult.message);
+        errorMessage = "Error loading checkout order: " + sessionResult.message;
+        checkoutOrder = null;
       }
 
       isLoading = false;
     } catch (error) {
-      console.error("Error loading checked out carts:", error);
+      console.error("Error loading checkout order:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      errorMessage = "Error loading checked out carts: " + errorMsg;
+      errorMessage = "Error loading checkout order: " + errorMsg;
       isLoading = false;
-      checkedOutCarts = [];
+      checkoutOrder = null;
     }
   }
 
 
-  // Function to return a cart to shopping
-  async function returnToShopping(item: any) {
+  // Function to return order to shopping
+  async function returnToShopping() {
     try {
-      console.log("Returning cart to shopping:", item.id);
+      console.log("Returning order to shopping");
 
-      // Use functional OrdersService
-      const result = await returnOrderToShopping(item.cartHash);
+      // Call recall order - this will update session status and trigger reactive logic
+      const result = await returnOrderToShopping();
 
       if (result.success) {
-        // Refresh the list of checked-out carts
-        await loadCheckedOutCarts();
-        console.log("Cart returned to shopping:", item.id);
+        console.log("Order returned to shopping - session status updated");
+        // No need to manually refresh - reactive logic will handle it
       } else {
-        console.error("Error returning cart to shopping:", result.message);
-        errorMessage = "Error returning cart to shopping: " + result.message;
+        console.error("Error returning order to shopping:", result.message);
+        errorMessage = "Error returning order to shopping: " + result.message;
       }
     } catch (error) {
-      console.error("Error returning cart to shopping:", error);
+      console.error("Error returning order to shopping:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      errorMessage = "Error returning cart to shopping: " + errorMsg;
+      errorMessage = "Error returning order to shopping: " + errorMsg;
     }
   }
 
@@ -107,7 +193,7 @@
       <div class="loading">Loading checked out orders...</div>
     {:else if errorMessage}
       <div class="error-message">{errorMessage}</div>
-    {:else if checkedOutCarts.length === 0}
+    {:else if !checkoutOrder}
       <div class="empty-state scale-in">
         <ShoppingCart size={64} color="var(--border)" />
         <h2>No Checked Out Orders</h2>
@@ -115,13 +201,11 @@
       </div>
     {:else}
       <div class="carts-grid">
-        {#each checkedOutCarts as item}
-          <OrderCard 
-            {item} 
-            agentPubKey={store?.myAgentPubKeyB64}
-            on:returnToShopping={() => returnToShopping(item)}
-          />
-        {/each}
+        <OrderCard 
+          item={checkoutOrder} 
+          agentPubKey={store?.myAgentPubKeyB64}
+          on:returnToShopping={returnToShopping}
+        />
       </div>
     {/if}
   </div>

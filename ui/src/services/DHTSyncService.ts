@@ -7,6 +7,7 @@ import { decode } from "@msgpack/msgpack";
 import type { ShopStore } from "../store";
 import { StockService } from "./StockService";
 import { getActiveClone, activateClone, disablePreviousClone } from "../products/utils/cloneHelpers";
+// No complex clone manager needed
 
 interface DecodedSingleProductFields {
   name: string;
@@ -69,6 +70,8 @@ export class ProductStore {
   ) {
     this.store = store;
     this.selectedLocationId = "70300168";
+
+    // No complex initialization needed
 
     this.state = writable({
       categoryProducts: {},

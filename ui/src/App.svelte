@@ -10,6 +10,7 @@
   import { setCheckoutServices } from "./cart/services/CheckoutService";
   import { setOrdersClient } from "./cart/services/OrdersService";
   import { setAddressClient } from "./cart/services/AddressService";
+  import { setCartAddressClient } from "./cart/services/CartAddressService";
   import { setPreferencesClient } from "./products/services/PreferencesService";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
@@ -75,34 +76,12 @@
     if (tokenResp) params.token = tokenResp.token;
     client = await AppWebsocket.connect(params);
     
-    // 🔥 SUMMON DNA HASH VERIFICATION 🔥
+    // App connection verification
     try {
       const appInfo = await client.appInfo();
-      if (appInfo?.cell_info) {
-        console.log("🔥 SUMMON DNA HASH VERIFICATION 🔥");
-        console.log("📡 App ID:", appInfo.installed_app_id);
-        console.log("📡 Cells:", appInfo.cell_info);
-        
-        Object.entries(appInfo.cell_info).forEach(([roleName, cellInfo]) => {
-          console.log(`📡 Role: ${roleName}`, cellInfo);
-          if (Array.isArray(cellInfo) && cellInfo.length > 0) {
-            const cell = cellInfo[0];
-            console.log(`📡 Cell structure:`, cell);
-            if (cell.type === 'provisioned' && cell.value?.cell_id) {
-              const dnaHash = cell.value.cell_id[0];
-              const agentHash = cell.value.cell_id[1];
-              console.log(`🔥 SUMMON DNA HASH (${roleName}): ${dnaHash}`);
-              console.log(`🔥 SUMMON AGENT HASH (${roleName}): ${agentHash}`);
-            } else {
-              console.log(`📡 Cell is not provisioned or missing cell_id:`, Object.keys(cell));
-            }
-          } else {
-            console.log(`📡 No cells in role ${roleName}:`, cellInfo);
-          }
-        });
-      }
+      console.log('App connected:', appInfo.installed_app_id);
     } catch (error) {
-      console.error("🔥 SUMMON: Failed to log DNA hash:", error);
+      console.error("Failed to connect to app:", error);
     }
 
     // Initialize ShopStore once client is available
@@ -110,25 +89,24 @@
 
     // Initialize cart service with functional pattern
     setCartServices(client);
-    console.log("CartBusinessService initialized with client:", !!client);
 
     // Initialize CheckoutService with dependencies
     setCheckoutServices(client);
-    console.log("CheckoutService initialized with client:", !!client);
 
     // Initialize OrdersService with functional pattern
     setOrdersClient(client);
-    console.log("OrdersService client initialized:", !!client);
 
     // Initialize AddressService client
     setAddressClient(client);
-    console.log("AddressService client initialized:", !!client);
+
+    // Initialize CartAddressService client
+    setCartAddressClient(client);
 
     // Initialize PreferencesService with client
     setPreferencesClient(client);
 
     // Initialize ProfilesStore
-    profilesStore = new ProfilesStore(new ProfilesClient(client, "cart"), {
+    profilesStore = new ProfilesStore(new ProfilesClient(client, "profiles_role"), {
       avatarMode: "avatar-optional",
       minNicknameLength: 2,
       additionalFields: [],

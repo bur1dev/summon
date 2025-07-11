@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
   import type { StoreContext } from "../../store";
-  import { cartTotal, uniqueItemCount } from "../../cart/services/CartBusinessService";
+  import { cartTotal, uniqueItemCount, isCheckoutSession } from "../../cart/services/CartBusinessService";
   import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart, Menu } from "lucide-svelte";
   import SearchBar from "../../search/SearchBar.svelte";
@@ -41,6 +41,10 @@
   // Direct reactive access to cart stores
   $: cartTotalValue = $cartTotal;
   $: uniqueItemCountValue = $uniqueItemCount;
+  
+  // Show zero values when in checkout session
+  $: displayTotalValue = $isCheckoutSession ? 0 : cartTotalValue;
+  $: displayItemCount = $isCheckoutSession ? 0 : uniqueItemCountValue;
 
   onMount(() => {
     // Agent pubkey logic
@@ -50,8 +54,6 @@
       avatarLoaded = true;
       console.log("Agent pubkey loaded:", myAgentPubKeyB64);
     }
-
-    // No subscription logic needed with direct store access
   });
 
   $: uiProps = store ? store.uiProps : {};
@@ -125,9 +127,9 @@
       on:click={toggleCart}
       title="Shopping Cart"
     >
-      <span class="item-count">{uniqueItemCountValue}</span>
+      <span class="item-count">{displayItemCount}</span>
       <ShoppingCart size={30} color="#ffffff" />
-      <span class="cart-total">${cartTotalValue.toFixed(2)}</span>
+      <span class="cart-total">${displayTotalValue.toFixed(2)}</span>
     </button>
   </div>
 </div>

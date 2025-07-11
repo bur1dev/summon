@@ -1,65 +1,76 @@
 import { callZome } from '../utils/zomeHelpers';
 import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
-import { writable, get } from 'svelte/store';
-import type { CheckoutDetails } from '../types/CartTypes';
-import { getCartItems, forceSyncToHolochain, clearCart } from './CartBusinessService';
-import { clearSessionPreferences } from '../../products/services/PreferencesService';
-import { mapCartItemsToPayload } from '../utils/cartHelpers';
-import { getAddress } from './AddressService';
+import { writable } from 'svelte/store';
+import { getSelectedAddress } from './CartAddressService';
+import { decode } from '@msgpack/msgpack';
+import { updateSessionStatus } from './CartBusinessService';
+// Functional store exports for delivery time and instructions
+export const selectedDeliveryTimeSlot = writable<any>(null);
+export const deliveryInstructions = writable<string>('');
 
-// Functional store exports
-export const savedDeliveryDetails = writable<CheckoutDetails>({});
 let client: any = null;
+
+// Helper function to decode session status from Holochain Record
+function decodeSessionStatus(sessionStatusRecord: any): string | null {
+    try {
+        if (!sessionStatusRecord?.entry?.Present?.entry) {
+            return null;
+        }
+        
+        // Convert the entry bytes array to Uint8Array and decode
+        const entryBytes = new Uint8Array(sessionStatusRecord.entry.Present.entry);
+        const decoded = decode(entryBytes) as any;
+        
+        return decoded.status || null;
+    } catch (error) {
+        console.error('Error decoding session status:', error);
+        return null;
+    }
+}
 
 // Initialize services
 export function setCheckoutServices(holoClient: any) {
     client = holoClient;
 }
 
-
-// SIMPLIFIED: Single-step checkout with public address
-export async function checkoutCart(details: CheckoutDetails) {
-    const clientError = validateClient(client, 'checkout cart');
+// Publish order (change session status to "Checkout")
+export async function publishOrder() {
+    const clientError = validateClient(client, 'publish order');
     if (clientError) return clientError;
     
     try {
-        await forceSyncToHolochain();
-        const localCartItems = getCartItems();
+        console.log('🚀 Frontend: Calling publish_order');
+        const result = await callZome(client, 'cart', 'cart', 'publish_order', null);
+        console.log('✅ Frontend: publish_order success:', result);
         
-        // Map cart items to backend structure
-        const cartProducts = mapCartItemsToPayload(localCartItems);
+        // Update session status reactively
+        await updateSessionStatus();
         
-        if (cartProducts.length === 0) return createErrorResult("Cart is empty");
-        
-        if (!details.addressHash) {
-            return createErrorResult("Address is required");
-        }
-        
-        // Get address data from user's address book
-        const addressData = getAddress(details.addressHash);
-        if (!addressData) {
-            return createErrorResult("Address not found in address book");
-        }
-        
-        // Single-step checkout with address included directly
-        const payload: any = {
-            delivery_address: addressData,
-            delivery_time: details.deliveryTime || null,
-            delivery_instructions: details.deliveryInstructions || null,
-            cart_products: cartProducts
-        };
-        
-        console.log("Checking out cart with public address:", payload);
-        const checkoutResult = await callZome(client, 'cart', 'cart', 'checkout_cart', payload);
-        
-        console.log("Checkout result:", checkoutResult);
-        await clearCart();
-        clearSessionPreferences(); // Clear temporary preference data
-        savedDeliveryDetails.set({});
-        
-        return createSuccessResult(checkoutResult);
+        return createSuccessResult(result);
     } catch (error) {
-        console.error('Error checking out cart:', error);
+        console.error('❌ Frontend: publish_order error:', error);
+        return createErrorResult(error);
+    }
+}
+
+
+// Get complete session data (cart items, address, status, etc.)
+export async function getSessionData() {
+    const clientError = validateClient(client, 'get session data');
+    if (clientError) return clientError;
+    
+    try {
+        const result = await callZome(client, 'cart', 'cart', 'get_session_data', null);
+        
+        // Decode session status if present
+        if (result.session_status) {
+            const decodedStatus = decodeSessionStatus(result.session_status);
+            result.session_status_decoded = decodedStatus;
+        }
+        
+        return createSuccessResult(result);
+    } catch (error) {
+        console.error('Error getting session data:', error);
         return createErrorResult(error);
     }
 }
@@ -112,15 +123,57 @@ export function generateDeliveryTimeSlots(startDate = new Date()) {
     }).filter(Boolean);
 }
 
-// Delivery details functions
-export function getSavedDeliveryDetails(): CheckoutDetails {
-    return get(savedDeliveryDetails);
+// Validate checkout readiness
+export function validateCheckoutReadiness(): { ready: boolean; error?: string } {
+    const selectedAddress = getSelectedAddress();
+    
+    if (!selectedAddress) {
+        return { ready: false, error: "Please select a delivery address" };
+    }
+    
+    return { ready: true };
 }
 
-export function setSavedDeliveryDetails(details: CheckoutDetails): void {
-    savedDeliveryDetails.set(details);
+// Save delivery time slot to DHT
+export async function saveDeliveryTimeSlot(timeSlot: any) {
+    const clientError = validateClient(client, 'save delivery time slot');
+    if (clientError) return clientError;
+
+    try {
+        const deliveryTimeSlot = {
+            date: timeSlot.date,       // Unix timestamp
+            time_slot: timeSlot.time_slot  // e.g. "2pm-4pm"
+        };
+
+        const result = await callZome(client, 'cart', 'cart', 'set_delivery_time_slot', deliveryTimeSlot);
+        return createSuccessResult(result);
+    } catch (error) {
+        console.error('Error saving delivery time slot:', error);
+        return createErrorResult(error);
+    }
 }
 
-export function clearSavedDeliveryDetails(): void {
-    savedDeliveryDetails.set({});
+// Save delivery instructions to DHT
+export async function saveDeliveryInstructions(instructions: string) {
+    const clientError = validateClient(client, 'save delivery instructions');
+    if (clientError) return clientError;
+
+    try {
+        const deliveryInstructions = {
+            instructions: instructions.trim(),
+            timestamp: Date.now()
+        };
+
+        const result = await callZome(client, 'cart', 'cart', 'set_delivery_instructions', deliveryInstructions);
+        return createSuccessResult(result);
+    } catch (error) {
+        console.error('Error saving delivery instructions:', error);
+        return createErrorResult(error);
+    }
+}
+
+// Clear checkout data
+export function clearCheckoutData() {
+    selectedDeliveryTimeSlot.set(null);
+    deliveryInstructions.set('');
 }

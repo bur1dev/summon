@@ -9,8 +9,8 @@
 
   import { PriceService } from "../../services/PriceService";
   import { StockService } from "../../services/StockService";
-  import { cartItems } from "../../cart/services/CartBusinessService";
-  import { addProductToCart, incrementItem, decrementItem, getCurrentQuantity } from "../../cart/services/CartInteractionService";
+  import { cartItems, isCheckoutSession } from "../../cart/services/CartBusinessService";
+  import { addProductToCart, incrementItem, decrementItem } from "../../cart/services/CartInteractionService";
   import { isSoldByWeight, parseProductHash } from "../../cart/utils/cartHelpers";
 
   export let selectedCategory: string = "";
@@ -33,7 +33,8 @@
 
   // Use cart helpers for product properties
   $: productIsSoldByWeight = isSoldByWeight(product);
-  $: displayAmount = productIsSoldByWeight ? itemWeight : itemCount;
+  // Show zero quantities when in checkout session
+  $: displayAmount = $isCheckoutSession ? 0 : (productIsSoldByWeight ? itemWeight : itemCount);
 
   // Use PriceService for display prices
   $: displayPrices = PriceService.getDisplayPrices(product);
@@ -47,7 +48,8 @@
   // SIMPLIFIED: Update item count whenever it changes
   function updateItemCount(items: any[]) {
     if (!productId) return; // Skip if no valid productId
-    const quantity = getCurrentQuantity(items, productId);
+    const item = items.find(cartItem => cartItem.productId === productId);
+    const quantity = item ? item.quantity : 0;
 
     if (quantity > 0) {
       if (productIsSoldByWeight) {
@@ -134,20 +136,24 @@
 
   // SIMPLIFIED: Cart operations using original product object
   async function handleIncrementClick() {
-    if (!productId) return;
+    if (!productId || $isCheckoutSession) return;
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
     await incrementItem(product, currentAmount);
   }
 
   async function handleDecrementClick() {
-    if (!productId) return;
+    if (!productId || $isCheckoutSession) return;
     const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
     await decrementItem(product, currentAmount);
   }
 
   // SIMPLIFIED: Add product to cart
   async function handleAddToCart() {
-    if (!productId) {
+    if (!productId || $isCheckoutSession) {
+      if ($isCheckoutSession) {
+        console.log("Cannot add to cart: currently in checkout session");
+        return;
+      }
       console.error("Cannot add to cart: invalid product hash", product);
       return;
     }

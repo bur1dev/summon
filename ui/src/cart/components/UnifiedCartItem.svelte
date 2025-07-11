@@ -18,24 +18,23 @@
         image_url: cartItem.productImageUrl,
         price: cartItem.priceAtCheckout,
         promo_price: cartItem.promoPrice || cartItem.priceAtCheckout, // Use promo price if available
-        sold_by: "UNIT", // Default to unit, could be enhanced later
-        // Reconstruct groupHash and productIndex from productId for backward compatibility
-        groupHash: cartItem.productId?.split(':')[0],
-        productIndex: parseInt(cartItem.productId?.split(':')[1] || '0')
+        sold_by: cartItem.soldBy || "UNIT", // Use actual soldBy from cart item
+        // CART ONLY NEEDS: productId string for identification
+        productId: cartItem.productId
     } : {
         name: "Unknown Product",
         image_url: null,
         price: 0,
         promo_price: 0,
         sold_by: "UNIT",
-        groupHash: "",
-        productIndex: 0
+        productId: null
     };
     $: quantity = cartItem?.quantity || 0;
     
-    // Preference loading - same pattern as ProductDetailModal
-    $: groupHashBase64 = product?.groupHash;
-    $: productIndex = product?.productIndex;
+    // Preference loading using productId directly
+    $: productId = cartItem?.productId;
+    $: groupHashBase64 = productId?.split(':')[0];
+    $: productIndex = productId ? parseInt(productId.split(':')[1] || '0') : null;
     $: preferenceKey = groupHashBase64 && productIndex !== null ? getPreferenceKey(groupHashBase64, productIndex) : null;
     $: preferenceData = preferenceKey ? ($preferences[preferenceKey] || { preference: null }) : { preference: null };
     $: masterPreference = preferenceData.preference?.preference?.note;
@@ -95,7 +94,7 @@
         showModal = true;
     };
     
-    // Load preference when component mounts - same pattern as ProductDetailModal
+    // Load preference when component mounts
     $: if (groupHashBase64 && productIndex !== null) {
         loadPreference(groupHashBase64, productIndex);
     }

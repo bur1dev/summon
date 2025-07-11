@@ -40,7 +40,7 @@ export async function loadAddresses() {
     
     addressesLoading.set(true);
     try {
-        const result = await callZome(client, 'cart', 'cart', 'get_addresses', null);
+        const result = await callZome(client, 'profiles_role', 'address', 'get_addresses', null);
 
         if (Array.isArray(result)) {
             const addressMap: AddressMap = {};
@@ -59,10 +59,14 @@ export async function createAddress(address: Address) {
     const clientError = validateClient(client, 'createAddress');
     if (clientError) return clientError;
     
+    console.log('🏠 FRONTEND: Creating PRIVATE address in profiles.dna:', `${address.street}, ${address.city}, ${address.state}`);
+    
     try {
-        const result = await callZome(client, 'cart', 'cart', 'create_address', address);
+        const result = await callZome(client, 'profiles_role', 'address', 'create_address', address);
         const hashB64 = encodeHash(result);
         addresses.update(current => ({ ...current, [hashB64]: address }));
+        
+        console.log('✅ FRONTEND: Private address created successfully with hash:', hashB64);
         
         if (address.is_default) {
             updateDefaultAddress(hashB64);
@@ -80,7 +84,7 @@ export async function updateAddress(hashB64: ActionHashB64, address: Address) {
     if (clientError) return clientError;
     
     try {
-        await callZome(client, 'cart', 'cart', 'update_address', [decodeHash(hashB64), address]);
+        await callZome(client, 'profiles_role', 'address', 'update_address', [decodeHash(hashB64), address]);
         addresses.update(current => ({ ...current, [hashB64]: address }));
         
         if (address.is_default) {
@@ -98,9 +102,13 @@ export async function deleteAddress(hashB64: ActionHashB64) {
     const clientError = validateClient(client, 'deleteAddress');
     if (clientError) return clientError;
     
+    console.log('🗑️ FRONTEND: Deleting PRIVATE address from profiles.dna with hash:', hashB64);
+    
     try {
-        await callZome(client, 'cart', 'cart', 'delete_address', decodeHash(hashB64));
+        await callZome(client, 'profiles_role', 'address', 'delete_address', decodeHash(hashB64));
 
+        console.log('✅ FRONTEND: Private address deleted successfully from profiles.dna');
+        
         addresses.update(current => {
             const { [hashB64]: deleted, ...remaining } = current;
             return remaining;

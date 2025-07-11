@@ -1,18 +1,18 @@
 :root {
   --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --primary: #ff7300;
-  --primary-dark: #E03C00;
-  --secondary: #E91E63;
-  --text-primary: #1A1A1A;
-  --text-secondary: #5A5A5A;
-  --background: #FFFFFF;
-  --surface: #F8F8F8;
-  --surface-hover: #F0F0F0;
-  --border: #E0E0E0;
-  --border-lighter: #F0F0F0;
-  --success: #00C851;
-  --warning: #FFBB33;
-  --error: #FF4444;
+  --primary: #00CFBB;
+  --primary-dark: #00B3A1;
+  --secondary: #8D72E1;
+  --text-primary: #1E3A3A;
+  --text-secondary: #5A7A7A;
+  --background: #F2FFFE;
+  --surface: #FFFFFF;
+  --surface-hover: #E8FAF8;
+  --border: #CCF2EE;
+  --border-lighter: #DFF8F5;
+  --success: #4ED9A7;
+  --warning: #FFDA85;
+  --error: #FF8D9E;
   --button-text: #FFFFFF;
   /* Horizontal padding for all content containers */
   --content-padding-x: 16px;
@@ -717,6 +717,7 @@ body {
     padding: var(--spacing-sm) 0;
     border-bottom-width: var(--border-width-thin);
   }
+
   50% {
     opacity: 0;
     transform: translateY(-10px) scale(0.98);
@@ -724,6 +725,7 @@ body {
     padding: var(--spacing-sm) 0;
     border-bottom-width: var(--border-width-thin);
   }
+
   100% {
     opacity: 0;
     transform: translateY(-10px) scale(0.98);

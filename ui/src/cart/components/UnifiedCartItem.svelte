@@ -20,27 +20,27 @@
         promo_price: cartItem.promoPrice || cartItem.priceAtCheckout, // Use promo price if available
         sold_by: cartItem.soldBy || "UNIT", // Use actual soldBy from cart item
         // CART ONLY NEEDS: productId string for identification
-        productId: cartItem.productId
+        productId: cartItem.productId,
+        upc: cartItem.upc // Include UPC for preference lookups
     } : {
         name: "Unknown Product",
         image_url: null,
         price: 0,
         promo_price: 0,
         sold_by: "UNIT",
-        productId: null
+        productId: null,
+        upc: null
     };
     $: quantity = cartItem?.quantity || 0;
     
-    // Preference loading using productId directly
-    $: productId = cartItem?.productId;
-    $: groupHashBase64 = productId?.split(':')[0];
-    $: productIndex = productId ? parseInt(productId.split(':')[1] || '0') : null;
-    $: preferenceKey = groupHashBase64 && productIndex !== null ? getPreferenceKey(groupHashBase64, productIndex) : null;
+    // Preference loading using UPC directly
+    $: upc = cartItem?.upc;
+    $: preferenceKey = upc ? getPreferenceKey(upc) : null;
     $: preferenceData = preferenceKey ? ($preferences[preferenceKey] || { preference: null }) : { preference: null };
-    $: masterPreference = preferenceData.preference?.preference?.note;
+    $: preferenceNote = preferenceData.preference?.note;
     
-    // Display note: session note OR master preference
-    $: note = cartItem?.note || masterPreference || null;
+    // Display note: stored preference only (simplified from dual-layer system)
+    $: note = preferenceNote || null;
 
     // Cart service is now store-based, no context needed
 
@@ -69,11 +69,11 @@
             }
         }
 
-        await decrementItem(product, quantity, note || undefined);
+        await decrementItem(product, quantity);
     };
 
     const handleIncrementItem = async () => {
-        await incrementItem(product, quantity, note || undefined);
+        await incrementItem(product, quantity);
     };
 
     const handleRemove = async () => {
@@ -95,8 +95,8 @@
     };
     
     // Load preference when component mounts
-    $: if (groupHashBase64 && productIndex !== null) {
-        loadPreference(groupHashBase64, productIndex);
+    $: if (upc) {
+        loadPreference(upc);
     }
 </script>
 

@@ -8,7 +8,6 @@
     export let product: any;
     export let quantity: number;
     export let isInCart: boolean;
-    export let existingNote: string;
     export let isTransitioning: boolean;
     export let onQuantityChange: (newQuantity: number) => void;
     export let onAddToCart: () => Promise<void>;
@@ -28,8 +27,7 @@
         if (isInCart) {
             await updateQuantity(
                 product,
-                newQuantity,
-                existingNote || undefined
+                newQuantity
             );
         }
     }
@@ -51,8 +49,7 @@
         if (isInCart) {
             await updateQuantity(
                 product,
-                newQuantity,
-                existingNote || undefined
+                newQuantity
             );
         }
     }

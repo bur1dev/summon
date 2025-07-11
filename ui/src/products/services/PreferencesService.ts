@@ -1,10 +1,8 @@
 import { writable } from 'svelte/store';
-import { encodeHashToBase64, decodeHashFromBase64 } from '@holochain/client';
 
 interface PreferenceState {
     loading: boolean;
     preference: any | null;
-    savePreference: boolean;
 }
 
 type PreferencesMap = Record<string, PreferenceState>;
@@ -18,66 +16,58 @@ export function setPreferencesClient(holochainClient: any): void {
     client = holochainClient;
 }
 
-export function getPreferenceKey(groupHash: string, productIndex: number): string {
-    return `${groupHash}_${productIndex}`;
+// Generate preference key from UPC
+export function getPreferenceKey(upc: string): string {
+    return `upc_${upc}`;
 }
 
-export async function loadPreference(groupHash: string, productIndex: number): Promise<boolean> {
+export async function loadPreference(upc: string): Promise<boolean> {
     if (!client) return false;
     
-    const key = getPreferenceKey(groupHash, productIndex);
+    const key = getPreferenceKey(upc);
     updatePreference(key, { loading: true });
     
     try {
         const result = await client.callZome({
-            role_name: 'products_role',
-            zome_name: 'product_catalog',
-            fn_name: 'get_product_preference_by_product',
-            payload: {
-                group_hash: decodeHashFromBase64(groupHash),
-                product_index: productIndex
-            }
+            role_name: 'preferences_role',
+            zome_name: 'preferences',
+            fn_name: 'get_preference',
+            payload: { upc }
         });
 
         if (result) {
-            const [prefHash, preference] = result;
             updatePreference(key, {
                 loading: false,
-                preference: { hash: encodeHashToBase64(prefHash), preference },
-                savePreference: true
+                preference: { note: result.note }
             });
         } else {
-            updatePreference(key, { loading: false, preference: null, savePreference: false });
+            updatePreference(key, { loading: false, preference: null });
         }
         return true;
     } catch (error) {
         console.error("Error loading preference:", error);
-        updatePreference(key, { loading: false, preference: null, savePreference: false });
+        updatePreference(key, { loading: false, preference: null });
         return false;
     }
 }
 
-export async function savePreference(groupHash: string, productIndex: number, note: string): Promise<boolean> {
+export async function savePreference(upc: string, note: string): Promise<boolean> {
     if (!client || !note?.trim()) return false;
     
     try {
-        const hash = await client.callZome({
-            role_name: 'products_role',
-            zome_name: 'product_catalog',
-            fn_name: 'save_product_preference',
+        await client.callZome({
+            role_name: 'preferences_role',
+            zome_name: 'preferences',
+            fn_name: 'save_preference',
             payload: {
-                group_hash: decodeHashFromBase64(groupHash),
-                product_index: productIndex,
-                note: note.trim(),
-                timestamp: Date.now(),
-                is_default: true
+                upc,
+                note: note.trim()
             }
         });
 
-        const key = getPreferenceKey(groupHash, productIndex);
+        const key = getPreferenceKey(upc);
         updatePreference(key, {
-            preference: { hash: encodeHashToBase64(hash), preference: { note: note.trim() } },
-            savePreference: true
+            preference: { note: note.trim() }
         });
         return true;
     } catch (error) {
@@ -86,19 +76,19 @@ export async function savePreference(groupHash: string, productIndex: number, no
     }
 }
 
-export async function deletePreference(preferenceHash: string, groupHash: string, productIndex: number): Promise<boolean> {
-    if (!client || !preferenceHash) return false;
+export async function deletePreference(upc: string): Promise<boolean> {
+    if (!client || !upc) return false;
     
     try {
         await client.callZome({
-            role_name: 'products_role',
-            zome_name: 'product_catalog',
-            fn_name: 'delete_product_preference',
-            payload: decodeHashFromBase64(preferenceHash)
+            role_name: 'preferences_role',
+            zome_name: 'preferences',
+            fn_name: 'delete_preference',
+            payload: { upc }
         });
 
-        const key = getPreferenceKey(groupHash, productIndex);
-        updatePreference(key, { preference: null, savePreference: false });
+        const key = getPreferenceKey(upc);
+        updatePreference(key, { preference: null });
         return true;
     } catch (error) {
         console.error("Error deleting preference:", error);
@@ -106,14 +96,7 @@ export async function deletePreference(preferenceHash: string, groupHash: string
     }
 }
 
-export function updateSavePreference(groupHash: string, productIndex: number, value: boolean): void {
-    const key = getPreferenceKey(groupHash, productIndex);
-    updatePreference(key, { savePreference: value });
-}
 
-export function clearSessionPreferences(): void {
-    preferences.set({});
-}
 
 // Helper to update preference state
 function updatePreference(key: string, updates: Partial<PreferenceState>) {

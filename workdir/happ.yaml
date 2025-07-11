@@ -41,6 +41,19 @@ roles:
     installed_hash: null
     clone_limit: 0
 
+# Preferences DNA - user preferences by UPC
+- name: preferences_role
+  provisioning:
+    strategy: create
+    deferred: false
+  dna:
+    bundled: ../dnas/preferences/workdir/preferences.dna
+    modifiers:
+      network_seed: null
+      properties: null
+    installed_hash: null
+    clone_limit: 0
+
 # Profiles DNA - persistent user data
 - name: profiles_role
   provisioning:

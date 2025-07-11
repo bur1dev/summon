@@ -7,7 +7,6 @@
     import { cartItems, getCartItems, isCheckoutSession } from "../../../cart/services/CartBusinessService";
     import { updateQuantity } from "../../../cart/services/CartInteractionService";
     import { preferences, loadPreference, getPreferenceKey } from "../../services/PreferencesService";
-    import { parseProductHash } from "../../../cart/utils/cartHelpers";
     import ProductModalHeader from "./ProductModalHeader.svelte";
     import ProductImage from "./ProductImage.svelte";
     import ProductInfo from "./ProductInfo.svelte";
@@ -27,19 +26,15 @@
     let quantity: number = 1;
     let isInCart: boolean = false;
     let note: string = "";
-    let existingNote: string = "";
     let showPreferences: boolean = false;
     let showButtons: boolean = false;
     let noteChanged: boolean = false;
     let isClosing: boolean = false;
     let isTransitioning: boolean = false; // Flag to track button state transitions
 
-    // Parse product hash to get consistent data
-    $: ({ groupHash: groupHashBase64, productIndex, productId } = parseProductHash(product));
-    
-    // SIMPLIFIED: Ultra-simple reactive preference access - massive code reduction!
-    $: preferenceKey = groupHashBase64 && productIndex !== null ? getPreferenceKey(groupHashBase64, productIndex) : null;
-    $: preferenceData = preferenceKey ? ($preferences[preferenceKey] || { loading: false, preference: null, savePreference: false }) : { loading: false, preference: null, savePreference: false };
+    // UPC-based preference access
+    $: preferenceKey = product?.upc ? getPreferenceKey(product.upc) : null;
+    $: preferenceData = preferenceKey ? ($preferences[preferenceKey] || { loading: false, preference: null }) : { loading: false, preference: null };
     $: existingPreference = preferenceData.preference;
     $: loadingPreference = preferenceData.loading;
 
@@ -57,7 +52,7 @@
             isClosing = false;
             showPreferences = false;
             showButtons = false;
-            note = existingNote;
+            note = existingPreference?.note || "";
         }, 300); // Match the CSS animation duration
     }
 
@@ -83,11 +78,7 @@
         try {
             isTransitioning = true; // Start transition animation
 
-            const success = await updateQuantity(
-                product,
-                quantity,
-                existingNote || undefined
-            );
+            const success = await updateQuantity(product, quantity);
 
             if (!success) {
                 isTransitioning = false;
@@ -109,41 +100,38 @@
 
     function checkCartStatus() {
         // SIMPLIFIED: Use centralized service to get cart data
-        if (!productId) return;
+        if (!product?.upc) return;
         
         const items = getCartItems();
-        const item = items.find(cartItem => cartItem.productId === productId);
+        const item = items.find(cartItem => cartItem.upc === product.upc);
 
         if (item && !$isCheckoutSession) {
             // Show normal cart quantities when not in checkout session
             isInCart = true;
             quantity = item.quantity;
             showPreferences = true;
-            existingNote = item.note || "";
-            note = item.note || "";
+            // Set note from existing preference if available
+            note = existingPreference?.note || "";
         } else {
             // Show as not in cart when in checkout session or item not found
             isInCart = false;
             quantity = 1;
             showPreferences = false;
-            existingNote = "";
-            note = "";
+            note = existingPreference?.note || "";
         }
     }
 
     // Load product preferences using service
     async function loadProductPreference() {
-        if (!groupHashBase64 || productIndex === null) {
+        if (!product?.upc) {
             return;
         }
 
-        await loadPreference(groupHashBase64, productIndex);
+        await loadPreference(product.upc);
 
-        // Set note from master preference if no cart session note
-        if (!isInCart && existingPreference?.preference?.note) {
-            note = existingPreference.preference.note;
-        } else if (isInCart && !existingNote && existingPreference?.preference?.note) {
-            note = existingPreference.preference.note;
+        // Set note from preference if available
+        if (existingPreference?.note) {
+            note = existingPreference.note;
         }
     }
 
@@ -234,7 +222,6 @@
                             {product}
                             {quantity}
                             {isInCart}
-                            {existingNote}
                             {isTransitioning}
                             onQuantityChange={(newQuantity) => {
                                 quantity = newQuantity;
@@ -252,32 +239,26 @@
                     </div>
                 </div>
 
-                {#if groupHashBase64 && productIndex !== null}
+                {#if product?.upc}
                     <PreferencesSection
-                        groupHashBase64={groupHashBase64}
-                        productIndex={productIndex}
+                        {product}
                         {quantity}
                         bind:note
-                        {existingNote}
                         {showPreferences}
                         bind:showButtons
                         bind:noteChanged
-                    {existingPreference}
-                    {loadingPreference}
-                    onNoteChange={(newNote) => {
-                        note = newNote;
-                    }}
-                    onShowButtonsChange={(show) => {
-                        showButtons = show;
-                    }}
-                    onNoteChangedChange={(changed) => {
-                        noteChanged = changed;
-                    }}
-                    onExistingNoteChange={(newNote) => {
-                        existingNote = newNote;
-                    }}
-                    onSave={closeModal}
-                />
+                        {existingPreference}
+                        onNoteChange={(newNote) => {
+                            note = newNote;
+                        }}
+                        onShowButtonsChange={(show) => {
+                            showButtons = show;
+                        }}
+                        onNoteChangedChange={(changed) => {
+                            noteChanged = changed;
+                        }}
+                        onSave={closeModal}
+                    />
                 {/if}
             </div>
         </div>

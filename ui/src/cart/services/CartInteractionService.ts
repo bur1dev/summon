@@ -11,11 +11,10 @@ import { getIncrementValue, parseProductHash } from '../utils/cartHelpers';
  * Updated to use full product object instead of hash references
  */
 export async function addProductToCart(
-    product: any,
-    note?: string
+    product: any
 ): Promise<boolean> {
     try {
-        const result = await addToCart(product, 1, note);
+        const result = await addToCart(product, 1);
         return result.success;
     } catch (error) {
         console.error("Error adding to cart:", error);
@@ -28,13 +27,12 @@ export async function addProductToCart(
  */
 export async function incrementItem(
     product: any,
-    _currentQuantity: number,
-    note?: string
+    _currentQuantity: number
 ): Promise<boolean> {
     try {
         const incrementValue = getIncrementValue(product);
         // ADD individual entries, don't create entry with total quantity
-        const result = await addToCart(product, incrementValue, note);
+        const result = await addToCart(product, incrementValue);
         return result.success;
     } catch (error) {
         console.error("Error incrementing item:", error);
@@ -48,8 +46,7 @@ export async function incrementItem(
  */
 export async function decrementItem(
     product: any,
-    currentQuantity: number,
-    _note?: string
+    currentQuantity: number
 ): Promise<boolean> {
     try {
         const incrementValue = getIncrementValue(product);
@@ -88,8 +85,7 @@ export async function removeItem(product: any): Promise<boolean> {
  */
 export async function updateQuantity(
     product: any,
-    newQuantity: number,
-    note?: string
+    newQuantity: number
 ): Promise<boolean> {
     try {
         if (newQuantity <= 0) {
@@ -100,13 +96,13 @@ export async function updateQuantity(
         
         // Get current quantity from aggregated cart
         const currentItems = getCartItems();
-        const currentItem = currentItems.find(item => item.productId === parseProductHash(product).productId);
+        const currentItem = currentItems.find(item => item.upc === product.upc);
         const currentQuantity = currentItem ? currentItem.quantity : 0;
         
         if (newQuantity > currentQuantity) {
             // Add the difference
             const quantityToAdd = newQuantity - currentQuantity;
-            const result = await addToCart(product, quantityToAdd, note);
+            const result = await addToCart(product, quantityToAdd);
             return result.success;
         } else if (newQuantity < currentQuantity) {
             // Remove the difference  

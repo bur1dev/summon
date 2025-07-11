@@ -1,49 +1,39 @@
 <script lang="ts">
-    import { get } from "svelte/store";
-    import { preferences, savePreference as savePreferenceAPI, deletePreference, updateSavePreference, getPreferenceKey } from "../../services/PreferencesService";
+    import { savePreference as savePreferenceAPI, deletePreference } from "../../services/PreferencesService";
     import { updateQuantity } from "../../../cart/services/CartInteractionService";
     import { Save } from "lucide-svelte";
 
-    // CartBusinessService no longer needed as prop
-    export let groupHashBase64: string;
-    export let productIndex: number;
+    // Simplified props - just need product and callbacks
+    export let product: any;
     export let quantity: number;
     export let note: string;
-    export let existingNote: string;
     export let showPreferences: boolean;
     export let showButtons: boolean;
     export let noteChanged: boolean;
     export let existingPreference: any;
-    export let loadingPreference: boolean;
     export let onNoteChange: (newNote: string) => void;
     export let onShowButtonsChange: (show: boolean) => void;
     export let onNoteChangedChange: (changed: boolean) => void;
-    export let onExistingNoteChange: (note: string) => void;
     export let onSave: (() => void) | null = null;
 
-    // Direct reactive access to preference state
-    $: preferenceKey = getPreferenceKey(groupHashBase64, productIndex);
-    $: preferenceData = $preferences[preferenceKey] || { loading: false, preference: null, savePreference: false };
-    $: savePreference = preferenceData.savePreference;
 
     async function saveProductPreference() {
-        if (!note || !note.trim()) return;
-        await savePreferenceAPI(groupHashBase64, productIndex, note.trim());
+        if (!note || !note.trim() || !product?.upc) return;
+        await savePreferenceAPI(product.upc, note.trim());
     }
 
     async function deleteProductPreference() {
-        if (!existingPreference || !existingPreference.hash) return;
+        if (!product?.upc) return;
 
-        const success = await deletePreference(existingPreference.hash, groupHashBase64, productIndex);
+        const success = await deletePreference(product.upc);
         if (success) {
             existingPreference = null;
-            savePreference = false;
         }
     }
 
     function handleNoteInput() {
-        // Show save button if note changed from ANY original state (session note or master preference)
-        const originalNote = existingNote || existingPreference?.preference?.note || "";
+        // Show save button if note changed from existing preference
+        const originalNote = existingPreference?.note || "";
         const hasChanged = note !== originalNote;
         onShowButtonsChange(hasChanged);
         onNoteChangedChange(hasChanged);
@@ -51,31 +41,16 @@
 
     async function saveInstructions() {
         try {
-            // Create product object for cart operations
-            const productForCart = {
-                groupHash: groupHashBase64,
-                productIndex: productIndex
-            };
-
-            await updateQuantity(
-                productForCart,
-                quantity,
-                note || undefined,
-            );
-            onExistingNoteChange(note);
+            // Update cart quantity (no more session notes)
+            await updateQuantity(product, quantity);
             onShowButtonsChange(false);
             onNoteChangedChange(false);
 
-            // Save preference if toggle is on
-            if (savePreference) {
-                if (note && note.trim()) {
-                    await saveProductPreference();
-                } else if (existingPreference) {
-                    // Empty note with remember checked = delete preference
-                    await deleteProductPreference();
-                }
-            } else if (!savePreference && existingPreference) {
-                // If toggle is off but preference exists, delete it
+            // Save or delete preference based on note content
+            if (note && note.trim()) {
+                await saveProductPreference();
+            } else if (existingPreference) {
+                // Empty note = delete preference
                 await deleteProductPreference();
             }
 
@@ -89,23 +64,11 @@
     }
 
     function cancelPreferences() {
-        onNoteChange(existingNote);
+        onNoteChange(existingPreference?.note || "");
         onShowButtonsChange(false);
         onNoteChangedChange(false);
     }
 
-    function handleSavePreferenceToggle(e: Event) {
-        const target = e.target as HTMLInputElement;
-        const checked = target.checked;
-
-        // Update service state
-        updateSavePreference(groupHashBase64, productIndex, checked);
-
-        // If toggle turned off and there's an existing preference, show delete button
-        onShowButtonsChange(
-            checked !== (existingPreference !== null) || noteChanged,
-        );
-    }
 </script>
 
 <div class="preferences-section {showPreferences ? 'visible' : ''}">
@@ -121,30 +84,14 @@
                 class="preferences-input {noteChanged ? 'active' : ''}"
             />
 
-            <!-- Checkbox for saving preferences -->
-            <div class="save-preference-toggle">
-                <label class="toggle-container">
-                    <input
-                        type="checkbox"
-                        checked={savePreference}
-                        on:change={handleSavePreferenceToggle}
-                        disabled={loadingPreference}
-                    />
-                    <span class="toggle-text">
-                        {#if loadingPreference}
-                            Loading...
-                        {:else}
-                            Remember my preferences for next time
-                        {/if}
+            {#if existingPreference}
+                <div class="saved-indicator">
+                    <span class="saved-badge">
+                        <Save size={12} />
+                        Saved
                     </span>
-                    {#if existingPreference}
-                        <span class="saved-badge">
-                            <Save size={12} />
-                            Saved
-                        </span>
-                    {/if}
-                </label>
-            </div>
+                </div>
+            {/if}
         </div>
         {#if showButtons}
             <div class="preferences-buttons">
@@ -237,29 +184,9 @@
         height: var(--btn-height-lg);
     }
 
-    /* Save preference toggle styling */
-    .save-preference-toggle {
+    /* Saved indicator styling */
+    .saved-indicator {
         margin-top: var(--spacing-md);
-    }
-
-    .toggle-container {
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .toggle-container input {
-        margin-right: var(--spacing-sm);
-        accent-color: var(--primary);
-        cursor: pointer;
-        width: 16px;
-        height: 16px;
-    }
-
-    .toggle-text {
-        font-size: var(--font-size-sm);
-        color: var(--text-secondary);
     }
 
     .saved-badge {

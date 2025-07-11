@@ -89,8 +89,7 @@ function aggregateByProductId(backendItems: any[]): CartItem[] {
                 promoPrice: item.promo_price,
                 soldBy: item.sold_by || "UNIT",
                 quantity: item.quantity || 1,
-                timestamp: item.timestamp || Date.now(),
-                note: item.note
+                timestamp: item.timestamp || Date.now()
             });
         }
     }
@@ -99,7 +98,7 @@ function aggregateByProductId(backendItems: any[]): CartItem[] {
 }
 
 // Add product to cart
-export async function addToCart(product: any, quantity: number = 1, note?: string) {
+export async function addToCart(product: any, quantity: number = 1) {
     if (!client) return { success: false, error: "Service not initialized" };
     
     try {
@@ -119,8 +118,7 @@ export async function addToCart(product: any, quantity: number = 1, note?: strin
             promo_price: product.promo_price,
             sold_by: product.sold_by || "UNIT",
             quantity: incrementValue, // Always uniform: 0.25 for WEIGHT, 1 for UNIT
-            timestamp: Date.now(),
-            note
+            timestamp: Date.now()
         };
         
         // Create multiple entries if needed

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
   import ReportCategoryDialog from "../../reports/components/ReportCategoryDialog.svelte";
   import ProductDetailModal from "./modal/ProductDetailModal.svelte";
   import ProductCardDisplay from "./ProductCardDisplay.svelte";
@@ -9,7 +8,7 @@
 
   import { PriceService } from "../../services/PriceService";
   import { StockService } from "../../services/StockService";
-  import { cartItems, isCheckoutSession } from "../../cart/services/CartBusinessService";
+  import { cartItems, isCheckoutSession, cartReady } from "../../cart/services/CartBusinessService";
   import { addProductToCart, incrementItem, decrementItem } from "../../cart/services/CartInteractionService";
   import { isSoldByWeight, parseProductHash } from "../../cart/utils/cartHelpers";
 
@@ -26,55 +25,24 @@
   export let product: any;
   export const actionHash: any = undefined; // External reference only
 
-  // For tracking cart updates
-  let itemCount: number = 0;
-  let itemWeight: number = 1; // Default to 1 lb for weight items
-  let unsubscribeCartState: (() => void) | null = null;
-
   // Use cart helpers for product properties
   $: productIsSoldByWeight = isSoldByWeight(product);
-  // Show zero quantities when in checkout session
-  $: displayAmount = $isCheckoutSession ? 0 : (productIsSoldByWeight ? itemWeight : itemCount);
+  
+  // Parse product hash using centralized helper
+  $: ({ productId } = parseProductHash(product));
+
+  // PURE REACTIVE: Get current quantity directly from store (only when cart is ready)
+  $: currentCartItem = (productId && $cartReady) ? $cartItems.find(cartItem => cartItem.productId === productId) : null;
+  $: currentQuantity = currentCartItem ? currentCartItem.quantity : 0;
+  
+  // Show zero quantities when in checkout session, otherwise show current quantity
+  $: displayAmount = $isCheckoutSession ? 0 : currentQuantity;
 
   // Use PriceService for display prices
   $: displayPrices = PriceService.getDisplayPrices(product);
 
   // Use StockService for stock information
   $: stockInfo = StockService.getStockInfo(product);
-
-  // Parse product hash using centralized helper
-  $: ({ productId } = parseProductHash(product));
-
-  // SIMPLIFIED: Update item count whenever it changes
-  function updateItemCount(items: any[]) {
-    if (!productId) return; // Skip if no valid productId
-    const item = items.find(cartItem => cartItem.productId === productId);
-    const quantity = item ? item.quantity : 0;
-
-    if (quantity > 0) {
-      if (productIsSoldByWeight) {
-        itemWeight = quantity;
-      } else {
-        itemCount = quantity;
-      }
-    } else {
-      itemCount = 0;
-      itemWeight = 0; // Keep at 0 to show +ADD button
-    }
-  }
-
-  onMount(() => {
-    // Subscribe directly to cart items store
-    unsubscribeCartState = cartItems.subscribe((items: any[]) => {
-      updateItemCount(items);
-    });
-  });
-
-  onDestroy(() => {
-    if (typeof unsubscribeCartState === "function") {
-      unsubscribeCartState();
-    }
-  });
 
   // Function to handle report button click
   function handleReportClick(e: MouseEvent) {
@@ -137,14 +105,12 @@
   // SIMPLIFIED: Cart operations using original product object
   async function handleIncrementClick() {
     if (!productId || $isCheckoutSession) return;
-    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await incrementItem(product, currentAmount);
+    await incrementItem(product, currentQuantity);
   }
 
   async function handleDecrementClick() {
     if (!productId || $isCheckoutSession) return;
-    const currentAmount = productIsSoldByWeight ? itemWeight : itemCount;
-    await decrementItem(product, currentAmount);
+    await decrementItem(product, currentQuantity);
   }
 
   // SIMPLIFIED: Add product to cart

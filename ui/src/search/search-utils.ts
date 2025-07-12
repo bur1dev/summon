@@ -1,6 +1,7 @@
 // search-utils.ts
 import { decode } from "@msgpack/msgpack";
 import type { Product, SearchResult, RankedSearchResult } from "./search-types";
+import { encodeHashToBase64 } from '@holochain/client';
 
 // ==========================================
 // Product Data Processing
@@ -35,6 +36,9 @@ export function decodeProducts(records: any[]): Product[] {
     for (const record of records) {
         try {
             const groupHash = record.signed_action.hashed.hash;
+            // Convert Holochain hash to base64 string immediately for consistency
+            const groupHashB64 = encodeHashToBase64(groupHash);
+            
             // +++ MODIFICATION HERE +++
             const groupData = decode(record.entry.Present.entry) as DecodedProductGroupEntry | null;
 
@@ -44,10 +48,10 @@ export function decodeProducts(records: any[]): Product[] {
                     products.push({
                         ...productDetails, // Spread the fields from the decoded product
                         hash: {
-                            groupHash,
+                            groupHash: groupHashB64,  // Use base64 string for consistency
                             index,
                             toString: function () {
-                                return `${(this.groupHash as any).toString()}:${this.index}`; // Added .toString() for safety if groupHash is complex
+                                return `${this.groupHash}:${this.index}`;  // Now always base64 string
                             }
                         }
                     } as Product); // Assert that the final object matches the Product interface

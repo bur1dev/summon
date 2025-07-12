@@ -581,13 +581,10 @@ export default class SearchCacheService {
                         const brandId = this.addToLookupTable(brandName, this.lookupTables.brands, this.lookupTables.reverseBrands);
 
                         const productHashObject: ProductHashObject = {
-                            groupHash: groupHash, // Keep as Uint8Array initially
+                            groupHash: encodeHashToBase64(groupHash), // Convert to base64 immediately for consistency
                             index: index,
                             toString: function (this: ProductHashObject) {
-                                const groupHashStr = (this.groupHash instanceof Uint8Array)
-                                    ? encodeHashToBase64(this.groupHash)
-                                    : String(this.groupHash); // Should already be string if not Uint8Array
-                                return `${groupHashStr}:${this.index}`;
+                                return `${this.groupHash}:${this.index}`; // groupHash is now always a string
                             }
                         };
 

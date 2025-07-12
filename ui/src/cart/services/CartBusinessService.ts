@@ -66,38 +66,22 @@ export async function loadCart(): Promise<void> {
     cartReady.set(true);
 }
 
-// Aggregate multiple backend entries by productId (sum quantities)
+// Convert backend items to CartItem format (no aggregation needed - backend now handles this)
 function aggregateByProductId(backendItems: any[]): CartItem[] {
-    const aggregated = new Map<string, CartItem>();
-    
-    for (const item of backendItems) {
-        // Backend returns flattened format, not nested under 'product'
-        const existing = aggregated.get(item.product_id);
-        
-        if (existing) {
-            // Sum quantities
-            existing.quantity += item.quantity;
-            existing.timestamp = Math.max(existing.timestamp, item.timestamp);
-        } else {
-            // First occurrence
-            aggregated.set(item.product_id, {
-                productId: item.product_id,
-                upc: item.upc,
-                productName: item.product_name,
-                productImageUrl: item.product_image_url,
-                priceAtCheckout: item.price_at_checkout || 0,
-                promoPrice: item.promo_price,
-                soldBy: item.sold_by || "UNIT",
-                quantity: item.quantity || 1,
-                timestamp: item.timestamp || Date.now()
-            });
-        }
-    }
-    
-    return Array.from(aggregated.values());
+    return backendItems.map(item => ({
+        productId: item.product_id,
+        upc: item.upc,
+        productName: item.product_name,
+        productImageUrl: item.product_image_url,
+        priceAtCheckout: item.price_at_checkout || 0,
+        promoPrice: item.promo_price,
+        soldBy: item.sold_by || "UNIT",
+        quantity: item.quantity || 1,      // Now comes directly from link tag
+        timestamp: item.timestamp || Date.now()  // Now comes directly from link tag
+    }));
 }
 
-// Add product to cart
+// Add product to cart - OPTIMIZED: uses new add_cart_item zome function
 export async function addToCart(product: any, quantity: number = 1) {
     if (!client) return { success: false, error: "Service not initialized" };
     
@@ -105,10 +89,7 @@ export async function addToCart(product: any, quantity: number = 1) {
         const { productId } = parseProductHash(product);
         if (!productId) return { success: false, error: "Invalid product" };
         
-        // Get increment value for uniform entry sizes
-        const incrementValue = getIncrementValue(product);
-        
-        // Create uniform entries (always 0.25 for WEIGHT, always 1 for UNIT)
+        // Create CartProduct without quantity (quantity now in link tag)
         const cartProduct = {
             product_id: productId,
             upc: product.upc,
@@ -117,15 +98,14 @@ export async function addToCart(product: any, quantity: number = 1) {
             price_at_checkout: product.price || 0,
             promo_price: product.promo_price,
             sold_by: product.sold_by || "UNIT",
-            quantity: incrementValue, // Always uniform: 0.25 for WEIGHT, 1 for UNIT
-            timestamp: Date.now()
+            note: null
         };
         
-        // Create multiple entries if needed
-        const entriesToCreate = Math.ceil(quantity / incrementValue);
-        for (let i = 0; i < entriesToCreate; i++) {
-            await callZome(client, 'cart', 'cart', 'add_item', cartProduct);
-        }
+        // Use optimized add_cart_item function with quantity parameter
+        await callZome(client, 'cart', 'cart', 'add_cart_item', {
+            product: cartProduct,
+            quantity: quantity
+        });
         
         await loadCart();
         return { success: true };
@@ -135,7 +115,7 @@ export async function addToCart(product: any, quantity: number = 1) {
     }
 }
 
-// Remove specific quantity of a product from cart
+// Remove specific quantity of a product from cart - OPTIMIZED: uses new remove_cart_item zome function
 export async function removeSpecificQuantity(product: any, quantityToRemove: number) {
     if (!client) return { success: false, error: "Service not initialized" };
     
@@ -143,23 +123,11 @@ export async function removeSpecificQuantity(product: any, quantityToRemove: num
         const { productId } = parseProductHash(product);
         if (!productId) return { success: false, error: "Invalid product" };
         
-        // Get all backend items and remove specific quantity
-        const backendItems = await callZome(client, 'cart', 'cart', 'get_current_items', null);
-        
-        if (backendItems && Array.isArray(backendItems)) {
-            let removedQuantity = 0;
-            
-            for (const item of backendItems) {
-                if (item.product_id === productId && removedQuantity < quantityToRemove) {
-                    const itemQuantity = item.quantity || 1;
-                    await callZome(client, 'cart', 'cart', 'remove_item', item.action_hash);
-                    removedQuantity += itemQuantity;
-                    
-                    // Stop when we've removed enough
-                    if (removedQuantity >= quantityToRemove) break;
-                }
-            }
-        }
+        // Use optimized remove_cart_item function with quantity parameter
+        await callZome(client, 'cart', 'cart', 'remove_cart_item', {
+            product_id: productId,
+            quantity: quantityToRemove
+        });
         
         await loadCart();
         return { success: true };
@@ -169,7 +137,7 @@ export async function removeSpecificQuantity(product: any, quantityToRemove: num
     }
 }
 
-// Remove all instances of a product from cart
+// Remove all instances of a product from cart - OPTIMIZED: removes entire quantity
 export async function removeItemFromCart(product: any) {
     if (!client) return { success: false, error: "Service not initialized" };
     
@@ -177,14 +145,17 @@ export async function removeItemFromCart(product: any) {
         const { productId } = parseProductHash(product);
         if (!productId) return { success: false, error: "Invalid product" };
         
-        // Get all backend items and remove all with matching productId
+        // Get current quantity and remove all of it
         const backendItems = await callZome(client, 'cart', 'cart', 'get_current_items', null);
         
         if (backendItems && Array.isArray(backendItems)) {
-            for (const item of backendItems) {
-                if (item.product_id === productId) {
-                    await callZome(client, 'cart', 'cart', 'remove_item', item.action_hash);
-                }
+            const item = backendItems.find(item => item.product_id === productId);
+            if (item && item.quantity > 0) {
+                // Remove the entire quantity using optimized function
+                await callZome(client, 'cart', 'cart', 'remove_cart_item', {
+                    product_id: productId,
+                    quantity: item.quantity
+                });
             }
         }
         
@@ -196,7 +167,7 @@ export async function removeItemFromCart(product: any) {
     }
 }
 
-// Clear cart
+// Clear cart - OPTIMIZED: removes all quantities using new function
 export async function clearCart() {
     if (!client) return { success: false, error: "Service not initialized" };
     
@@ -205,7 +176,13 @@ export async function clearCart() {
         
         if (backendItems && Array.isArray(backendItems)) {
             for (const item of backendItems) {
-                await callZome(client, 'cart', 'cart', 'remove_item', item.action_hash);
+                if (item.quantity > 0) {
+                    // Remove entire quantity using optimized function
+                    await callZome(client, 'cart', 'cart', 'remove_cart_item', {
+                        product_id: item.product_id,
+                        quantity: item.quantity
+                    });
+                }
             }
         }
         

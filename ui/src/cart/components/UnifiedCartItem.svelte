@@ -2,7 +2,7 @@
     import { PencilLine, Plus, Minus } from "lucide-svelte";
     import { PriceService } from "../../services/PriceService";
     import { decrementItem, incrementItem, removeItem } from "../services/CartInteractionService";
-    import { getDisplayUnit } from "../utils/cartHelpers";
+    import { getDisplayUnit, getIncrementValue } from "../utils/cartHelpers";
     import ProductDetailModal from "../../products/components/modal/ProductDetailModal.svelte";
     import CartItem from "./items/CartItem.svelte";
     import { AnimationService } from "../../services/AnimationService";
@@ -59,8 +59,11 @@
 
     // SIMPLIFIED: Cart interactions using product object
     const handleDecrementItem = async () => {
-        // If decrementing to 0, trigger removal animation
-        if (quantity === 1) {
+        // Check if decrementing will result in removal (use proper increment value)
+        const incrementValue = getIncrementValue(product);
+        const newQuantity = quantity - incrementValue;
+        
+        if (newQuantity <= 0) {
             isRemoving = true;
             const element =
                 variant === "cart" ? cartItemElement : checkoutItemElement;

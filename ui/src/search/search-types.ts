@@ -14,6 +14,7 @@ export interface Product {
     image_url?: string;
     sold_by?: string;
     productId?: string;
+    upc?: string; // UPC for preference lookups
     brand?: string;
     embedding?: Float32Array | number[]; // For semantic search
     isType?: boolean; // Flag for dropdown display

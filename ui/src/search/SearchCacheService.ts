@@ -21,6 +21,7 @@ interface RawProductDataFromZome {
     stocks_status?: string;
     sold_by?: string;
     product_id?: string;
+    upc?: string;
     embedding?: number[];
     [key: string]: any; // For other potential fields
 }
@@ -51,6 +52,7 @@ interface StoredProductRecord {
     image_url?: string;
     sold_by?: string;
     productId?: string;
+    upc?: string;
 
     embeddingBuffer?: ArrayBuffer; // Embeddings stored as ArrayBuffer
 
@@ -86,6 +88,7 @@ interface ProcessedProduct {
     image_url?: string;
     sold_by?: string;
     productId?: string;
+    upc?: string;
 
     embedding?: Float32Array; // Processed embedding
     hash: ProductHashObject; // Hash as an object with a toString method
@@ -605,6 +608,7 @@ export default class SearchCacheService {
                             image_url: rawProduct.image_url,
                             sold_by: rawProduct.sold_by,
                             productId: rawProduct.product_id,
+                            upc: rawProduct.upc,
                             embedding: embeddingTypedArray,
                             hash: productHashObject,
                             // Removed hashString, normalization will create string hash from ProductHashObject

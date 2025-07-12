@@ -1,10 +1,30 @@
 <script lang="ts">
+  import { preferences, loadPreference, getPreferenceKey } from "../../../products/services/PreferencesService";
+
   // Props
   export let products: any[] = [];
+
+  // Load preferences for all products with UPCs
+  $: if (products) {
+    products.forEach(product => {
+      if (product.upc) {
+        loadPreference(product.upc);
+      }
+    });
+  }
+
+  // Helper function to get preference note for a product
+  function getPreferenceNote(upc: string): string | null {
+    if (!upc) return null;
+    const preferenceKey = getPreferenceKey(upc);
+    const preferenceData = $preferences[preferenceKey];
+    return preferenceData?.preference?.note || null;
+  }
 </script>
 
 <div class="cart-items">
   {#each products as product}
+    {@const preferenceNote = getPreferenceNote(product.upc)}
     <div class="cart-product">
       <div class="product-image">
         {#if product.details?.image_url}
@@ -26,9 +46,9 @@
             product.details?.price || 0
           ).toFixed(2)}
         </div>
-        {#if product.note}
+        {#if preferenceNote}
           <div class="shopper-note">
-            Shopper note: {product.note}
+            Shopper note: {preferenceNote}
           </div>
         {/if}
       </div>

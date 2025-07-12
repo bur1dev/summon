@@ -96,7 +96,7 @@
               productId: item.productId,
               productName: item.productName,
               quantity: item.quantity,
-              note: item.note,
+              upc: item.upc, // UPC for preference lookups
               details: {
                 name: item.productName,
                 image_url: item.productImageUrl,

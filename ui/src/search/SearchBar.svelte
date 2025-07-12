@@ -230,6 +230,7 @@
                 brand: p.brand,
                 embedding: finalEmbedding,
                 ...(p.productId && { productId: p.productId }),
+                ...(p.upc && { upc: p.upc }),
                 promo_price: p.promo_price,
                 stocks_status: p.stocks_status,
                 sold_by: p.sold_by,

@@ -154,8 +154,8 @@
                     <PencilLine size={16} />
                     <span
                         >{note && note.trim().length > 0
-                            ? "Edit instructions"
-                            : "Add instructions"}</span
+                            ? "Edit preference"
+                            : "Add preference"}</span
                     >
                 </button>
             </div>
@@ -263,8 +263,8 @@
                     <PencilLine size={14} />
                     <span
                         >{note
-                            ? "Edit instructions"
-                            : "Add instructions"}</span
+                            ? "Edit preference"
+                            : "Add preference"}</span
                     >
                 </button>
             </div>

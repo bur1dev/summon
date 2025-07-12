@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { CartItem } from '../types/CartTypes';
 import { parseProductHash, getIncrementValue } from '../utils/cartHelpers';
 import { callZome } from '../utils/zomeHelpers';
@@ -24,6 +24,9 @@ export const itemCount = derived(cartItems, items =>
 );
 export const uniqueItemCount = derived(cartItems, items => items.length);
 export const hasItems = derived(cartItems, items => items.length > 0);
+
+// Order tracking for stable cart item ordering
+let nextAddedOrder = 1;
 
 // Service initialization
 export function setCartServices(holoClient: any): void {
@@ -68,6 +71,10 @@ export async function loadCart(): Promise<void> {
 
 // Convert backend items to CartItem format (no aggregation needed - backend now handles this)
 function aggregateByProductId(backendItems: any[]): CartItem[] {
+    // Keep track of existing items to preserve their addedOrder
+    const currentItems = get(cartItems);
+    const existingOrders = new Map(currentItems.map((item: CartItem) => [item.productId, item.addedOrder]));
+    
     return backendItems.map(item => ({
         productId: item.product_id,
         upc: item.upc,
@@ -77,7 +84,8 @@ function aggregateByProductId(backendItems: any[]): CartItem[] {
         promoPrice: item.promo_price,
         soldBy: item.sold_by || "UNIT",
         quantity: item.quantity || 1,      // Now comes directly from link tag
-        timestamp: item.timestamp || Date.now()  // Now comes directly from link tag
+        timestamp: item.timestamp || Date.now(),  // Now comes directly from link tag
+        addedOrder: existingOrders.get(item.product_id) ?? nextAddedOrder++  // Preserve existing order or assign new
     }));
 }
 

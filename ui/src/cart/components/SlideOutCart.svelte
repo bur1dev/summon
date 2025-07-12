@@ -36,8 +36,6 @@
   let cartContainer: HTMLElement;
   let hasTriggeredInitialZipper = false;
 
-  // Subscribe to cart changes
-  let unsubscribe: (() => void) | null = null;
 
   // DELETED: getItemKey function no longer needed
 
@@ -58,17 +56,8 @@
     isLoading = false;
   }
 
-  onMount(() => {
-    // SIMPLIFIED: Subscribe directly to cart items store
-    unsubscribe = cartItems.subscribe((items) => {
-      // All cart items are valid with new structure
-      updateEnrichedItems(items || []);
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  });
+  // Reactive cart items handling
+  $: updateEnrichedItems($cartItems || []);
 
   // Reactive session status - no need for manual checks
 
@@ -225,7 +214,7 @@
                   <span class="empty-cart-text">{$isCheckoutSession ? "Cart is checked out" : "Your cart is empty"}</span>
                 </div>
               {:else}
-                {#each enrichedCartItems as item (item.productId || `${item.groupHash}_${item.productIndex}`)}
+                {#each [...enrichedCartItems].sort((a, b) => (a.addedOrder || 0) - (b.addedOrder || 0)) as item (item.productId)}
                   <UnifiedCartItem
                     cartItem={item}
                     variant="cart"

@@ -43,8 +43,6 @@
 
   // Cart service is now store-based, no context needed
 
-  // Cart total for header display
-  let cartTotalValue = 0;
 
   setContext("store", {
     getStore: () => store,
@@ -80,15 +78,6 @@
     
     // Inject DataManager into navigation store
     setNavigationDataManager(dataManager);
-
-    // Subscribe to the cartTotal from the cart service
-    const unsubscribe = cartTotal.subscribe((value) => {
-      cartTotalValue = value || 0;
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
   });
 </script>
 
@@ -121,7 +110,7 @@
         {#if $currentViewStore === "active"}
           <!-- The global scroll container with header and shop view -->
           <div class="global-scroll-container scroll-container">
-            <HeaderContainer cartTotalValue={cartTotalValue} />
+            <HeaderContainer cartTotalValue={$cartTotal || 0} />
             <div class="workspace">
               <ShopView bind:this={shopViewComponent} />
             </div>

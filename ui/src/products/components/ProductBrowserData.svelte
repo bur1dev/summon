@@ -62,19 +62,14 @@
 
     export const action = resizeObserver.action;
 
-    // Simple navigation subscription
-    let unsubscribe: (() => void) | null = null;
-
-    // Initialize navigation subscription
+    // Initialize navigation handling
     onMount(async () => {
         // Wait for DOM to be ready
         await tick();
-
-        // Subscribe to navigation changes
-        unsubscribe = navigationStore.subscribe(($nav) => {
-            handleNavigationChange($nav);
-        });
     });
+
+    // Reactive navigation handling
+    $: handleNavigationChange($navigationStore);
 
     // Handle navigation state changes
     function handleNavigationChange(nav: {
@@ -113,11 +108,6 @@
         categoryProducts = {};
         allCategoryProducts = [];
         resizeObserver.disconnect();
-
-        // Clean up navigation subscription
-        if (unsubscribe) {
-            unsubscribe();
-        }
     });
 
     // Ultra-simple navigation with race condition protection

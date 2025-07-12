@@ -27,6 +27,7 @@ export interface CartItem {
     soldBy?: string; // "UNIT" or "WEIGHT" - needed for correct increment/decrement behavior
     quantity: number;
     timestamp: number;
+    addedOrder?: number; // Stable ordering field for display - never changes once set
     note?: string;
 }
 

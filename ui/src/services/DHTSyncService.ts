@@ -6,7 +6,7 @@ import type { AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
 import type { ShopStore } from "../store";
 import { StockService } from "./StockService";
-import { getActiveClone, activateClone, disablePreviousClone } from "../products/utils/cloneHelpers";
+import { createAndActivateClone, disableClone } from "../products/utils/cloneHelpers";
 // No complex clone manager needed
 
 interface DecodedSingleProductFields {
@@ -101,48 +101,6 @@ export class ProductStore {
     return this.state.subscribe(callback);
   }
 
-  // Create a new product catalog clone for fresh data upload
-  private async createNewProductClone() {
-    console.log("[LOG] Creating new product catalog clone...");
-
-    // Create clone using standard Holochain 0.5.3 client method
-    const clonedCell = await this.store.client.createCloneCell({
-      role_name: 'products_role',
-      name: `products-clone-${Date.now()}`,
-      modifiers: {
-        network_seed: crypto.randomUUID()
-      }
-    });
-
-    console.log("[LOG] New product catalog clone created:", clonedCell);
-    console.log("[LOG] Clone cell_id:", clonedCell.cell_id);
-    console.log("[LOG] Clone role name:", clonedCell.clone_id);
-
-    // Authorize signing credentials for the new clone cell
-    try {
-      const adminPort = import.meta.env.VITE_ADMIN_PORT;
-      if (adminPort) {
-        const { AdminWebsocket } = await import('@holochain/client');
-        const adminWebsocket = await AdminWebsocket.connect({
-          url: new URL(`ws://localhost:${adminPort}`),
-        });
-        
-        console.log("[LOG] Authorizing signing credentials for clone cell:", clonedCell.cell_id);
-        await adminWebsocket.authorizeSigningCredentials(clonedCell.cell_id);
-        console.log("[LOG] ✅ Clone cell signing credentials authorized");
-        
-        // Close admin connection properly
-        adminWebsocket.client.close();
-      } else {
-        console.warn("[LOG] ⚠️ No admin port available, clone cell may not be authorized");
-      }
-    } catch (authError) {
-      console.error("[LOG] ❌ Failed to authorize clone cell signing credentials:", authError);
-      throw new Error(`Failed to authorize clone cell: ${authError}`);
-    }
-
-    return clonedCell;
-  }
 
 
   loadFromSavedData = async () => {
@@ -160,8 +118,11 @@ export class ProductStore {
 
     try {
       // Step 1: Create new catalog clone for fresh data upload
-      console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 1: Creating new clone...");
-      clonedCell = await this.createNewProductClone();
+      console.log("🚀 STARTING UPLOAD PROCESS");
+      const cloneResult = await createAndActivateClone(this.store.client);
+      const clonedCell = { cell_id: cloneResult.cellId, seed: cloneResult.seed };
+      const previousCellId = cloneResult.previousCellId;
+      console.log("📦 Will upload data to clone:", cloneResult.seed.slice(0, 8));
 
       this.state.update(state => ({
         ...state,
@@ -194,10 +155,7 @@ export class ProductStore {
       }, {} as Record<string, any[]>); // Initialize with the correct type
 
       const productTypesCount = Object.keys(productsByType).length;
-      console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 2: Starting data upload to NEW clone");
-      console.log("📡 [DATA UPLOAD] Target Clone DNA Hash:", clonedCell.cell_id[0]);
-      console.log("📡 [DATA UPLOAD] Target Network Seed:", clonedCell.name);
-      console.log(`📡 [DATA UPLOAD] Products to upload: ${totalProductsFromFile} in ${productTypesCount} product types`);
+      console.log(`Starting upload: ${totalProductsFromFile} products in ${productTypesCount} groups`);
 
       this.state.update(state => ({
         ...state,
@@ -217,13 +175,6 @@ export class ProductStore {
         const [categoryFromFile, subcategoryFromFile, productTypeFromFile] = key.split('|||'); // Renamed variables
         processedTypes++;
 
-        console.log(`[LOG] Load Saved Data: Processing Product Type ${processedTypes}/${productTypesCount}: "${productTypeFromFile || 'None'}" (${productList.length} products)`);
-
-        // Log first product UPC data for verification
-        if (productList.length > 0) {
-          const firstProduct = productList[0];
-          console.log(`[LOG] UPC Data: First product "${firstProduct.name || firstProduct.description}" has UPC: ${firstProduct.upc || 'MISSING'}`);
-        }
 
         const processedBatch = productList.map((product: any) => ({ // product is now known to be from an array
           product: {
@@ -267,7 +218,6 @@ export class ProductStore {
             totalGroupsCreated += recordsLength;
             success = true;
 
-            console.log(`[LOG] Load Saved Data: ✅ Uploaded ${productList.length} products, created ${recordsLength} groups. Total: ${successfullyUploadedProducts}/${totalProductsFromFile} products (${totalGroupsCreated} groups)`);
 
             this.state.update(state => ({
               ...state,
@@ -276,15 +226,12 @@ export class ProductStore {
 
           } catch (batchError: unknown) {
             const errorMessage = batchError instanceof Error ? batchError.message : String(batchError);
-            console.error(`[LOG] Load Saved Data: ❌ Attempt ${attempts}/3 failed for "${productTypeFromFile || 'None'}":`, batchError);
-
             if (attempts >= 3) {
-              console.warn(`[LOG] Load Saved Data: ⚠️ Skipping product type after 3 failed attempts.`);
+              console.warn(`Skipping product type after 3 failed attempts`);
               break;
             }
 
             const delayMs = 3000 * Math.pow(2, attempts - 1);
-            console.log(`[LOG] Load Saved Data: Retrying in ${delayMs / 1000}s...`); // Corrected display to seconds
 
             this.state.update(state => ({
               ...state,
@@ -297,50 +244,19 @@ export class ProductStore {
 
         // Pause between product types
         if (processedTypes < productTypesCount) {
-          console.log(`[LOG] Load Saved Data: Waiting 125 milliseconds before next product type...`); // Corrected log message
           await new Promise(resolve => setTimeout(resolve, 125));
         }
       }
 
-      console.log("[LOG] Load Saved Data: --------------------------------------------------");
-      console.log("[LOG] Load Saved Data: ✅ Upload Process Complete.");
-      console.log(`[LOG] Load Saved Data:   Total products:      ${totalProductsFromFile}`);
-      console.log(`[LOG] Load Saved Data:   Uploaded products:   ${successfullyUploadedProducts}`);
-      console.log(`[LOG] Load Saved Data:   Failed products:     ${totalProductsFromFile - successfullyUploadedProducts}`);
-      console.log(`[LOG] Load Saved Data:   Groups created:      ${totalGroupsCreated}`);
-      console.log(`[LOG] Load Saved Data:   Product types:       ${productTypesCount}`);
-      console.log("[LOG] Load Saved Data: --------------------------------------------------");
+      console.log(`✅ UPLOAD COMPLETE: ${successfullyUploadedProducts}/${totalProductsFromFile} products in ${totalGroupsCreated} groups uploaded to clone ${clonedCell.seed.slice(0, 8)}`);
 
-      // Step 3: Activate the new catalog clone to make it live
-      if (clonedCell && successfullyUploadedProducts > 0) {
-        console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 3: Getting old active seed before activation...");
-        
-        // Get the old active seed BEFORE we activate the new one
-        const oldActiveSeed = await getActiveClone(this.store.client).catch(() => null);
-        console.log("[LOG] Old active seed before activation:", oldActiveSeed || "none");
-
-        console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 3: Activating new clone...");
-
-        this.state.update(state => ({
-          ...state,
-          error: `🚀 Activating new catalog (${successfullyUploadedProducts}/${totalProductsFromFile} products)`,
-        }));
-
-        const newNetworkSeed = await activateClone(this.store.client, clonedCell);
-        console.log("[LOG] New catalog clone activated:", newNetworkSeed);
-        console.log("🎉 [SUCCESS] Step 3 Complete: New catalog clone activated and live!");
-
-        // Step 4: Disable the previous clone after successful activation
-        if (oldActiveSeed && oldActiveSeed !== newNetworkSeed) {
-          console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 4: Disabling previous clone...");
-          console.log("[LOG] Disabling previous clone with seed:", oldActiveSeed);
-          await disablePreviousClone(this.store.client, oldActiveSeed);
-          console.log("[LOG] ✅ Previous clone disabled successfully");
-          console.log("🎉 [SUCCESS] Step 4 Complete: Previous clone disabled!");
-        } else {
-          console.log("🎯 [VERSIONED CLONING WORKFLOW] Step 4: No previous clone to disable (first upload or same seed)");
-        }
+      // Step 4: Disable previous clone after successful upload
+      if (previousCellId && successfullyUploadedProducts > 0) {
+        console.log("🗑️ Disabling previous clone after successful upload...");
+        await disableClone(this.store.client, previousCellId);
       }
+
+      console.log("🎉 Upload process complete - new clone active, old clone disabled");
 
       this.state.update(state => ({
         ...state,
@@ -348,10 +264,6 @@ export class ProductStore {
         loading: false
       }));
 
-      console.log("\n🎉 ================= VERSIONED CLONING COMPLETE! =================\n");
-      console.log("✅ [SUCCESS] All users will now automatically query the new clone");
-      console.log("✅ [SUCCESS] Old clone remains available until next upload cycle");
-      console.log("✅ [SUCCESS] Zero downtime deployment achieved!\n");
 
       // Delete the DHT upload flag after a successful full load
       await this.deleteDhtUploadFlag();
@@ -360,13 +272,7 @@ export class ProductStore {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("[LOG] Load Saved Data: ❌ Critical error:", error);
 
-      console.log("[LOG] Load Saved Data: --------------------------------------------------");
-      console.log("[LOG] Load Saved Data: ⚠️ Upload Process Failed.");
-      console.log(`[LOG] Load Saved Data:   Total products:      ${totalProductsFromFile}`);
-      console.log(`[LOG] Load Saved Data:   Uploaded products:   ${successfullyUploadedProducts}`);
-      console.log(`[LOG] Load Saved Data:   Failed products:     ${totalProductsFromFile - successfullyUploadedProducts}`);
-      console.log(`[LOG] Load Saved Data:   Groups created:      ${totalGroupsCreated}`);
-      console.log("[LOG] Load Saved Data: --------------------------------------------------");
+      console.error(`Upload failed: ${successfullyUploadedProducts}/${totalProductsFromFile} products uploaded`);
 
       this.state.update(state => ({
         ...state,

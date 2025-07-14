@@ -359,9 +359,6 @@
         gap: var(--spacing-sm);
     }
 
-    .time-slot-wrapper {
-        /* Wrapper for animation targeting */
-    }
 
     .time-slot {
         padding: var(--spacing-sm);

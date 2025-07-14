@@ -2,7 +2,7 @@ import { decode } from "@msgpack/msgpack";
 import { encodeHashToBase64, decodeHashFromBase64, type HoloHash } from "@holochain/client";
 import type { DecodedProductGroupEntry } from "../../search/search-utils";
 import type { ProductRowCacheService } from "./ProductRowCacheService";
-import { getActiveCloneCellId } from "../utils/cloneHelpers";
+import { SimpleCloneCache } from "../utils/SimpleCloneCache";
 
 interface RawProductFromDHT {
     name: string;
@@ -60,26 +60,20 @@ export interface NavigationResult {
 export class ProductDataService {
     private store: any;
     private cache: ProductRowCacheService;
+    private cloneCache: SimpleCloneCache;
     private readonly PRODUCTS_PER_GROUP = 1000;
     private groupBoundaries: Map<string, Array<{ start: number; end: number }>> = new Map();
 
-    constructor(store: any, cache: ProductRowCacheService) {
+    constructor(store: any, cache: ProductRowCacheService, cloneCache?: SimpleCloneCache) {
         this.store = store;
         this.cache = cache;
-        
-        // No initialization needed for simple clone helpers
+        this.cloneCache = cloneCache || new SimpleCloneCache(store.service.client);
+        console.log('🚀 ProductDataService initialized');
     }
 
-    // Get the cell_id for targeting the current active clone  
+    // Get the cell_id for targeting the current active clone with caching
     private async getActiveCloneCellId(): Promise<any> {
-        try {
-            const cellId = await getActiveCloneCellId(this.store.service.client);
-            console.log("[ProductDataService] ✅ Targeting clone cell:", cellId);
-            return cellId;
-        } catch (error) {
-            console.error("[ProductDataService] ❌ No active clone available:", error);
-            throw error;
-        }
+        return await this.cloneCache.getActiveCellId();
     }
 
     // NEW: Method to get a single product by group hash and index for cart
@@ -435,13 +429,7 @@ export class ProductDataService {
                 }
                 : category;
 
-            const cellId = await this.getActiveCloneCellId();
-            const response = await this.store.service.client.callZome({
-                cell_id: cellId,
-                zome_name: "product_catalog",
-                fn_name: fn_name,
-                payload: payload,
-            });
+            const response = await this.callZomeWithRetry(fn_name, payload);
 
             const products = this.extractProductsFromGroups(response.product_groups || []);
             const totalProducts = response.total_products || 0;
@@ -457,6 +445,41 @@ export class ProductDataService {
         } catch (error) {
             console.error("Error fetching products from API:", { category, subcategory, productType, groupOffset, groupLimit, error });
             return null;
+        }
+    }
+
+    // Core method with cache invalidation and retry
+    private async callZomeWithRetry(fn_name: string, payload: any, maxRetries: number = 2): Promise<any> {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const cellId = await this.getActiveCloneCellId();
+                console.log(`Calling zome (attempt ${attempt}):`, fn_name, 'with cell_id:', cellId[0].slice(0, 8) + '...');
+                
+                return await this.store.service.client.callZome({
+                    cell_id: cellId,
+                    zome_name: "product_catalog",
+                    fn_name: fn_name,
+                    payload: payload,
+                });
+            } catch (error: any) {
+                console.error(`Zome call attempt ${attempt} failed:`, error);
+                
+                // Check if this looks like a clone/cell error
+                const errorMsg = error?.message || error?.toString() || '';
+                const isCloneError = errorMsg.includes('CellNotFound') || 
+                                   errorMsg.includes('disabled') || 
+                                   errorMsg.includes('clone') ||
+                                   errorMsg.includes('Cell');
+                
+                if (isCloneError && attempt < maxRetries) {
+                    console.log('🔄 Clone error detected - invalidating cache and retrying...');
+                    this.cloneCache.clearCache();
+                    continue;
+                }
+                
+                // Re-throw error if max retries reached or not a clone error
+                throw error;
+            }
         }
     }
 

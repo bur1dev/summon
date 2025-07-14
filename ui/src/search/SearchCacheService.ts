@@ -214,7 +214,7 @@ export default class SearchCacheService {
 
     // Get the cell_id for targeting the current active clone
     private static async getActiveCloneCellId(store: HolochainStore): Promise<any> {
-        const cellId = await getActiveCloneCellId(store.service.client);
+        const cellId = await getActiveCloneCellId(store.service.client as any);
         return cellId;
     }
 

@@ -4,7 +4,11 @@
   import { ShopStore } from "./store";
   import { ProductDataService } from "./products/services/ProductDataService";
   import { ProductRowCacheService } from "./products/services/ProductRowCacheService";
+  import { SimpleCloneCache } from "./products/utils/SimpleCloneCache";
+  import { BackgroundCloneManager } from "./products/utils/BackgroundCloneManager";
   import { DataManager } from "./services/DataManager";
+  import AppLoadingScreen from "./components/AppLoadingScreen.svelte";
+  import { cloneSetupStore } from "./stores/LoadingStore";
   import { setContext, onMount } from "svelte";
   import type { AppClient } from "@holochain/client";
   import { encodeHashToBase64 } from "@holochain/client";
@@ -25,6 +29,13 @@
 
   let store: ShopStore = new ShopStore(client, roleName);
   let shopViewComponent: ShopView; // Reference to the ShopView component
+  let cloneSystemReady = false;
+  let setupMessage = "Setting up catalog access...";
+  let setupProgress = 0;
+  
+  // Global loading state for any clone setup operations
+  $: globalLoading = $cloneSetupStore.isLoading;
+  $: showLoading = !cloneSystemReady || globalLoading;
 
   // Create ProductDataService during initialization
   // Create global cache service instance if it doesn't exist
@@ -36,7 +47,15 @@
     typeof window !== "undefined" && window.productRowCache
       ? window.productRowCache
       : new ProductRowCacheService();
-  const productDataService = new ProductDataService(store, cacheService);
+
+  // Create clone cache and background manager
+  const cloneCache = new SimpleCloneCache(client);
+  const backgroundCloneManager = new BackgroundCloneManager(client, cloneCache);
+  
+  // Connect cache to background manager for daily checks
+  cloneCache.setBackgroundManager(backgroundCloneManager);
+  
+  const productDataService = new ProductDataService(store, cacheService, cloneCache);
 
   // STEP 2: Create centralized DataManager
   const dataManager = new DataManager(productDataService);
@@ -70,8 +89,44 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     store.setUIprops({ showMenu: false });
+
+    // ===== CONSOLE TESTING - KEEP FOR DEBUGGING =====
+    // Expose reset method to global window for console testing
+    if (typeof window !== "undefined") {
+      (window as any).resetCloneManager = () => backgroundCloneManager.resetForTesting();
+      console.log('🧪 TESTING: Use window.resetCloneManager() in console to reset');
+    }
+    // ===== END CONSOLE TESTING =====
+
+    // Check if we need daily setup
+    if (backgroundCloneManager.shouldRunDailySetup()) {
+      setupMessage = "Checking for new catalog...";
+      cloneSystemReady = false;
+      
+      setupProgress = 25;
+      setupMessage = "Finding active catalog...";
+      
+      setupProgress = 50;
+      setupMessage = "Preparing clone access...";
+      
+      const success = await backgroundCloneManager.setup();
+      
+      setupProgress = 100;
+      setupMessage = success ? "Ready!" : "Setup failed";
+      
+      // Brief delay to show completion
+      setTimeout(() => {
+        cloneSystemReady = true;
+      }, 500);
+    } else {
+      // Already setup today, skip loading screen
+      cloneSystemReady = true;
+    }
+
+    // Background polling disabled - we handle setup manually now
+    // backgroundCloneManager.start();
 
     // Inject DataManager into cart service
     setDataManager(dataManager);
@@ -80,6 +135,13 @@
     setNavigationDataManager(dataManager);
   });
 </script>
+
+<!-- Loading Screen - Shows for both startup and browsing setup -->
+<AppLoadingScreen 
+  show={showLoading} 
+  message={globalLoading ? $cloneSetupStore.message : setupMessage} 
+  progress={globalLoading ? $cloneSetupStore.progress : setupProgress} 
+/>
 
 <div class="flex-scrollable-parent">
   <div class="flex-scrollable-container">

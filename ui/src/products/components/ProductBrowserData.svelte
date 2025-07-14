@@ -78,6 +78,8 @@
         productType: string | null;
         searchMode: boolean;
     }) {
+        console.log('🧭 Navigation change:', nav);
+        
         // Prevent invalid productType without category/subcategory
         if (nav.productType && (!nav.category || !nav.subcategory)) {
             console.warn(
@@ -89,17 +91,21 @@
 
         if (nav.searchMode) {
             // Search mode - no data loading needed, SearchResults handles its own data
+            console.log('🔍 Search mode - no data loading needed');
             return;
         } else if (!nav.category) {
             // Home view
             if (featuredSubcategories.length > 0) {
+                console.log('🏠 Loading home view with', featuredSubcategories.length, 'featured subcategories');
                 handleNavigation("home");
             }
         } else if (nav.category && nav.subcategory) {
             // Subcategory view
+            console.log('📂 Loading subcategory view:', nav.category, '>', nav.subcategory);
             handleNavigation("subcategory");
         } else if (nav.category && !nav.subcategory) {
             // Category view
+            console.log('📁 Loading category view:', nav.category);
             handleNavigation("category");
         }
     }
@@ -269,7 +275,7 @@
     }
 
     async function loadProductsForCategory(navId: number) {
-        if (!$navigationStore.category || false) return;
+        if (!$navigationStore.category) return;
 
         resetState();
 
@@ -293,6 +299,7 @@
     }
 
     async function loadHomeView(navId: number) {
+        console.log('🏠 Starting loadHomeView, navId:', navId);
         resetState();
 
         if (!mainGridContainer) {
@@ -306,15 +313,19 @@
         }
 
         containerCapacity = calculateContainerCapacity(mainGridContainer);
+        console.log('🏠 Container capacity:', containerCapacity);
 
         const BATCH_SIZE = 3;
 
         for (let i = 0; i < featuredSubcategories.length; i += BATCH_SIZE) {
             const currentBatch = featuredSubcategories.slice(i, i + BATCH_SIZE);
 
+            console.log('🏠 Loading batch', i / BATCH_SIZE + 1, 'of', Math.ceil(featuredSubcategories.length / BATCH_SIZE));
+            
             const batchResults = await Promise.all(
                 currentBatch
                     .map(async (featured) => {
+                        console.log('📡 Fetching data for:', featured.category, featured.subcategory);
                         const result =
                             await dataManager.loadSubcategoryProducts(
                                 featured.category,
@@ -322,6 +333,8 @@
                                 containerCapacity,
                             );
 
+                        console.log('📦 Data result for', featured.category, featured.subcategory, ':', result ? `${result.products?.length || 0} products` : 'null');
+                        
                         if (result) {
                             return {
                                 ...result,
@@ -338,12 +351,16 @@
 
             // Only update if this navigation is still current
             if (navId === navigationId) {
+                console.log('🔄 Processing batch results for UI update, batch size:', batchResults.length);
                 await processResults(
                     batchResults,
                     containerCapacity,
                     "homeView",
                 );
+                console.log('✅ UI updated with batch data');
                 await tick();
+            } else {
+                console.log('⏭️ Skipping batch update - navigation changed');
             }
         }
     }
@@ -351,8 +368,7 @@
     async function loadProductsForProductType(navId: number) {
         if (
             !$navigationStore.category ||
-            !$navigationStore.subcategory ||
-            false
+            !$navigationStore.subcategory
         )
             return;
 
@@ -594,6 +610,8 @@
         capacity: number,
         type: "subcategory" | "homeView" | "productType",
     ) {
+        console.log('🔄 processResults called with', results.length, 'results, type:', type);
+        
         for (const result of results) {
             // Extract identifier based on type
             const identifier =
@@ -603,8 +621,13 @@
                       ? result.identifier
                       : result.type;
 
-            if (!result?.products?.length || !identifier) continue;
+            if (!result?.products?.length || !identifier) {
+                console.log('⚠️ Skipping result - no products or identifier:', identifier, result?.products?.length);
+                continue;
+            }
 
+            console.log('🏪 Processing', identifier, 'with', result.products.length, 'products');
+            
             const initialProducts = sliceProducts(result.products, capacity);
             currentRanges[identifier] = {
                 start: 0,
@@ -615,6 +638,8 @@
                 result.hasMore || result.products.length > capacity;
             rowCapacities[identifier] = capacity;
             visibleGroups.add(identifier);
+            
+            console.log('✅ Added to UI state:', identifier, 'with', initialProducts.length, 'products');
 
             // Calculate totals based on type
             if (type === "subcategory") {
@@ -657,11 +682,17 @@
         }
 
         // Single reactive trigger
+        console.log('🔥 Triggering reactive updates for UI');
+        console.log('📊 Final categoryProducts keys:', Object.keys(categoryProducts));
+        console.log('📊 Total products per category:', totalProducts);
+        
         categoryProducts = categoryProducts;
         currentRanges = currentRanges;
         totalProducts = totalProducts;
         hasMore = hasMore;
         rowCapacities = rowCapacities;
+        
+        console.log('✅ All reactive updates triggered');
     }
 
     function resetState() {

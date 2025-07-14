@@ -52,7 +52,7 @@ roles:
       network_seed: null
       properties: null
     installed_hash: null
-    clone_limit: 0
+    clone_limit: 1
 
 # Profiles DNA - persistent user data
 - name: profiles_role

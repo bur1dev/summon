@@ -102,7 +102,7 @@
     // Initialize CartAddressService client
     setCartAddressClient(client);
 
-    // Initialize PreferencesService with client
+    // Initialize PreferencesService with client (clone setup happens on-demand)
     setPreferencesClient(client);
 
     // Initialize ProfilesStore

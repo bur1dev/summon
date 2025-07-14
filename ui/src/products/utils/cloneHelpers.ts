@@ -2,7 +2,7 @@
  * Simple clone management following Holochain docs pattern
  */
 
-import type { AppClient, CellId, ClonedCell } from "@holochain/client";
+import type { AppClient, CellId } from "@holochain/client";
 
 /**
  * Get active clone cell_id (finds existing or creates new for same seed)
@@ -24,19 +24,28 @@ export async function getActiveCloneCellId(client: AppClient): Promise<CellId> {
     return await findOrCreateClone(client, activeSeed);
 }
 
+
 /**
- * Find existing clone only (for browsing - throws error if not found)
+ * Find existing clone or optionally create new one
  */
-async function findExistingClone(client: AppClient, seed: string): Promise<CellId> {
-    // Check if clone exists locally
+async function findOrCreateClone(client: AppClient, seed: string, createIfMissing = true): Promise<CellId> {
     const appInfo = await client.appInfo();
     if (!appInfo) {
         throw new Error('App info not available');
     }
     
+    if (createIfMissing) {
+        console.log('Looking for clone with seed:', seed.slice(0, 8));
+        console.log('Available clones:', appInfo.cell_info["products_role"]?.map(cell => ({
+            type: cell.type,
+            name: cell.type === "cloned" ? cell.value.name : "N/A",
+            seed: cell.type === "cloned" ? (cell.value as any).dna_modifiers?.network_seed : "N/A"
+        })));
+    }
+    
     const existingClone = appInfo.cell_info["products_role"]?.find(cell => 
         cell.type === "cloned" && 
-        ((cell.value as any).modifiers?.network_seed === seed || cell.value.name === `products-${seed.slice(0, 8)}`)
+        ((cell.value as any).dna_modifiers?.network_seed === seed || cell.value.name === `products-${seed.slice(0, 8)}`)
     );
 
     if (existingClone && existingClone.type === "cloned") {
@@ -44,34 +53,8 @@ async function findExistingClone(client: AppClient, seed: string): Promise<CellI
         return existingClone.value.cell_id;
     }
 
-    throw new Error(`Clone not found for seed: ${seed.slice(0, 8)}. Upload data first.`);
-}
-
-/**
- * Find existing clone or create new one for the given seed (for uploads)
- */
-async function findOrCreateClone(client: AppClient, seed: string): Promise<CellId> {
-    // Check if clone exists locally
-    const appInfo = await client.appInfo();
-    if (!appInfo) {
-        throw new Error('App info not available');
-    }
-    
-    console.log('Looking for clone with seed:', seed.slice(0, 8));
-    console.log('Available clones:', appInfo.cell_info["products_role"]?.map(cell => ({
-        type: cell.type,
-        name: cell.type === "cloned" ? cell.value.name : "N/A",
-        seed: cell.type === "cloned" ? (cell.value as any).modifiers?.network_seed : "N/A"
-    })));
-    
-    const existingClone = appInfo.cell_info["products_role"]?.find(cell => 
-        cell.type === "cloned" && 
-        ((cell.value as any).modifiers?.network_seed === seed || cell.value.name === `products-${seed.slice(0, 8)}`)
-    );
-
-    if (existingClone && existingClone.type === "cloned") {
-        console.log('Found existing clone:', seed.slice(0, 8));
-        return existingClone.value.cell_id;
+    if (!createIfMissing) {
+        throw new Error(`Clone not found for seed: ${seed.slice(0, 8)}. Upload data first.`);
     }
 
     // Create new clone if not found

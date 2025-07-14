@@ -61,15 +61,14 @@ export class SimpleCloneCache {
                 
                 updateCloneSetup('Loading initial data...', 75);
                 // Pre-load some data to prevent UI crashes
-                const preloadSuccess = await this.preloadInitialData();
+                const preloadSuccess = await this.verifyDataAvailability(0);
                 if (!preloadSuccess) {
                     console.warn('⚠️ Preload failed but continuing with setup');
                 }
                 
                 updateCloneSetup('Syncing with network...', 90);
                 // Wait until we can actually see data (scalable approach)
-                console.log('⏱️ Waiting for DHT data to be available...');
-                const dataAvailable = await this.waitForDataAvailability();
+                const dataAvailable = await this.verifyDataAvailability(15000);
                 if (!dataAvailable) {
                     console.warn('⚠️ Data verification failed but continuing');
                 }
@@ -127,54 +126,27 @@ export class SimpleCloneCache {
     }
 
     /**
-     * Pre-load initial data to prevent UI crashes
+     * Verify data availability with optional timeout (combines preload and wait logic)
      */
-    private async preloadInitialData() {
-        try {
-            if (!this.cachedCellId) {
-                console.log('⚠️ No cached cell_id for preloading data');
-                return false;
-            }
-
-            console.log('📡 Pre-loading initial data to prevent UI crashes...');
-            
-            // Make a simple call to verify the clone is working and has data
-            const result = await this.client.callZome({
-                cell_id: this.cachedCellId,
-                zome_name: "product_catalog",
-                fn_name: "get_all_category_products",
-                payload: "Produce" // Simple test call
-            });
-            
-            console.log('✅ Initial data pre-loaded successfully:', result ? 'Data found' : 'No data');
-            return true;
-        } catch (error) {
-            console.error('❌ Failed to pre-load initial data - this will cause UI issues:', error);
-            // Don't clear cache here as the clone might still work for other calls
+    private async verifyDataAvailability(maxWaitTime = 0): Promise<boolean> {
+        if (!this.cachedCellId) {
+            console.log('⚠️ No cached cell_id for data verification');
             return false;
         }
-    }
 
-    /**
-     * Wait until data is actually available from DHT (scalable approach)
-     * Polls every 2 seconds up to 15 seconds maximum
-     */
-    private async waitForDataAvailability(): Promise<boolean> {
-        const MAX_WAIT_TIME = 15000; // 15 seconds max (reduced)
-        const POLL_INTERVAL = 2000;  // Check every 2 seconds (less frequent)
+        const POLL_INTERVAL = 2000;
         const startTime = Date.now();
-        
         let attempt = 0;
-        while (Date.now() - startTime < MAX_WAIT_TIME) {
+
+        if (maxWaitTime === 0) {
+            console.log('📡 Pre-loading initial data to prevent UI crashes...');
+        } else {
+            console.log('⏱️ Waiting for DHT data to be available...');
+        }
+
+        do {
             attempt++;
             try {
-                if (!this.cachedCellId) {
-                    console.log('⚠️ No cached cell_id for data verification');
-                    return false;
-                }
-
-                // Try to fetch data using the same pattern that works in the UI
-                // Use get_all_category_products which is simpler and more reliable
                 const result = await this.client.callZome({
                     cell_id: this.cachedCellId,
                     zome_name: "product_catalog",
@@ -182,26 +154,43 @@ export class SimpleCloneCache {
                     payload: "Produce"
                 });
                 
-                console.log(`🔍 Data check attempt ${attempt}:`, result);
+                if (maxWaitTime > 0) {
+                    console.log(`🔍 Data check attempt ${attempt}:`, result);
+                }
                 
-                // Check if we got any products (use same logic as working calls)
                 const hasProducts = result?.product_groups?.length > 0;
                 
                 if (hasProducts) {
-                    console.log(`✅ DHT data verified after ${attempt} attempts (${Date.now() - startTime}ms)`);
+                    if (maxWaitTime > 0) {
+                        console.log(`✅ DHT data verified after ${attempt} attempts (${Date.now() - startTime}ms)`);
+                    } else {
+                        console.log('✅ Initial data pre-loaded successfully: Data found');
+                    }
                     return true;
+                }
+                
+                if (maxWaitTime === 0) {
+                    console.log('✅ Initial data pre-loaded successfully: No data');
+                    return true; // For preload, no data is still success
                 }
                 
                 console.log(`🔄 Attempt ${attempt}: No data yet, waiting...`);
                 await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
                 
             } catch (error) {
-                console.log(`🔄 Attempt ${attempt}: Error checking data (${error}), retrying...`);
-                await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+                if (maxWaitTime === 0) {
+                    console.error('❌ Failed to pre-load initial data - this will cause UI issues:', error);
+                    return false;
+                } else {
+                    console.log(`🔄 Attempt ${attempt}: Error checking data (${error}), retrying...`);
+                    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+                }
             }
-        }
+        } while (maxWaitTime > 0 && Date.now() - startTime < maxWaitTime);
         
-        console.warn(`⚠️ DHT data verification timeout after ${MAX_WAIT_TIME}ms`);
+        if (maxWaitTime > 0) {
+            console.warn(`⚠️ DHT data verification timeout after ${maxWaitTime}ms`);
+        }
         return false;
     }
 

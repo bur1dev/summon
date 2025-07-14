@@ -12,6 +12,13 @@ export class BackgroundCloneManager {
     private readonly CHECK_INTERVAL_MS = 20 * 1000; // 20 seconds
     private lastSetupTime: number = 0;
 
+    /**
+     * Extract network seed from clone (handles both dna_modifiers and modifiers)
+     */
+    private getCloneSeed(clone: any): string | null {
+        return clone.dna_modifiers?.network_seed || clone.modifiers?.network_seed || null;
+    }
+
     constructor(client: AppClient, cache?: SimpleCloneCache) {
         this.client = client;
         this.cache = cache || null;
@@ -105,13 +112,7 @@ export class BackgroundCloneManager {
     private async cleanupOldClones() {
         try {
             // 1. Get current active seed from directory
-            const currentSeed = await this.client.callZome({
-                role_name: "products_directory",
-                zome_name: "products_directory", 
-                fn_name: "get_active_catalog",
-                payload: null
-            });
-
+            const currentSeed = await this.getCurrentSeed();
             if (!currentSeed) {
                 console.log('🧹 No active catalog found, skipping cleanup');
                 return;
@@ -136,8 +137,7 @@ export class BackgroundCloneManager {
             let disabledCount = 0;
             for (const clone of allMyClones) {
                 if (clone.type === "cloned") {
-                    const cloneValue = clone.value as any; // Type assertion to handle modifiers property
-                    const cloneSeed = cloneValue.dna_modifiers?.network_seed || cloneValue.modifiers?.network_seed;
+                    const cloneSeed = this.getCloneSeed(clone.value);
                     if (cloneSeed && cloneSeed !== currentSeed) {
                         try {
                             await this.client.disableCloneCell({
@@ -169,21 +169,32 @@ export class BackgroundCloneManager {
     }
 
     private async ensureCloneReadyForSetup() {
-        // Get current seed from directory (single call)
-        const currentSeed = await this.client.callZome({
-            role_name: "products_directory",
-            zome_name: "products_directory", 
-            fn_name: "get_active_catalog",
-            payload: null
-        });
-
-        if (!currentSeed) {
-            console.log('🔍 No active catalog found in directory');
-            return;
+        const currentSeed = await this.getCurrentSeed();
+        if (currentSeed) {
+            console.log(`🔍 Found active catalog seed: ${currentSeed.slice(0, 8)}`);
+            await this.ensureCloneReady(currentSeed);
         }
+    }
 
-        console.log(`🔍 Found active catalog seed: ${currentSeed.slice(0, 8)}`);
-        await this.ensureCloneReady(currentSeed);
+    private async getCurrentSeed(): Promise<string | null> {
+        try {
+            const currentSeed = await this.client.callZome({
+                role_name: "products_directory",
+                zome_name: "products_directory", 
+                fn_name: "get_active_catalog",
+                payload: null
+            });
+            
+            if (!currentSeed) {
+                console.log('🔍 No active catalog found in directory');
+                return null;
+            }
+            
+            return currentSeed;
+        } catch (error) {
+            console.log('🔍 Error getting current seed:', error);
+            return null;
+        }
     }
 
     private async ensureCloneReady(currentSeed: string) {
@@ -197,8 +208,7 @@ export class BackgroundCloneManager {
 
             const existingClone = allMyClones.find(clone => {
                 if (clone.type === "cloned") {
-                    const cloneValue = clone.value as any;
-                    const cloneSeed = cloneValue.dna_modifiers?.network_seed || cloneValue.modifiers?.network_seed;
+                    const cloneSeed = this.getCloneSeed(clone.value);
                     return cloneSeed === currentSeed;
                 }
                 return false;

@@ -261,10 +261,11 @@ App.svelte
 - ❌ Multiple initialization patterns in same app
 - ❌ Services that depend on other services through compatibility layers
 
-## Status: Phase 2 COMPLETED - Service Layer Simplification ✅
+## Status: Phase 3 COMPLETED - Service Consolidation ✅
 
 **✅ Phase 1 Completed**: Legacy removal (store.ts, Controller.svelte, profiles)
 **✅ Phase 2 COMPLETED**: Service layer simplification to match cart services pattern
+**✅ Phase 3 COMPLETED**: Service consolidation - merged duplicate address services
 
 ### Current Progress (December 2024)
 
@@ -399,15 +400,24 @@ await doSomething();
 
 ### **5. Next Refactoring Phases**
 
-#### **Phase 3: Service Consolidation**
-1. **Merge AddressService + CartAddressService** into unified AddressService
+#### **Phase 3: Service Consolidation ✅ COMPLETED**
+1. **✅ Merged AddressService + CartAddressService** into unified AddressService
+   - **Eliminated**: CartAddressService.ts (103 lines of duplication)
+   - **Created**: Unified AddressService.ts (291 lines) with clear separation:
+     - **PRIVATE ADDRESSES (profiles.dna)** - Personal address book
+     - **PUBLIC ADDRESSES (cart.dna)** - Current cart delivery address
+     - **SHARED UTILITIES** - Address validation for both types
+   - **Updated**: 4 files with import changes (App.svelte, CheckoutService.ts, CheckoutFlow.svelte, AddressSelector.svelte)
+   - **Verified**: 0 TypeScript errors, clean compilation
 2. **Simplify CheckoutService** by extracting time slot generation to utilities
 3. **Consolidate OrdersService** into CartBusinessService (only 27 lines)
 
-#### **Phase 4: Static Class Elimination**
+#### **Phase 4: Static Class Elimination (NEXT PRIORITY)**
 1. **Convert AnimationService** to simple utility functions
 2. **Convert PriceService** to simple utility functions  
 3. **Convert StockService** to simple utility functions
+
+**Priority Target**: AnimationService, PriceService, StockService - these are classes with only static methods = unnecessary complexity. Should be simple utility functions instead.
 
 #### **Phase 5: ProductDataService Simplification**
 1. **Remove functional exports** (lines 644-713) - pure delegation waste

@@ -20,7 +20,6 @@
   import { setCheckoutServices } from "./cart/services/CheckoutService";
   import { setOrdersClient } from "./cart/services/OrdersService";
   import { setAddressClient } from "./cart/services/AddressService";
-  import { setCartAddressClient } from "./cart/services/CartAddressService";
   import { setPreferencesClient } from "./products/services/PreferencesService";
 
   import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
@@ -126,7 +125,6 @@
     setCheckoutServices(client);
     setOrdersClient(client);
     setAddressClient(client);
-    setCartAddressClient(client);
     setPreferencesClient(client);
     
     console.log('✅ All service clients initialized');

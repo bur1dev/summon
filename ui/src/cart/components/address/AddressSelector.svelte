@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from "svelte";
     import { type Address, addresses, loadAddresses, createAddress, deleteAddress, validateAddress } from "../../services/AddressService";
-    import { selectedCartAddress, selectedCartAddressHash, setDeliveryAddress, updateDeliveryAddress } from "../../services/CartAddressService";
+    import { selectedCartAddress, selectedCartAddressHash, setDeliveryAddress, updateDeliveryAddress } from "../../services/AddressService";
     import AddressForm from "./AddressForm.svelte";
     import AddressList from "./AddressList.svelte";
     import DeleteConfirmationModal from "./DeleteConfirmationModal.svelte";

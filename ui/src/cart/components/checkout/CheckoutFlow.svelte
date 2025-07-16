@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher, onMount, getContext } from "svelte";
     import { get } from "svelte/store";
-    import { selectedCartAddress, selectedCartAddressHash } from "../../services/CartAddressService";
+    import { selectedCartAddress, selectedCartAddressHash } from "../../services/AddressService";
     import { publishOrder, selectedDeliveryTimeSlot, deliveryInstructions, generateDeliveryTimeSlots, validateCheckoutReadiness, saveDeliveryTimeSlot, saveDeliveryInstructions } from "../../services/CheckoutService";
     import AddressSelector from "../address/AddressSelector.svelte";
     import DeliveryTimeSelector from "../address/DeliveryTimeSelector.svelte";

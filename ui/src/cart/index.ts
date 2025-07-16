@@ -2,7 +2,6 @@
 // All services are now functional, not class exports
 export * from './services/CartInteractionService';
 export * from './services/AddressService';
-export * from './services/CartAddressService';
 export * from './services/CheckoutService';
 
 export * from './utils/cartHelpers';

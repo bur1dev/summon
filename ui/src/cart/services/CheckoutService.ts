@@ -1,7 +1,7 @@
 import { callZome } from '../utils/zomeHelpers';
 import { createSuccessResult, createErrorResult, validateClient } from '../utils/errorHelpers';
 import { writable } from 'svelte/store';
-import { getSelectedAddress } from './CartAddressService';
+import { getSelectedAddress } from './AddressService';
 import { decode } from '@msgpack/msgpack';
 import { updateSessionStatus } from './CartBusinessService';
 // Functional store exports for delivery time and instructions

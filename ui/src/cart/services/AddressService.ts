@@ -21,19 +21,41 @@ type ActionHashB64 = string;
 // Type for the addresses map
 type AddressMap = Record<ActionHashB64, Address>;
 
-// Core stores
+// ========================================================================
+// PRIVATE ADDRESSES (profiles.dna) - Personal address book
+// ========================================================================
+
 export const addresses = writable<AddressMap>({});
 export const addressesLoading = writable<boolean>(false);
 
+// ========================================================================
+// PUBLIC ADDRESSES (cart.dna) - Current cart delivery address
+// ========================================================================
+
+export const selectedCartAddress = writable<Address | null>(null);
+export const selectedCartAddressHash = writable<string | null>(null);
+
 let client: any = null;
 
-// Initialize
+// ========================================================================
+// INITIALIZATION
+// ========================================================================
+
 export function setAddressClient(holoClient: any) {
     client = holoClient;
-    // Don't automatically load addresses - will be called explicitly after client is ready
 }
 
-// Load addresses
+// Compatibility alias for cart address initialization
+export function setCartAddressClient(holoClient: any) {
+    setAddressClient(holoClient);
+}
+
+// ========================================================================
+// PRIVATE ADDRESS OPERATIONS (profiles.dna)
+// These functions manage the user's personal address book
+// ========================================================================
+
+// Load private addresses from profiles.dna
 export async function loadAddresses() {
     const clientError = validateClient(client, 'loadAddresses');
     if (clientError) return;
@@ -54,7 +76,7 @@ export async function loadAddresses() {
     }
 }
 
-// Create address
+// Create private address in profiles.dna
 export async function createAddress(address: Address) {
     const clientError = validateClient(client, 'createAddress');
     if (clientError) return clientError;
@@ -78,7 +100,7 @@ export async function createAddress(address: Address) {
     }
 }
 
-// Update address
+// Update private address in profiles.dna
 export async function updateAddress(hashB64: ActionHashB64, address: Address) {
     const clientError = validateClient(client, 'updateAddress');
     if (clientError) return clientError;
@@ -97,7 +119,7 @@ export async function updateAddress(hashB64: ActionHashB64, address: Address) {
     }
 }
 
-// Delete address
+// Delete private address from profiles.dna
 export async function deleteAddress(hashB64: ActionHashB64) {
     const clientError = validateClient(client, 'deleteAddress');
     if (clientError) return clientError;
@@ -120,13 +142,123 @@ export async function deleteAddress(hashB64: ActionHashB64) {
     }
 }
 
-// Get address (for compatibility)
+// Get private address (for compatibility)
 export function getAddress(hashB64: ActionHashB64) {
     return get(addresses)[hashB64];
 }
 
+// Helper to update default address in private address book
+function updateDefaultAddress(defaultHashB64: ActionHashB64) {
+    addresses.update(current => {
+        const updated = { ...current };
+        Object.keys(updated).forEach(hash => {
+            if (hash !== defaultHashB64 && updated[hash].is_default) {
+                updated[hash] = { ...updated[hash], is_default: false };
+            }
+        });
+        return updated;
+    });
+}
 
-// Validate address
+// ========================================================================
+// PUBLIC ADDRESS OPERATIONS (cart.dna)
+// These functions manage the current cart's delivery address
+// ========================================================================
+
+// Set delivery address for the first time in the cart session (PUBLIC)
+export async function setDeliveryAddress(address: Address) {
+    const clientError = validateClient(client, 'setDeliveryAddress');
+    if (clientError) return clientError;
+    
+    console.log('🛒 FRONTEND: Setting PUBLIC address in cart.dna (first time):', `${address.street}, ${address.city}, ${address.state}`);
+    
+    try {
+        const result = await callZome(client, 'cart', 'cart', 'set_delivery_address', address);
+        
+        console.log('✅ FRONTEND: Public address set successfully with hash:', result);
+        
+        // Update local state
+        selectedCartAddress.set(address);
+        selectedCartAddressHash.set(result);
+        
+        return createSuccessResult({ hash: result });
+    } catch (error) {
+        return createErrorResult(error);
+    }
+}
+
+// Update delivery address in the cart session (PUBLIC)
+export async function updateDeliveryAddress(previousHashB64: string, newAddress: Address) {
+    const clientError = validateClient(client, 'updateDeliveryAddress');
+    if (clientError) return clientError;
+    
+    console.log('🔄 FRONTEND: Updating PUBLIC address in cart.dna from hash:', previousHashB64, 'to:', `${newAddress.street}, ${newAddress.city}, ${newAddress.state}`);
+    
+    try {
+        // Create input struct for backend
+        const input = {
+            previous_address_hash: previousHashB64,
+            new_address: newAddress
+        };
+        
+        const result = await callZome(client, 'cart', 'cart', 'update_delivery_address', input);
+        
+        console.log('✅ FRONTEND: Public address updated successfully with new hash:', result);
+        
+        // Update local state
+        selectedCartAddress.set(newAddress);
+        selectedCartAddressHash.set(result);
+        
+        return createSuccessResult({ hash: result });
+    } catch (error) {
+        return createErrorResult(error);
+    }
+}
+
+// Get current cart session data including address (PUBLIC)
+export async function getCartSessionData() {
+    const clientError = validateClient(client, 'getSessionData');
+    if (clientError) return clientError;
+    
+    try {
+        const result = await callZome(client, 'cart', 'cart', 'get_session_data', null);
+        
+        // Update local state if address exists
+        if (result.address) {
+            // Extract address data from Record
+            const addressData = result.address.entry;
+            selectedCartAddress.set(addressData);
+            selectedCartAddressHash.set(result.address.action_hash);
+        }
+        
+        return createSuccessResult(result);
+    } catch (error) {
+        return createErrorResult(error);
+    }
+}
+
+// Clear selected cart address (PUBLIC)
+export function clearSelectedAddress() {
+    selectedCartAddress.set(null);
+    selectedCartAddressHash.set(null);
+}
+
+// Get current selected cart address (PUBLIC)
+export function getSelectedAddress(): Address | null {
+    return get(selectedCartAddress);
+}
+
+// Get current selected cart address hash (PUBLIC)
+export function getSelectedAddressHash(): string | null {
+    return get(selectedCartAddressHash);
+}
+
+// ========================================================================
+// SHARED UTILITIES
+// These functions work with both private and public addresses
+// ========================================================================
+
+// Validate address using OpenStreetMap
 export async function validateAddress(address: Address) {
     try {
         const query = encodeURIComponent(`${address.street}, ${address.city}, ${address.state} ${address.zip}`);
@@ -156,17 +288,4 @@ export async function validateAddress(address: Address) {
     } catch {
         return { valid: false, message: 'Error validating address.' };
     }
-}
-
-// Helper to update default address
-function updateDefaultAddress(defaultHashB64: ActionHashB64) {
-    addresses.update(current => {
-        const updated = { ...current };
-        Object.keys(updated).forEach(hash => {
-            if (hash !== defaultHashB64 && updated[hash].is_default) {
-                updated[hash] = { ...updated[hash], is_default: false };
-            }
-        });
-        return updated;
-    });
 }

@@ -136,7 +136,7 @@
     cloneCache.setBackgroundManager(backgroundCloneManager);
     
     // Create services synchronously after client is ready (talking-stickies pattern)
-    const { ProductsUploadService } = await import('./services/DHTSyncService');
+    const { ProductsUploadService } = await import('./services/DHTUploadService');
     uploadService = new ProductsUploadService(client, { client });
     
     productDataService = new ProductDataService({ client }, cacheService, cloneCache);

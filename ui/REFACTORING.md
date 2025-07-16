@@ -261,13 +261,15 @@ App.svelte
 - ❌ Multiple initialization patterns in same app
 - ❌ Services that depend on other services through compatibility layers
 
-## Status: Phase 5 COMPLETED - ProductDataService Simplification ✅
+## Status: Phase 7 COMPLETED - DHTUploadService Refactoring ✅
 
 **✅ Phase 1 Completed**: Legacy removal (store.ts, Controller.svelte, profiles)
 **✅ Phase 2 COMPLETED**: Service layer simplification to match cart services pattern
 **✅ Phase 3 COMPLETED**: Service consolidation - merged duplicate address services
 **✅ Phase 4 COMPLETED**: Static class elimination - converted to simple utility functions
 **✅ Phase 5 COMPLETED**: ProductDataService simplification - removed functional exports delegation
+**✅ Phase 6 ABANDONED**: Context injection elimination - failed to provide meaningful simplification
+**✅ Phase 7 COMPLETED**: DHTUploadService refactoring - massive function decomposition
 
 ### Current Progress (December 2024)
 
@@ -282,6 +284,8 @@ App.svelte
 - **PHASE 3: Merged AddressService + CartAddressService** (eliminated 103 lines of duplication)
 - **PHASE 4: Converted static classes to utility functions** (eliminated 3 files, cleaner imports)
 - **PHASE 5: Eliminated ProductDataService functional exports** (removed 70 lines of delegation waste)
+- **PHASE 6: ABANDONED Context injection elimination** (failed to provide meaningful improvement)
+- **PHASE 7: DHTUploadService refactoring** (decomposed 147-line function into 7 focused methods)
 
 **🎯 Target Architecture ACHIEVED:**
 ```javascript
@@ -324,50 +328,111 @@ ProductDataService → Direct imports → Components
 SortingStore → Direct imports → Components
 ```
 
-## Next Phase: Eliminate ALL Remaining Complexity ⚠️
+## Phase 7 COMPLETED: DHTUploadService Refactoring ✅
 
-**After removing DataManager.ts, I found MORE complexity patterns throughout the codebase:**
+**Problem Solved**: DHTSyncService.ts contained a massive 147-line nested function that was difficult to understand, debug, and maintain.
 
-### **1. MAJOR COMPLEXITY ISSUES**
+**Solution Implemented**:
+1. **File Renamed**: DHTSyncService.ts → DHTUploadService.ts (better reflects purpose)
+2. **Method Decomposition**: Split 147-line `loadFromSavedData()` into 7 focused methods
+3. **Single Responsibility**: Each method now has one clear purpose
+4. **Maintained Functionality**: Zero behavior changes, same upload logic
 
-#### **A. ProductDataService.ts - Double Pattern Complexity**
-- **Lines 644-713**: Functional exports that just wrap class methods (DataManager-style delegation)
-- **Lines 7-13**: Global service singleton pattern with manual initialization
-- **Problem**: Both class AND functional patterns for the same service
-- **Solution**: Pick one pattern and stick with it
+**Refactoring Results**:
+```javascript
+// BEFORE: One massive nested function
+async loadFromSavedData() {
+  // 147 lines of nested logic doing everything
+}
 
-#### **B. EmbeddingService.ts - Extreme Over-Engineering**
-- **714 lines** of complex state management, worker coordination, and caching
-- **Multiple overlapping concerns**: Worker management, caching, HNSW indexing, embedding generation
-- **Problem**: Single class handling too many responsibilities (violates SRP)
-- **Solution**: Split into focused services with clear boundaries
+// AFTER: Clean orchestration with helper methods
+async loadFromSavedData() {
+  // 40 lines orchestrating the process
+  const { clonedCell, previousCellId } = await this.createNewClone();
+  const data = await this.loadProductDataFromAPI();
+  const productsByType = this.groupProductsByType(data);
+  const uploadResults = await this.uploadAllProductGroups(productsByType, clonedCell, totalProductsFromFile);
+  await this.cleanupOldClone(previousCellId, successfullyUploadedProducts);
+}
+```
 
-#### **C. DHTSyncService.ts - Misleading Name + Complex Logic**
-- **Actually ProductsUploadService** (line 18) but file named DHTSyncService
-- **188 lines** of complex upload logic mixing concerns
-- **Problem**: Name doesn't match functionality, complex nested logic
-- **Solution**: Rename file, simplify upload logic
+**New Method Structure**:
+1. `loadFromSavedData()` - Main orchestrator (40 lines)
+2. `createNewClone()` - Clone setup logic
+3. `loadProductDataFromAPI()` - API data fetching & validation
+4. `groupProductsByType()` - Data grouping logic
+5. `uploadAllProductGroups()` - Upload coordination
+6. `uploadProductGroup()` - Individual group upload with retry logic
+7. `transformProductsForUpload()` - Product data transformation
+8. `cleanupOldClone()` - Cleanup logic
 
-### **2. MODERATE COMPLEXITY ISSUES**
+**Benefits Achieved**:
+- **73% reduction** in main method length (147 → 40 lines)
+- **Much more readable** - Clear method names explain intent
+- **Easier to maintain** - Each method has single responsibility
+- **Easier to debug** - Can debug individual steps
+- **Easier to test** - Each method can be tested independently
 
-#### **A. Service Splitting Without Clear Benefit**
-- **CartAddressService.ts vs AddressService.ts**: Similar functionality split across two files
-- **CheckoutService.ts**: Mixes delivery time generation with DHT operations
-- **OrdersService.ts**: Only 27 lines, could be merged into CartBusinessService
-- **Problem**: Unnecessary file proliferation
-- **Solution**: Consolidate related functionality
+## Next Phase: Context Injection Elimination ⚠️ **NEEDS REVIEW**
 
-#### **B. Unnecessary Wrapper Classes (Static Method Abuse)**
-- **AnimationService.ts**: Static methods that could be simple utility functions
-- **PriceService.ts**: Static methods that could be simple utility functions  
-- **StockService.ts**: Static methods that could be simple utility functions
-- **Problem**: Classes with only static methods = unnecessary complexity
-- **Solution**: Convert to simple utility functions
+**Problem**: Mixed patterns for service access create inconsistency and complexity.
 
-#### **C. Context Injection Overuse**
-- **8 files using getContext()** for simple service access
-- **Problem**: Adds complexity when direct imports would work
-- **Solution**: Use direct imports where appropriate
+**Current State**:
+- ✅ **Cart services**: Use direct imports (clean, simple)
+- ❌ **Product & Upload services**: Use context injection (complex, boilerplate)
+
+**Previous Attempts Failed**:
+- **Attempt 1**: Added wrapper layers instead of removing complexity
+- **Attempt 2**: Completely rewrote service logic (broke functionality)
+- **Result**: No meaningful improvement achieved
+
+**For Next Assistant - Requirements for Success**:
+1. **MUST result in SIMPLER code** - fewer lines, less complexity
+2. **MUST maintain EXACT same functionality** - zero behavior changes
+3. **MUST follow cart services pattern** - direct imports, not context injection
+4. **MUST NOT create new abstraction layers** - eliminate, don't add
+
+**Target Pattern (Cart Services Model)**:
+```javascript
+// Current Cart Services (✅ GOOD - Target Pattern)
+import { cartItems, addToCart } from "./CartBusinessService";
+
+// Current Product Services (❌ BAD - Should Match Cart Pattern)
+const productDataServiceContext = getContext("productDataService");
+$: productDataService = (productDataServiceContext as any)?.getService();
+```
+
+**Key Success Criteria**:
+- **Fewer total lines of code** across all affected files
+- **Consistent patterns** - all services use same access method
+- **No context injection** for singleton services
+- **Same functionality** - upload, navigation, product loading all work identically
+
+**Files to Modify**:
+- `App.svelte` - Remove setContext calls
+- `ProductBrowserData.svelte` - Replace getContext with direct imports
+- `NavigationArrows.svelte` - Replace getContext with direct imports
+- `CategoryReportsAdmin.svelte` - Replace getContext with direct imports
+
+**Red Flags to Avoid**:
+- ❌ Creating wrapper files or modules
+- ❌ Adding new abstraction layers
+- ❌ Changing service business logic
+- ❌ Making code more complex than current state
+
+**Only proceed if you can demonstrate the result will be genuinely simpler.**
+
+### **Remaining Opportunities for Future Development**
+
+#### **Service Consolidation Opportunities**
+- **CheckoutService.ts**: Could extract delivery time generation to separate utilities
+- **OrdersService.ts**: Only 27 lines, could potentially be merged with related services
+- **Solution**: Evaluate if consolidation provides clear benefits
+
+#### **Context vs Direct Import Patterns**
+- **Current mixed usage**: Some services use getContext(), others use direct imports
+- **Opportunity**: Standardize on consistent patterns
+- **Caveat**: Only pursue if genuinely simpler than current state
 
 ### **3. What is setContext vs Direct Imports?**
 
@@ -463,18 +528,18 @@ productDataService.getProductByReference(groupHashB64, productIndex);
 1. **Replace getContext() with direct imports** where appropriate
 2. **Keep getContext() only for true component-specific state**
 
-#### **Phase 7: EmbeddingService Refactoring**
-1. **Extract Worker Management** into separate service
-2. **Extract Caching Logic** into separate utility
-3. **Simplify HNSW operations** with cleaner state management
+#### **Phase 8: Future Improvements**
+1. **Context injection standardization** - If and only if it results in simpler code
+2. **Service consolidation** - Evaluate remaining opportunities for meaningful improvement
 
-#### **Phase 8: File Renaming & Cleanup**
-1. **Rename DHTSyncService.ts** to ProductsUploadService.ts
-2. **Simplify upload logic** with better separation of concerns
-
-### **Expected Benefits**
-- **Eliminate ~500+ lines** of unnecessary delegation code
-- **Consistent patterns** throughout codebase
+### **Benefits Achieved to Date**
+- **Eliminated 300+ lines** of unnecessary delegation code across phases
+- **Consistent patterns** in most services (cart, utility functions, upload service)
 - **Better maintainability** with clear service boundaries
 - **Improved performance** by removing abstraction layers
 - **Easier debugging** with direct call paths
+- **Significantly improved readability** in DHTUploadService
+
+### **Remaining Work**
+- **Context injection standardization** - Only if it genuinely simplifies the codebase
+- **Service consolidation** - Evaluate remaining opportunities on case-by-case basis

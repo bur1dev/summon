@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { PriceService } from "../../../services/PriceService";
+    import { getDisplayPrices } from "../../../utils/priceUtils";
     
     export let product: any;
     
-    $: displayPrices = PriceService.getDisplayPrices(product);
+    $: displayPrices = getDisplayPrices(product);
 </script>
 
 <div class="product-price">

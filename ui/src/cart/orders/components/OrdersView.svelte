@@ -5,7 +5,6 @@
   import { currentViewStore } from "../../../stores/UiOnlyStore";
   import { cartItems, cartTotal, isCheckoutSession } from "../../services/CartBusinessService";
   import { getSessionData } from "../../services/CheckoutService";
-  import { PriceService } from "../../../services/PriceService";
   import OrderCard from "./OrderCard.svelte";
   import { decode } from '@msgpack/msgpack';
 

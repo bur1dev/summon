@@ -7,7 +7,7 @@
     import DeliveryTimeSelector from "../address/DeliveryTimeSelector.svelte";
     import CheckoutSummary from "./CheckoutSummary.svelte";
     import { ChevronLeft } from "lucide-svelte";
-    import { AnimationService } from "../../../services/AnimationService";
+    import { stopCartZipper, startCartZipper, getAnimationDuration } from "../../../utils/animationUtils";
 
 
     // Props
@@ -50,7 +50,7 @@
 
     // When cart is closing from step 3, trigger zipper animation
     $: if (isClosingCart && currentStep === 3 && checkoutContainer) {
-        AnimationService.stopCartZipper(checkoutContainer);
+        stopCartZipper(checkoutContainer);
     }
 
     // Reactive values from stores
@@ -66,7 +66,7 @@
         checkoutContainer &&
         !hasTriggeredCheckoutZipper
     ) {
-        AnimationService.startCartZipper(checkoutContainer);
+        startCartZipper(checkoutContainer);
         hasTriggeredCheckoutZipper = true;
 
         // Remove the animation class after it completes to prevent re-animation on DOM changes
@@ -74,7 +74,7 @@
             if (checkoutContainer) {
                 checkoutContainer.classList.remove("zipper-enter");
             }
-        }, AnimationService.getAnimationDuration("smooth"));
+        }, getAnimationDuration("smooth"));
     }
 
     // Initialize delivery time slots
@@ -131,7 +131,7 @@
             currentStep++;
             isExiting = false;
             isEntering = true;
-        }, AnimationService.getAnimationDuration("smooth"));
+        }, getAnimationDuration("smooth"));
     }
 
     // Go back to previous step
@@ -140,14 +140,14 @@
         isExiting = true;
 
         if (currentStep === 3 && checkoutContainer) {
-            AnimationService.stopCartZipper(checkoutContainer);
+            stopCartZipper(checkoutContainer);
         }
 
         setTimeout(() => {
             currentStep--;
             isExiting = false;
             isEntering = true;
-        }, AnimationService.getAnimationDuration("smooth"));
+        }, getAnimationDuration("smooth"));
     }
 
     // Handle back to cart
@@ -156,14 +156,14 @@
         isExiting = true;
 
         if (currentStep === 3 && checkoutContainer) {
-            AnimationService.stopCartZipper(checkoutContainer);
+            stopCartZipper(checkoutContainer);
         }
 
         setTimeout(() => {
             onClose();
             isEntering = true;
             isExiting = false;
-        }, AnimationService.getAnimationDuration("smooth"));
+        }, getAnimationDuration("smooth"));
     }
 
     // Place the order using new backend system
@@ -204,7 +204,7 @@
             isExiting = true;
 
             if (currentStep === 3 && checkoutContainer) {
-                AnimationService.stopCartZipper(checkoutContainer);
+                stopCartZipper(checkoutContainer);
             }
 
             // 4. Update session status to "Checkout" (existing logic)
@@ -232,7 +232,7 @@
             onClose();
             isEntering = true;
             isExiting = false;
-        }, AnimationService.getAnimationDuration("smooth"));
+        }, getAnimationDuration("smooth"));
     }
 </script>
 

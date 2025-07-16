@@ -3,7 +3,7 @@
     import CategoryReportsAdmin from "../../reports/components/CategoryReportsAdmin.svelte";
     import { X, Tag, AlertTriangle } from "lucide-svelte";
     import { clickable } from "../../shared/actions/clickable";
-    import { AnimationService } from "../../services/AnimationService";
+    import { slideOutPanel } from "../../utils/animationUtils";
 
 
     let showCategoryAdmin = false;
@@ -18,7 +18,7 @@
         ) as HTMLElement;
 
         // Use AnimationService for consistent timing
-        await AnimationService.slideOutPanel(sidebarElement, "left");
+        await slideOutPanel(sidebarElement, "left");
 
         $showMenuStore = false;
         isClosing = false;

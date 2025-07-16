@@ -3,7 +3,7 @@
     import type { DeliveryTimeSlot } from "../../types/CartTypes";
     import { ChevronLeft, ChevronRight } from "lucide-svelte";
     import { clickable } from "../../../shared/actions/clickable";
-    import { AnimationService } from "../../../services/AnimationService";
+    import { stopTimeSlotStagger, startTimeSlotStagger } from "../../../utils/animationUtils";
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
@@ -104,10 +104,10 @@
     // Simple animation logic
     $: if (timeSlotContainer) {
         if (isExiting) {
-            AnimationService.stopTimeSlotStagger(timeSlotContainer);
+            stopTimeSlotStagger(timeSlotContainer);
         } else if (selectedDate && currentDateTimeSlots.length > 0) {
             timeSlotContainer.classList.remove("stagger-enter", "stagger-exit");
-            AnimationService.startTimeSlotStagger(timeSlotContainer);
+            startTimeSlotStagger(timeSlotContainer);
         }
     }
 

@@ -1,6 +1,6 @@
 // ProductsUploadService.ts
 
-import { StockService } from "./StockService";
+import { normalizeStatus } from "../utils/stockUtils";
 import { createAndActivateClone, disableClone } from "../products/utils/cloneHelpers";
 
 
@@ -106,7 +106,7 @@ export class ProductsUploadService {
             price: (typeof product.price === 'number') ? product.price : (product.items?.[0]?.price?.regular ?? 0),
             promo_price: normalizePromoPrice(product.promo_price, product.price),
             size: product.size || "",
-            stocks_status: StockService.normalizeStatus(product.stocks_status),
+            stocks_status: normalizeStatus(product.stocks_status),
             category: product.category,
             subcategory: product.subcategory || null,
             product_type: product.product_type === "All" || !product.product_type ? null : product.product_type,

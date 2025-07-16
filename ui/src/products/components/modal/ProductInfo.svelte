@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { StockService } from "../../../services/StockService";
+    import { getStockInfo } from "../../../utils/stockUtils";
     import { clickable } from "../../../shared/actions/clickable";
     import { navigationStore } from "../../../stores/NavigationStore";
     
@@ -11,7 +11,7 @@
     export let selectedSubcategory: string = "";
 
     // Use StockService for stock information
-    $: stockInfo = StockService.getStockInfo(product);
+    $: stockInfo = getStockInfo(product);
 
     function handleShopAllClick() {
         const productType = product.product_type || product.category;

@@ -6,7 +6,7 @@
     import AddressList from "./AddressList.svelte";
     import DeleteConfirmationModal from "./DeleteConfirmationModal.svelte";
     import { NotebookPen } from "lucide-svelte";
-    import { AnimationService } from "../../../services/AnimationService";
+    import { getAnimationDuration, startItemRemoval } from "../../../utils/animationUtils";
 
     // Props - remove legacy props, use cart address system
     export let deliveryInstructions: string = "";
@@ -99,7 +99,7 @@
                 setTimeout(() => {
                     showNewAddressForm = false;
                     isFormClosing = false;
-                }, AnimationService.getAnimationDuration('normal'));
+                }, getAnimationDuration('normal'));
             } else {
                 validationError = "Failed to save address. Please try again.";
             }
@@ -118,7 +118,7 @@
         setTimeout(() => {
             showNewAddressForm = true;
             isFormClosing = false;
-        }, AnimationService.getAnimationDuration('normal'));
+        }, getAnimationDuration('normal'));
     }
 
     // Update delivery instructions
@@ -133,7 +133,7 @@
             showNewAddressForm = false;
             isFormClosing = false;
             validationError = "";
-        }, AnimationService.getAnimationDuration('normal'));
+        }, getAnimationDuration('normal'));
     }
 
     // Confirmation modal state
@@ -158,7 +158,7 @@
             isConfirmationClosing = false;
             addressToDelete = null;
             addressHashToDelete = null;
-        }, AnimationService.getAnimationDuration('normal'));
+        }, getAnimationDuration('normal'));
     }
 
     // Handle confirmation modal confirm
@@ -180,7 +180,7 @@
         // Find the address element for animation
         const addressElement = document.querySelector(`[data-address-hash="${addressHash}"]`) as HTMLElement;
         if (addressElement) {
-            await AnimationService.startItemRemoval(addressElement);
+            await startItemRemoval(addressElement);
         }
 
         // Delete the address

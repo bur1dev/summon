@@ -5,9 +5,9 @@
   import CartHeader from "./CartHeader.svelte";
   import UnifiedCartItem from "./UnifiedCartItem.svelte";
   import CheckoutFlow from "./checkout/CheckoutFlow.svelte";
-  import { PriceService } from "../../services/PriceService";
+  import { calculateSavings, formatTotal, formatSavings } from "../../utils/priceUtils";
   import { clickable } from "../../shared/actions/clickable";
-  import { AnimationService } from "../../services/AnimationService";
+  import { stopCartZipper, getAnimationDuration, startCartZipper } from "../../utils/animationUtils";
 
   // Props
   export let isOpen = false;
@@ -75,24 +75,24 @@
   // Close cart with animation
   function closeCart() {
     isClosing = true;
-    if (cartContainer) AnimationService.stopCartZipper(cartContainer);
+    if (cartContainer) stopCartZipper(cartContainer);
 
     // Wait for animation to complete, then close
     setTimeout(() => {
       onClose();
       isClosing = false;
-    }, AnimationService.getAnimationDuration("smooth"));
+    }, getAnimationDuration("smooth"));
   }
 
   // Start checkout flow
   function startCheckout() {
     isTransitioningToCheckout = true;
-    if (cartContainer) AnimationService.stopCartZipper(cartContainer);
+    if (cartContainer) stopCartZipper(cartContainer);
 
     setTimeout(() => {
       isShowingCheckoutFlow = true;
       isTransitioningToCheckout = false;
-    }, AnimationService.getAnimationDuration("smooth"));
+    }, getAnimationDuration("smooth"));
   }
 
   // Handle checkout success
@@ -111,11 +111,11 @@
 
 
   // Use PriceService for savings calculation
-  $: totalSavings = PriceService.calculateSavings($cartTotal, $cartPromoTotal);
+  $: totalSavings = calculateSavings($cartTotal, $cartPromoTotal);
 
   // Trigger zipper animation ONLY on initial cart load
   $: if (!isLoading && enrichedCartItems.length > 0 && cartContainer && !hasTriggeredInitialZipper) {
-    AnimationService.startCartZipper(cartContainer);
+    startCartZipper(cartContainer);
     hasTriggeredInitialZipper = true;
     
     // Remove the animation class after it completes to prevent re-animation on DOM changes
@@ -123,7 +123,7 @@
       if (cartContainer) {
         cartContainer.classList.remove('zipper-enter');
       }
-    }, AnimationService.getAnimationDuration('smooth'));
+    }, getAnimationDuration('smooth'));
   }
 </script>
 
@@ -193,14 +193,14 @@
                   : 'slide-in-left'}"
             >
               <div class="cart-total-regular">
-                Total: {PriceService.formatTotal($isCheckoutSession ? 0 : $cartTotal)}
+                Total: {formatTotal($isCheckoutSession ? 0 : $cartTotal)}
               </div>
               <div class="cart-total-promo">
-                With loyalty card: {PriceService.formatTotal($isCheckoutSession ? 0 : $cartPromoTotal)}
+                With loyalty card: {formatTotal($isCheckoutSession ? 0 : $cartPromoTotal)}
               </div>
               {#if !$isCheckoutSession && totalSavings > 0}
                 <div class="savings-amount">
-                  You save: {PriceService.formatSavings(totalSavings)}
+                  You save: {formatSavings(totalSavings)}
                 </div>
               {/if}
             </div>

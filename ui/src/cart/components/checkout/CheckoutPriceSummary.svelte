@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { PriceService } from "../../../services/PriceService";
+    import { formatTotal, formatSavings } from "../../../utils/priceUtils";
 
     // Props
     export let cartItems: any[] = [];
@@ -57,7 +57,7 @@
     <div class="price-row">
         <div class="price-label">Items Subtotal</div>
         <div class="price-value">
-            {PriceService.formatTotal(itemsTotal)}
+            {formatTotal(itemsTotal)}
         </div>
     </div>
 
@@ -65,14 +65,14 @@
         <div class="price-row savings-row">
             <div class="price-label">Loyalty Card Savings</div>
             <div class="price-value savings-value">
-                -{PriceService.formatSavings(totalSavings)}
+                -{formatSavings(totalSavings)}
             </div>
         </div>
 
         <div class="price-row promo-subtotal-row">
             <div class="price-label">Subtotal with Savings</div>
             <div class="price-value promo-value">
-                {PriceService.formatTotal(itemsPromoTotal)}
+                {formatTotal(itemsPromoTotal)}
             </div>
         </div>
     {/if}
@@ -80,14 +80,14 @@
     <div class="price-row">
         <div class="price-label">Estimated Tax</div>
         <div class="price-value">
-            {PriceService.formatTotal(estimatedTax)}
+            {formatTotal(estimatedTax)}
         </div>
     </div>
 
     <div class="price-row total-row">
         <div class="price-label">Total</div>
         <div class="price-value">
-            {PriceService.formatTotal(subtotal)}
+            {formatTotal(subtotal)}
         </div>
     </div>
 </div>

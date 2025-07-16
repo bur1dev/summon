@@ -1,11 +1,11 @@
 <script lang="ts">
     import { PencilLine, Plus, Minus } from "lucide-svelte";
-    import { PriceService } from "../../services/PriceService";
+    import { calculateItemTotal, hasPromoPrice, formatPriceWithUnit, formatTotal, formatSavings } from "../../utils/priceUtils";
     import { decrementItem, incrementItem, removeItem } from "../services/CartInteractionService";
     import { getDisplayUnit, getIncrementValue } from "../utils/cartHelpers";
     import ProductDetailModal from "../../products/components/modal/ProductDetailModal.svelte";
     import CartItem from "./items/CartItem.svelte";
-    import { AnimationService } from "../../services/AnimationService";
+    import { startItemRemoval } from "../../utils/animationUtils";
     import { preferences, loadPreference, getPreferenceKey } from "../../products/services/PreferencesService";
 
     // SIMPLIFIED: Props for new CartItem structure
@@ -54,8 +54,8 @@
     $: displayUnit = getDisplayUnit(product);
 
     // SIMPLIFIED: Use PriceService for calculations with frozen price
-    $: itemTotals = PriceService.calculateItemTotal(product, quantity);
-    $: hasPromo = PriceService.hasPromoPrice(product);
+    $: itemTotals = calculateItemTotal(product, quantity);
+    $: hasPromo = hasPromoPrice(product);
 
     // SIMPLIFIED: Cart interactions using product object
     const handleDecrementItem = async () => {
@@ -68,7 +68,7 @@
             const element =
                 variant === "cart" ? cartItemElement : checkoutItemElement;
             if (element) {
-                await AnimationService.startItemRemoval(element);
+                await startItemRemoval(element);
             }
         }
 
@@ -86,7 +86,7 @@
         const element =
             variant === "cart" ? cartItemElement : checkoutItemElement;
         if (element) {
-            await AnimationService.startItemRemoval(element);
+            await startItemRemoval(element);
         }
 
         // Then remove from cart
@@ -129,7 +129,7 @@
                 <!-- Price display using PriceService -->
                 <div class="cart-item-price">
                     <span
-                        >{PriceService.formatPriceWithUnit(
+                        >{formatPriceWithUnit(
                             product?.price || 0,
                             product?.sold_by,
                         )}</span
@@ -137,7 +137,7 @@
                     {#if hasPromo}
                         <span class="price-separator">/</span>
                         <span class="promo-price">
-                            {PriceService.formatPriceWithUnit(
+                            {formatPriceWithUnit(
                                 product.promo_price,
                                 product?.sold_by,
                             )}
@@ -188,15 +188,15 @@
                 <!-- Total price using PriceService -->
                 <div class="cart-item-total">
                     <span class="total-regular"
-                        >{PriceService.formatTotal(itemTotals.regular)}</span
+                        >{formatTotal(itemTotals.regular)}</span
                     >
                     {#if hasPromo}
                         <span class="total-promo"
-                            >{PriceService.formatTotal(itemTotals.promo)}</span
+                            >{formatTotal(itemTotals.promo)}</span
                         >
                         {#if itemTotals.savings > 0}
                             <span class="total-savings"
-                                >You save {PriceService.formatSavings(
+                                >You save {formatSavings(
                                     itemTotals.savings,
                                 )}</span
                             >
@@ -238,7 +238,7 @@
                 <!-- Price display using PriceService -->
                 <div class="item-quantity-price">
                     <span class="item-unit-price">
-                        {PriceService.formatPriceWithUnit(
+                        {formatPriceWithUnit(
                             product?.price || 0,
                             product?.sold_by,
                         )}
@@ -246,7 +246,7 @@
                     {#if hasPromo}
                         <span class="price-separator">/</span>
                         <span class="item-unit-price promo-price">
-                            {PriceService.formatPriceWithUnit(
+                            {formatPriceWithUnit(
                                 product.promo_price,
                                 product?.sold_by,
                             )}
@@ -294,15 +294,15 @@
                 <!-- Item totals using PriceService -->
                 <div class="item-price">
                     <span class="price-amount"
-                        >{PriceService.formatTotal(itemTotals.regular)}</span
+                        >{formatTotal(itemTotals.regular)}</span
                     >
                     {#if hasPromo}
                         <span class="promo-amount"
-                            >{PriceService.formatTotal(itemTotals.promo)}</span
+                            >{formatTotal(itemTotals.promo)}</span
                         >
                         {#if itemTotals.savings > 0}
                             <span class="item-savings"
-                                >You save {PriceService.formatSavings(
+                                >You save {formatSavings(
                                     itemTotals.savings,
                                 )}</span
                             >

@@ -6,8 +6,8 @@
   import { createEventDispatcher } from "svelte";
   import { clickable } from "../../shared/actions/clickable";
 
-  import { PriceService } from "../../services/PriceService";
-  import { StockService } from "../../services/StockService";
+  import { getDisplayPrices } from "../../utils/priceUtils";
+  import { getStockInfo } from "../../utils/stockUtils";
   import { cartItems, isCheckoutSession, cartReady } from "../../cart/services/CartBusinessService";
   import { addProductToCart, incrementItem, decrementItem } from "../../cart/services/CartInteractionService";
   import { isSoldByWeight, parseProductHash } from "../../cart/utils/cartHelpers";
@@ -39,10 +39,10 @@
   $: displayAmount = $isCheckoutSession ? 0 : currentQuantity;
 
   // Use PriceService for display prices
-  $: displayPrices = PriceService.getDisplayPrices(product);
+  $: displayPrices = getDisplayPrices(product);
 
   // Use StockService for stock information
-  $: stockInfo = StockService.getStockInfo(product);
+  $: stockInfo = getStockInfo(product);
 
   // Function to handle report button click
   function handleReportClick(e: MouseEvent) {

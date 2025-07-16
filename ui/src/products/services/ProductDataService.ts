@@ -4,13 +4,6 @@ import type { DecodedProductGroupEntry } from "../../search/search-utils";
 import type { ProductRowCacheService } from "./ProductRowCacheService";
 import { SimpleCloneCache } from "../utils/SimpleCloneCache";
 
-// Global service instance for functional exports
-let productDataService: ProductDataService | null = null;
-
-// Service initialization function
-export function setProductDataService(service: ProductDataService) {
-  productDataService = service;
-}
 
 interface RawProductFromDHT {
     name: string;
@@ -641,73 +634,3 @@ export class ProductDataService {
     }
 }
 
-// === FUNCTIONAL EXPORTS (Following cart services pattern) ===
-
-// Product reference functions
-export async function getProductByReference(groupHashB64: string, productIndex: number) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.getProductByReference(groupHashB64, productIndex);
-}
-
-export function extractProductsFromGroups(groupRecords: any[]) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.extractProductsFromGroups(groupRecords);
-}
-
-// Navigation functions
-export async function navigate(direction: "left" | "right", params: NavigationParams) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.navigate(direction, params);
-}
-
-export async function loadProductsForNavigation(
-  category: string,
-  subcategory: string,
-  productType: string | undefined,
-  groupOffset: number,
-  groupLimit: number,
-  isProductType: boolean = false
-) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.loadProductsForNavigation(
-    category, subcategory, productType, groupOffset, groupLimit, isProductType
-  );
-}
-
-// Category loading functions
-export async function loadSubcategoryProducts(
-  category: string,
-  subcategory: string,
-  containerCapacity: number
-) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.loadSubcategoryProducts(category, subcategory, containerCapacity);
-}
-
-export async function loadProductTypeProducts(
-  category: string,
-  subcategory: string,
-  productType: string | null,
-  isPreview: boolean = false,
-  containerCapacity?: number
-) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.loadProductTypeProducts(
-    category, subcategory, productType, isPreview, containerCapacity
-  );
-}
-
-export async function loadAllCategoryProducts(category: string) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.loadAllCategoryProducts(category);
-}
-
-// Utility functions
-export async function getTotalProductsForPath(
-  category: string,
-  subcategory?: string,
-  productType?: string
-) {
-  if (!productDataService) throw new Error('ProductDataService not initialized');
-  return productDataService.calculateTotalForPath(category, subcategory, productType);
-}

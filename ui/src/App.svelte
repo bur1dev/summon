@@ -31,7 +31,6 @@
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
   import { cartTotal } from "./cart/services/CartBusinessService";
-  import { setProductDataService } from "./products/services/ProductDataService";
 
   // App connection constants
   const appId = import.meta.env.VITE_APP_ID ? import.meta.env.VITE_APP_ID : "summon";
@@ -142,8 +141,6 @@
     
     productDataService = new ProductDataService({ client }, cacheService, cloneCache);
     
-    // Initialize ProductDataService for functional exports
-    setProductDataService(productDataService);
     
     // Make upload service available globally for debugging/manual upload
     (window as any).uploadService = uploadService;

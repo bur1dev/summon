@@ -2,7 +2,6 @@
     import { onMount, onDestroy } from "svelte";
     import { mainCategories } from "../../products/utils/categoryData";
     import { getContext } from "svelte";
-    import { extractProductsFromGroups } from "../../products/services/ProductDataService";
     import {
         X,
         Check,

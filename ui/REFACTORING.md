@@ -261,11 +261,13 @@ App.svelte
 - ❌ Multiple initialization patterns in same app
 - ❌ Services that depend on other services through compatibility layers
 
-## Status: Phase 3 COMPLETED - Service Consolidation ✅
+## Status: Phase 5 COMPLETED - ProductDataService Simplification ✅
 
 **✅ Phase 1 Completed**: Legacy removal (store.ts, Controller.svelte, profiles)
 **✅ Phase 2 COMPLETED**: Service layer simplification to match cart services pattern
 **✅ Phase 3 COMPLETED**: Service consolidation - merged duplicate address services
+**✅ Phase 4 COMPLETED**: Static class elimination - converted to simple utility functions
+**✅ Phase 5 COMPLETED**: ProductDataService simplification - removed functional exports delegation
 
 ### Current Progress (December 2024)
 
@@ -277,6 +279,9 @@ App.svelte
 - Converted to direct imports following cart services pattern
 - Created SortingStore.ts for filter state management
 - Updated 11 files to use direct imports instead of context injection
+- **PHASE 3: Merged AddressService + CartAddressService** (eliminated 103 lines of duplication)
+- **PHASE 4: Converted static classes to utility functions** (eliminated 3 files, cleaner imports)
+- **PHASE 5: Eliminated ProductDataService functional exports** (removed 70 lines of delegation waste)
 
 **🎯 Target Architecture ACHIEVED:**
 ```javascript
@@ -412,17 +417,47 @@ await doSomething();
 2. **Simplify CheckoutService** by extracting time slot generation to utilities
 3. **Consolidate OrdersService** into CartBusinessService (only 27 lines)
 
-#### **Phase 4: Static Class Elimination (NEXT PRIORITY)**
-1. **Convert AnimationService** to simple utility functions
-2. **Convert PriceService** to simple utility functions  
-3. **Convert StockService** to simple utility functions
+#### **Phase 4: Static Class Elimination ✅ COMPLETED**
+1. **✅ Converted AnimationService** to animationUtils.ts (9 functions)
+2. **✅ Converted PriceService** to priceUtils.ts (10 functions)
+3. **✅ Converted StockService** to stockUtils.ts (8 functions)
 
-**Priority Target**: AnimationService, PriceService, StockService - these are classes with only static methods = unnecessary complexity. Should be simple utility functions instead.
+**Results Achieved:**
+- **Eliminated 3 unnecessary static class files** (PriceService.ts, StockService.ts, AnimationService.ts)
+- **Created 3 clean utility modules** in /utils/ directory
+- **Updated 15 files** with new import statements
+- **Better tree shaking** - import only specific functions needed
+- **Cleaner syntax** - no unnecessary class prefixes
+- **Consistent patterns** - matches existing utils/ directory structure
+- **0 TypeScript errors** - perfect compilation maintained
+- **Net code reduction** - 14 fewer lines, simpler implementation
 
-#### **Phase 5: ProductDataService Simplification**
-1. **Remove functional exports** (lines 644-713) - pure delegation waste
-2. **Eliminate global singleton pattern** (lines 7-13)
-3. **Use consistent class-based approach** throughout
+#### **Phase 5: ProductDataService Simplification ✅ COMPLETED**
+1. **✅ Removed functional exports** (lines 644-713) - eliminated 70 lines of delegation waste
+2. **✅ Eliminated global singleton pattern** (lines 7-13) - removed `productDataService` global variable
+3. **✅ Updated all imports** to use class-based approach consistently
+
+**What Was Removed:**
+```typescript
+// BEFORE: Dual pattern complexity (lines 644-712)
+export async function getProductByReference(groupHashB64: string, productIndex: number) {
+  if (!productDataService) throw new Error('ProductDataService not initialized');
+  return productDataService.getProductByReference(groupHashB64, productIndex);
+}
+// ... 15+ more functions doing the same delegation
+
+// AFTER: Clean class-based approach
+productDataService.getProductByReference(groupHashB64, productIndex);
+```
+
+**Files Updated:**
+- **ProductDataService.ts**: Removed functional exports and global singleton
+- **NavigationArrows.svelte**: Updated to use class-based service from context
+- **ProductBrowserData.svelte**: Updated 4 function calls to use class methods
+- **CategoryReportsAdmin.svelte**: Removed unused import
+- **App.svelte**: Removed `setProductDataService()` call
+
+**Results**: 70 lines removed, consistent class-based pattern throughout, 0 TypeScript errors.
 
 #### **Phase 6: Context Injection Review**
 1. **Replace getContext() with direct imports** where appropriate

@@ -2,13 +2,7 @@
     // TODO: ProductBrowserData.svelte doing too much
     // maybe centralize resizeObserver logic and simplify data fetching?
     // We have resize observer logic in useVirtualGrid.ts and also useResizeObserver.ts
-    import { onDestroy, onMount, createEventDispatcher } from "svelte";
-    import { 
-        loadSubcategoryProducts, 
-        loadProductTypeProducts, 
-        loadAllCategoryProducts as loadAllCategoryProductsService, 
-        getTotalProductsForPath 
-    } from "../services/ProductDataService";
+    import { onDestroy, onMount, createEventDispatcher, getContext } from "svelte";
     import { tick } from "svelte";
     import { useResizeObserver } from "../../shared/utils/useResizeObserver";
     import ProductBrowserView from "./ProductBrowserView.svelte";
@@ -24,6 +18,10 @@
     }> = [];
 
     const dispatch = createEventDispatcher();
+
+    // Get ProductDataService from context
+    const productDataServiceContext = getContext("productDataService");
+    $: productDataService = (productDataServiceContext as any)?.getService();
 
     // State variables with proper types
     let categoryProducts: Record<string, any[]> = {};
@@ -236,7 +234,7 @@
 
             let result;
             if (isProductTypeRow) {
-                result = await loadProductTypeProducts(
+                result = await productDataService.loadProductTypeProducts(
                     category,
                     subcategory,
                     identifier,
@@ -244,7 +242,7 @@
                     capacity,
                 );
             } else {
-                result = await loadSubcategoryProducts(
+                result = await productDataService.loadSubcategoryProducts(
                     category,
                     subcategory,
                     capacity,
@@ -331,7 +329,7 @@
                     .map(async (featured) => {
                         console.log('📡 Fetching data for:', featured.category, featured.subcategory);
                         const result =
-                            await loadSubcategoryProducts(
+                            await productDataService.loadSubcategoryProducts(
                                 featured.category,
                                 featured.subcategory || featured.category,
                                 containerCapacity,
@@ -380,7 +378,7 @@
             if ($navigationStore.productType !== "All") {
                 isLoadingProductType = true;
 
-                const result = await loadProductTypeProducts(
+                const result = await productDataService.loadProductTypeProducts(
                     $navigationStore.category,
                     $navigationStore.subcategory,
                     $navigationStore.productType,
@@ -426,7 +424,7 @@
 
         const initialResults = await Promise.all(
             initialSubcategories.map(async (sub: any) => {
-                return await loadSubcategoryProducts(
+                return await productDataService.loadSubcategoryProducts(
                     $navigationStore.category!,
                     sub.name,
                     capacity,
@@ -467,7 +465,7 @@
 
             const batchResults = await Promise.all(
                 currentBatch.map(async (sub: any) => {
-                    return await loadSubcategoryProducts(
+                    return await productDataService.loadSubcategoryProducts(
                         $navigationStore.category!,
                         sub.name,
                         capacity,
@@ -514,7 +512,7 @@
     async function loadGridOnlySubcategory(navId: number) {
         if (!$navigationStore.category || !$navigationStore.subcategory) return;
 
-        const result = await loadProductTypeProducts(
+        const result = await productDataService.loadProductTypeProducts(
             $navigationStore.category,
             $navigationStore.subcategory,
             null,
@@ -553,7 +551,7 @@
 
             const batchResults = await Promise.all(
                 currentBatch.map(async (type: string) => {
-                    return await loadProductTypeProducts(
+                    return await productDataService.loadProductTypeProducts(
                         $navigationStore.category!,
                         $navigationStore.subcategory!,
                         type,
@@ -578,7 +576,7 @@
 
         if (!$navigationStore.category) return;
 
-        const gridData = await loadAllCategoryProductsService(
+        const gridData = await productDataService.loadAllCategoryProducts(
             $navigationStore.category,
         );
 
@@ -651,7 +649,7 @@
                     result.total || result.products?.length || 0;
             } else if (type === "homeView") {
                 try {
-                    const total = await getTotalProductsForPath(
+                    const total = await productDataService.calculateTotalForPath(
                         result.category,
                         result.subcategory,
                     );
@@ -669,7 +667,7 @@
                 $navigationStore.subcategory
             ) {
                 try {
-                    const total = await getTotalProductsForPath(
+                    const total = await productDataService.calculateTotalForPath(
                         $navigationStore.category,
                         $navigationStore.subcategory,
                         identifier,

@@ -2,7 +2,7 @@
     // TODO: ProductBrowserData.svelte doing too much
     // maybe centralize resizeObserver logic and simplify data fetching?
     // We have resize observer logic in useVirtualGrid.ts and also useResizeObserver.ts
-    import { onDestroy, onMount, createEventDispatcher, getContext } from "svelte";
+    import { onDestroy, onMount, createEventDispatcher } from "svelte";
     import { tick } from "svelte";
     import { useResizeObserver } from "../../shared/utils/useResizeObserver";
     import ProductBrowserView from "./ProductBrowserView.svelte";
@@ -10,6 +10,9 @@
 
     // Import NavigationStore for simple navigation
     import { navigationStore } from "../../stores/NavigationStore";
+    
+    // Import ProductDataService directly
+    import { productDataService } from "../services/ProductDataService";
 
     // Required props - dataManager no longer needed
     export let featuredSubcategories: Array<{
@@ -18,10 +21,6 @@
     }> = [];
 
     const dispatch = createEventDispatcher();
-
-    // Get ProductDataService from context
-    const productDataServiceContext = getContext("productDataService");
-    $: productDataService = (productDataServiceContext as any)?.getService();
 
     // State variables with proper types
     let categoryProducts: Record<string, any[]> = {};
@@ -200,6 +199,8 @@
         startIndex: number,
         capacity: number,
     ) {
+        if (!productDataService) return;
+        
         let category = $navigationStore.category;
         let subcategory = $navigationStore.subcategory;
 
@@ -301,6 +302,8 @@
     }
 
     async function loadHomeView(navId: number) {
+        if (!productDataService) return;
+        
         console.log('🏠 Starting loadHomeView, navId:', navId);
         resetState();
 
@@ -327,6 +330,7 @@
             const batchResults = await Promise.all(
                 currentBatch
                     .map(async (featured) => {
+                        if (!productDataService) return null;
                         console.log('📡 Fetching data for:', featured.category, featured.subcategory);
                         const result =
                             await productDataService.loadSubcategoryProducts(
@@ -368,6 +372,8 @@
     }
 
     async function loadProductsForProductType(navId: number) {
+        if (!productDataService) return;
+        
         if (
             !$navigationStore.category ||
             !$navigationStore.subcategory
@@ -414,6 +420,7 @@
     }
 
     async function loadMainCategoryView(capacity: number, navId: number) {
+        if (!productDataService) return;
         if (!$navigationStore.category) return;
 
         const categoryConfig = mainCategories.find(
@@ -424,6 +431,7 @@
 
         const initialResults = await Promise.all(
             initialSubcategories.map(async (sub: any) => {
+                if (!productDataService) return null;
                 return await productDataService.loadSubcategoryProducts(
                     $navigationStore.category!,
                     sub.name,
@@ -465,6 +473,7 @@
 
             const batchResults = await Promise.all(
                 currentBatch.map(async (sub: any) => {
+                    if (!productDataService) return null;
                     return await productDataService.loadSubcategoryProducts(
                         $navigationStore.category!,
                         sub.name,
@@ -482,6 +491,7 @@
     }
 
     async function loadSubcategoryView(capacity: number, navId: number) {
+        if (!productDataService) return;
         if (!$navigationStore.category || !$navigationStore.subcategory) return;
 
         const categoryConfig = mainCategories.find(
@@ -510,6 +520,7 @@
     }
 
     async function loadGridOnlySubcategory(navId: number) {
+        if (!productDataService) return;
         if (!$navigationStore.category || !$navigationStore.subcategory) return;
 
         const result = await productDataService.loadProductTypeProducts(
@@ -532,6 +543,7 @@
     }
 
     async function loadProductTypesView(capacity: number, navId: number) {
+        if (!productDataService) return;
         if (!$navigationStore.category || !$navigationStore.subcategory) return;
 
         const categoryConfig = mainCategories.find(
@@ -551,6 +563,7 @@
 
             const batchResults = await Promise.all(
                 currentBatch.map(async (type: string) => {
+                    if (!productDataService) return null;
                     return await productDataService.loadProductTypeProducts(
                         $navigationStore.category!,
                         $navigationStore.subcategory!,
@@ -570,6 +583,7 @@
     }
 
     async function loadAllCategoryProducts(navId: number) {
+        if (!productDataService) return;
         if ($navigationStore.subcategory !== null) {
             return;
         }
@@ -649,6 +663,7 @@
                     result.total || result.products?.length || 0;
             } else if (type === "homeView") {
                 try {
+                    if (!productDataService) return;
                     const total = await productDataService.calculateTotalForPath(
                         result.category,
                         result.subcategory,
@@ -667,6 +682,7 @@
                 $navigationStore.subcategory
             ) {
                 try {
+                    if (!productDataService) return;
                     const total = await productDataService.calculateTotalForPath(
                         $navigationStore.category,
                         $navigationStore.subcategory,

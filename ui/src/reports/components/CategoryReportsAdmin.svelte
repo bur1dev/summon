@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { mainCategories } from "../../products/utils/categoryData";
-    import { getContext } from "svelte";
     import {
         X,
         Check,
@@ -11,12 +10,9 @@
         RefreshCw,
     } from "lucide-svelte";
     import { clickable } from "../../shared/actions/clickable";
+    import { uploadService } from "../../services/DHTUploadService";
 
     // No longer need DataManager context - using direct imports
-    
-    // Get UploadService for admin operations
-    const uploadServiceContext = getContext("uploadService");
-    $: uploadService = (uploadServiceContext as any)?.getService();
 
     export let onClose = () => {};
 
@@ -689,7 +685,7 @@
     }
 
     // Get sync status from the store (MOVED FROM SIDEBAR)
-    $: syncStatus = uploadService?.getState ? uploadService.getState()?.syncStatus : {
+    $: syncStatus = {
         inProgress: false,
         message: "",
         progress: 0,

@@ -1,6 +1,7 @@
 <script lang="ts">
-    import { createEventDispatcher, getContext } from "svelte";
+    import { createEventDispatcher } from "svelte";
     import { ChevronsLeft, ChevronsRight } from "lucide-svelte";
+    import { productDataService } from "../../products/services/ProductDataService";
 
     export let direction: "left" | "right";
     export let disabled: boolean = false;
@@ -17,13 +18,9 @@
     const dispatch = createEventDispatcher();
     let isNavigating = false;
 
-    // Get ProductDataService from context
-    const productDataServiceContext = getContext("productDataService");
-    $: productDataService = (productDataServiceContext as any)?.getService();
-
     // Handle navigation
     async function handleNavigation() {
-        if (!mainGridContainer || disabled || isNavigating) {
+        if (!productDataService || !mainGridContainer || disabled || isNavigating) {
             return;
         }
 

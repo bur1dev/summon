@@ -3,6 +3,13 @@
 import { normalizeStatus } from "../utils/stockUtils";
 import { createAndActivateClone, disableClone } from "../products/utils/cloneHelpers";
 
+// Exported service instance for direct imports
+export let uploadService: ProductsUploadService | null = null;
+
+export function setUploadService(service: ProductsUploadService): void {
+    uploadService = service;
+}
+
 
 // Add this function to normalize promo prices during DHT sync
 function normalizePromoPrice(promoPrice: number | null | undefined, regularPrice: number | null | undefined): number | null {

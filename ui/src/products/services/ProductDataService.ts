@@ -4,6 +4,13 @@ import type { DecodedProductGroupEntry } from "../../search/search-utils";
 import type { ProductRowCacheService } from "./ProductRowCacheService";
 import { SimpleCloneCache } from "../utils/SimpleCloneCache";
 
+// Exported service instance for direct imports
+export let productDataService: ProductDataService | null = null;
+
+export function setProductDataService(service: ProductDataService): void {
+    productDataService = service;
+}
+
 
 interface RawProductFromDHT {
     name: string;

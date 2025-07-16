@@ -2,7 +2,7 @@
   
   import ShopView from "./navigation/components/ShopView.svelte";
   import HeaderContainer from "./navigation/components/HeaderContainer.svelte";
-  import { ProductDataService } from "./products/services/ProductDataService";
+  import { ProductDataService, setProductDataService } from "./products/services/ProductDataService";
   import { ProductRowCacheService } from "./products/services/ProductRowCacheService";
   import { SimpleCloneCache } from "./products/utils/SimpleCloneCache";
   import { BackgroundCloneManager } from "./products/utils/BackgroundCloneManager";
@@ -136,10 +136,14 @@
     cloneCache.setBackgroundManager(backgroundCloneManager);
     
     // Create services synchronously after client is ready (talking-stickies pattern)
-    const { ProductsUploadService } = await import('./services/DHTUploadService');
+    const { ProductsUploadService, setUploadService } = await import('./services/DHTUploadService');
     uploadService = new ProductsUploadService(client, { client });
     
     productDataService = new ProductDataService({ client }, cacheService, cloneCache);
+    
+    // Set exported service instances for direct imports
+    setUploadService(uploadService);
+    setProductDataService(productDataService);
     
     
     // Make upload service available globally for debugging/manual upload
@@ -148,9 +152,6 @@
     connected = true;
   }
 
-  // Set contexts directly (talking-stickies pattern)
-  setContext("productDataService", { getService: () => productDataService });
-  setContext("uploadService", { getService: () => uploadService });
   
   onMount(async () => {
     await initialize();

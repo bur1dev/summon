@@ -67,8 +67,13 @@ export class ProductDataService {
     constructor(store: any, cache: ProductRowCacheService, cloneCache?: SimpleCloneCache) {
         this.store = store;
         this.cache = cache;
-        this.cloneCache = cloneCache || new SimpleCloneCache(store.service.client);
+        this.cloneCache = cloneCache || new SimpleCloneCache(store.client);
         console.log('🚀 ProductDataService initialized');
+    }
+    
+    // Public getter for store access
+    public get storeInstance(): any {
+        return this.store;
     }
 
     // Get the cell_id for targeting the current active clone with caching
@@ -86,7 +91,7 @@ export class ProductDataService {
             const cellId = await this.getActiveCloneCellId();
 
             // Call the same zome method that the browsing system uses
-            const result = await this.store.service.client.callZome({
+            const result = await this.store.client.callZome({
                 cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_product_group",
@@ -116,7 +121,7 @@ export class ProductDataService {
     ): Promise<number> {
         try {
             const cellId = await this.getActiveCloneCellId();
-            const response = await this.store.service.client.callZome({
+            const response = await this.store.client.callZome({
                 cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_all_group_counts_for_path",
@@ -310,7 +315,7 @@ export class ProductDataService {
         const parsed = this.parseIdentifier(params.identifier, params);
 
         const cellId = await this.getActiveCloneCellId();
-        const response = await this.store.service.client.callZome({
+        const response = await this.store.client.callZome({
             cell_id: cellId,
             zome_name: "product_catalog",
             fn_name: "get_all_group_counts_for_path",
@@ -357,7 +362,7 @@ export class ProductDataService {
             const parsed = this.parseIdentifier(params.identifier, params);
 
             const cellId = await this.getActiveCloneCellId();
-            const response = await this.store.service.client.callZome({
+            const response = await this.store.client.callZome({
                 cell_id: cellId,
                 zome_name: "product_catalog",
                 fn_name: "get_products_by_category",
@@ -455,7 +460,7 @@ export class ProductDataService {
                 const cellId = await this.getActiveCloneCellId();
                 console.log(`Calling zome (attempt ${attempt}):`, fn_name, 'with cell_id:', cellId[0].slice(0, 8) + '...');
                 
-                return await this.store.service.client.callZome({
+                return await this.store.client.callZome({
                     cell_id: cellId,
                     zome_name: "product_catalog",
                     fn_name: fn_name,

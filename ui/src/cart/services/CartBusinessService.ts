@@ -31,8 +31,7 @@ let nextAddedOrder = 1;
 // Service initialization
 export function setCartServices(holoClient: any): void {
     client = holoClient;
-    loadCart();
-    updateSessionStatus(); // Load initial session status
+    // Don't automatically load cart - will be called explicitly after client is ready
 }
 
 export function setDataManager(_dataManager: any): void {

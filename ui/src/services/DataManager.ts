@@ -22,7 +22,7 @@ interface FilterState {
  * DO NOT remove this layer or directly expose ProductDataService to components!
  */
 export class DataManager {
-    private productDataService: ProductDataService;
+    public productDataService: ProductDataService;
     private readonly _filterStore = writable<FilterState>({
         sortBy: 'best',
         selectedBrands: new Set(),

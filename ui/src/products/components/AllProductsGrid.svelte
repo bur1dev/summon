@@ -15,8 +15,9 @@
     export let selectedProductType: string | null = null;
     export let products: any[] = [];
 
-    const dataManager = getContext<DataManager>("dataManager");
-    const { filterState } = dataManager;
+    const dataManagerStore = getContext("dataManager");
+    $: dataManager = $dataManagerStore;
+    $: filterState = dataManager?.filterState;
     const dispatch = createEventDispatcher();
 
     let productsGridRef: HTMLElement;
@@ -53,9 +54,9 @@
 
     // Track previous sort/filter state to detect order changes
     let previousSortState = {
-        sortBy: $filterState.sortBy,
-        brands: new Set($filterState.selectedBrands),
-        organic: $filterState.selectedOrganic,
+        sortBy: $filterState?.sortBy || 'best',
+        brands: new Set($filterState?.selectedBrands || []),
+        organic: $filterState?.selectedOrganic || 'all',
     };
 
     // Apply sorting and filtering to products using DataManager

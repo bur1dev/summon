@@ -44,9 +44,7 @@
   }
 
 
-  // Get the store for the client
-  const storeContext = getContext<import("../../../store").StoreContext>("store");
-  const store = storeContext.getStore();
+  // Store context removed - direct service access used
 
   // State
   let isLoading = true;
@@ -203,7 +201,6 @@
       <div class="carts-grid">
         <OrderCard 
           item={checkoutOrder} 
-          agentPubKey={store?.myAgentPubKeyB64}
           on:returnToShopping={returnToShopping}
         />
       </div>

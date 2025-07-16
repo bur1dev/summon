@@ -10,7 +10,6 @@
     import { deduplicateProducts } from "./search-utils";
     import type { Product, SearchMethod } from "./search-types";
 
-    export let store;
     export let query: string = "";
     export let selectedProductHash: any = null;
     export let productName: string = "";
@@ -18,8 +17,7 @@
     export let searchMethod: SearchMethod = ""; // Now uses the SearchMethod type
 
     let apiClient: SearchApiClient;
-    let uiProps;
-    $: uiProps = store?.uiProps;
+    // UIProps removed
 
     let isLoading = false;
     let displayedResults: Product[] = [];
@@ -29,7 +27,7 @@
     const dispatch = createEventDispatcher();
 
     onMount(() => {
-        apiClient = new SearchApiClient(store);
+        apiClient = new SearchApiClient(null); // Store removed
         // Initial call to processAndDisplayResults will be triggered by the reactive block
     });
 

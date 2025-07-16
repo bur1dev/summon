@@ -30,7 +30,7 @@ let client: any = null;
 // Initialize
 export function setAddressClient(holoClient: any) {
     client = holoClient;
-    loadAddresses();
+    // Don't automatically load addresses - will be called explicitly after client is ready
 }
 
 // Load addresses

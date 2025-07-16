@@ -1,7 +1,5 @@
 <script lang="ts">
   import { getContext } from "svelte";
-  import type { Writable } from "svelte/store";
-  import type { ShopStore, StoreContext, UIProps } from "../../store";
   import type { DataManager } from "../../services/DataManager";
   import SearchResults from "../../search/SearchResults.svelte";
   import ReportCategoryDialog from "../../reports/components/ReportCategoryDialog.svelte";
@@ -24,39 +22,22 @@
   // Note: searchMode and searchQuery now come from DataManager navigationState
   
   // Get DataManager from context
-  const dataManager = getContext<DataManager>("dataManager");
+  const dataManagerStore = getContext("dataManager");
+  $: dataManager = $dataManagerStore;
 
   // Import NavigationStore and category utilities
   import { navigationStore } from "../../stores/NavigationStore";
   import { mainCategories } from "../../products/utils/categoryData";
 
-  const storeContext = getContext<StoreContext>("store");
-  let store: ShopStore | null = storeContext ? storeContext.getStore() : null;
+  // Store context removed - using direct service access
 
 
   export function selectCategory(category: any, subcategory: any) {
     handleCategorySelect({ detail: { category, subcategory } });
   }
 
-  let uiProps: Writable<UIProps> | null = null;
-  $: if (store) {
-    uiProps = store.uiProps;
-  }
+  // UIProps removed - using direct store access
 
-  $: {
-    if (uiProps && $uiProps) {
-      const props = $uiProps as any;
-      // Note: searchMode and searchQuery now managed by DataManager navigationState
-      if (props.selectedProductHash !== undefined)
-        $selectedProductHashStore = props.selectedProductHash;
-      if (props.productName !== undefined)
-        $productNameStore = props.productName;
-      if (props.searchResults !== undefined)
-        $searchResultsStore = props.searchResults || [];
-      if (props.isViewAll !== undefined)
-        $isViewAllStore = props.isViewAll || false;
-    }
-  }
 
   function handleCategorySelect({
     detail: { category, subcategory },
@@ -108,7 +89,7 @@
 
 <div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
   <div class="main-content">
-    {#if store && dataManager}
+    {#if dataManager}
       <div class="content-wrapper">
         {#if $navigationStore.category && $navigationStore.subcategory && !$navigationStore.searchMode}
             {#if showProductTypeNavigation}
@@ -144,7 +125,6 @@
         <div class="product-sections">
           {#if $navigationStore.searchMode}
             <SearchResults
-              {store}
               query={$navigationStore.searchQuery}
               selectedProductHash={$selectedProductHashStore}
               productName={$productNameStore}

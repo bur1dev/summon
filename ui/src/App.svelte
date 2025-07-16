@@ -1,9 +1,19 @@
 <script lang="ts">
-  import Controller from "./Controller.svelte";
+  import ShopView from "./navigation/components/ShopView.svelte";
+  import HeaderContainer from "./navigation/components/HeaderContainer.svelte";
+  import { ProductDataService } from "./products/services/ProductDataService";
+  import { ProductRowCacheService } from "./products/services/ProductRowCacheService";
+  import { SimpleCloneCache } from "./products/utils/SimpleCloneCache";
+  import { BackgroundCloneManager } from "./products/utils/BackgroundCloneManager";
+  import { DataManager } from "./services/DataManager";
+  import AppLoadingScreen from "./components/AppLoadingScreen.svelte";
+  import { cloneSetupStore } from "./stores/LoadingStore";
+  import { setContext, onMount } from "svelte";
   import {
     AppWebsocket,
     AdminWebsocket,
     type AppWebsocketConnectionOptions,
+    type AppClient,
   } from "@holochain/client";
   import "@shoelace-style/shoelace/dist/themes/light.css";
   import { setCartServices } from "./cart/services/CartBusinessService";
@@ -12,50 +22,71 @@
   import { setAddressClient } from "./cart/services/AddressService";
   import { setCartAddressClient } from "./cart/services/CartAddressService";
   import { setPreferencesClient } from "./products/services/PreferencesService";
-  import { setContext } from "svelte";
-  import { writable } from "svelte/store";
-  import { ShopStore, type StoreContext } from "./store";
 
-  // Import Profiles components
-  import { ProfilesStore, ProfilesClient } from "@holochain-open-dev/profiles";
-  import "@holochain-open-dev/profiles/dist/elements/profiles-context.js";
-  import "@holochain-open-dev/profiles/dist/elements/create-profile.js";
+  import CategorySidebar from "./navigation/components/CategorySidebar.svelte";
+  import SlideOutCart from "./cart/components/SlideOutCart.svelte";
+  import OrdersView from "./cart/orders/components/OrdersView.svelte";
 
-  const appId = import.meta.env.VITE_APP_ID
-    ? import.meta.env.VITE_APP_ID
-    : "summon";
+  // Import from UI-only store
+  import { currentViewStore, isCartOpenStore } from "./stores/UiOnlyStore";
+
+  import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
+  import { setDataManager, cartTotal } from "./cart/services/CartBusinessService";
+  import { setNavigationDataManager } from "./stores/NavigationStore";
+
+  // App connection constants
+  const appId = import.meta.env.VITE_APP_ID ? import.meta.env.VITE_APP_ID : "summon";
   const roleName = "cart";
-  const appPort = import.meta.env.VITE_APP_PORT
-    ? import.meta.env.VITE_APP_PORT
-    : 8888;
+  const appPort = import.meta.env.VITE_APP_PORT ? import.meta.env.VITE_APP_PORT : 8888;
   const adminPort = import.meta.env.VITE_ADMIN_PORT;
   const url = `ws://127.0.0.1:${appPort}`;
 
-  let client: any;
-  let profilesStore: ProfilesStore;
-  let shopStoreInstance: ShopStore | null = null;
-
-  // Cart service is now store-based, no context needed
-
-
-  // Set the "store" context immediately. shopStoreInstance is initially null.
-  setContext<StoreContext>("store", {
-    getStore: () => shopStoreInstance,
-  });
-
+  let client: AppClient;
+  let shopViewComponent: ShopView;
+  let cloneSystemReady = false;
+  let setupMessage = "Setting up catalog access...";
+  let setupProgress = 0;
   let connected = false;
+  
+  // Global loading state for any clone setup operations
+  $: globalLoading = $cloneSetupStore.isLoading;
+  $: showLoading = !connected || !cloneSystemReady || globalLoading;
 
-  // Then start the async initialization
-  initialize();
+  // Create ProductDataService during initialization
+  // Create global cache service instance if it doesn't exist
+  if (typeof window !== "undefined" && !window.productRowCache) {
+    window.productRowCache = new ProductRowCacheService();
+  }
 
+  const cacheService: ProductRowCacheService =
+    typeof window !== "undefined" && window.productRowCache
+      ? window.productRowCache
+      : new ProductRowCacheService();
+
+  let cloneCache: SimpleCloneCache;
+  let backgroundCloneManager: BackgroundCloneManager;
+  let productDataService: ProductDataService;
+  let dataManager: DataManager;
+
+  // Handle category selection from sidebar
+  function handleCategorySelect(event: CustomEvent) {
+    if (shopViewComponent) {
+      shopViewComponent.selectCategory(
+        event.detail.category,
+        event.detail.subcategory,
+      );
+    }
+  }
+
+  // Initialize the app
   async function initialize(): Promise<void> {
     let tokenResp;
 
     if (adminPort) {
-      const url = `ws://localhost:${adminPort}`;
+      const adminUrl = `ws://localhost:${adminPort}`;
 
       const adminWebsocket = await AdminWebsocket.connect({
-        url: new URL(url),
+        url: new URL(adminUrl),
       });
       tokenResp = await adminWebsocket.issueAppAuthenticationToken({
         installed_app_id: appId,
@@ -76,53 +107,121 @@
     if (tokenResp) params.token = tokenResp.token;
     client = await AppWebsocket.connect(params);
     
-    // App connection verification
+    // App connection verification - critical for cell mapping
     try {
       const appInfo = await client.appInfo();
-      console.log('App connected:', appInfo.installed_app_id);
+      console.log('App connected:', appInfo?.installed_app_id || 'unknown');
+      console.log('Available cell roles:', Object.keys(appInfo?.cell_info || {}));
+      
+      // Verify cart role exists
+      if (!appInfo?.cell_info?.cart) {
+        throw new Error('Cart role not found in app info');
+      }
     } catch (error) {
-      console.error("Failed to connect to app:", error);
+      console.error("Failed to connect to app or missing cells:", error);
+      throw error; // Stop initialization if we can't access required cells
     }
 
-    // Initialize ShopStore once client is available
-    shopStoreInstance = new ShopStore(client, "products_role", "product_catalog");
-
-    // Initialize cart service with functional pattern
+    // Initialize all services with functional pattern - just set clients, NO data loading
     setCartServices(client);
-
-    // Initialize CheckoutService with dependencies
     setCheckoutServices(client);
-
-    // Initialize OrdersService with functional pattern
     setOrdersClient(client);
-
-    // Initialize AddressService client
     setAddressClient(client);
-
-    // Initialize CartAddressService client
     setCartAddressClient(client);
-
-    // Initialize PreferencesService with client (clone setup happens on-demand)
     setPreferencesClient(client);
+    
+    console.log('✅ All service clients initialized');
 
-    // Initialize ProfilesStore
-    profilesStore = new ProfilesStore(new ProfilesClient(client, "profiles_role"), {
-      avatarMode: "avatar-optional",
-      minNicknameLength: 2,
-      additionalFields: [],
-    });
+    // Create clone cache and background manager
+    cloneCache = new SimpleCloneCache(client);
+    backgroundCloneManager = new BackgroundCloneManager(client, cloneCache);
+    
+    // Connect cache to background manager for daily checks
+    cloneCache.setBackgroundManager(backgroundCloneManager);
+    
+    // Create a minimal store-like object for compatibility
+    const storeCompat = {
+      client,
+      uiProps: {
+        subscribe: () => {},
+        update: () => {},
+      },
+      setUIprops: () => {},
+      productStore: null as any, // Will be set after creation
+    };
+    
+    // Create ProductStore with simplified interface
+    const { ProductStore } = await import('./services/DHTSyncService');
+    const productStore = new ProductStore(client, storeCompat);
+    storeCompat.productStore = productStore;
+    
+    productDataService = new ProductDataService(storeCompat, cacheService, cloneCache);
+
+    // Create centralized DataManager
+    dataManager = new DataManager(productDataService);
+    
+    // Update reactive contexts
+    dataManagerStore.set(dataManager);
+    productDataServiceStore.set(productDataService);
+    productStoreStore.set(productStore);
 
     connected = true;
   }
 
-  // Use Svelte's reactive statement to watch profilesStore
-  $: prof = profilesStore ? profilesStore.myProfile : undefined;
-  $: profValue = $prof && ($prof as any).value;
 
-  function handleProfileCreated(event: CustomEvent) {
-    console.log("Profile created event:", event);
-    console.log("Event detail:", event.detail);
-  }
+  // Create reactive stores for contexts
+  import { writable } from 'svelte/store';
+  const dataManagerStore = writable(null);
+  const productDataServiceStore = writable(null);
+  const productStoreStore = writable(null);
+  
+  // Set reactive contexts
+  setContext("dataManager", dataManagerStore);
+  setContext("productDataService", productDataServiceStore);
+  setContext("productStore", productStoreStore);
+  
+  onMount(async () => {
+    await initialize();
+
+    // ===== CONSOLE TESTING - KEEP FOR DEBUGGING =====
+    // Expose reset method to global window for console testing
+    if (typeof window !== "undefined") {
+      (window as any).resetCloneManager = () => backgroundCloneManager.resetForTesting();
+      console.log('🧪 TESTING: Use window.resetCloneManager() in console to reset');
+    }
+    // ===== END CONSOLE TESTING =====
+
+    // Check if we need daily setup
+    if (backgroundCloneManager.shouldRunDailySetup()) {
+      setupMessage = "Checking for new catalog...";
+      cloneSystemReady = false;
+      
+      setupProgress = 25;
+      setupMessage = "Finding active catalog...";
+      
+      setupProgress = 50;
+      setupMessage = "Preparing clone access...";
+      
+      const success = await backgroundCloneManager.setup();
+      
+      setupProgress = 100;
+      setupMessage = success ? "Ready!" : "Setup failed";
+      
+      // No delay needed - set ready immediately
+      cloneSystemReady = true;
+    } else {
+      // Already setup today, skip loading screen
+      cloneSystemReady = true;
+    }
+
+    // Inject DataManager into cart service
+    setDataManager(dataManager);
+    
+    // Inject DataManager into navigation store
+    setNavigationDataManager(dataManager);
+    
+    // Let components load their own data when they need it - no premature loading
+  });
 </script>
 
 <svelte:head>
@@ -132,44 +231,58 @@
   />
 </svelte:head>
 
-{#if connected}
-  <profiles-context store={profilesStore}>
-    {#if !prof || ($prof && $prof.status === "pending")}
-      <div class="loading-container">
-        <div class="loading-wrapper">
-          <div class="pulse-ring"></div>
-          <div class="loader"></div>
-          <p class="loading-text">Connecting to the network...</p>
-        </div>
-      </div>
-    {:else if $prof && $prof.status === "complete" && !profValue}
-      <div class="welcome-container">
-        <div class="welcome-card">
-          <div class="welcome-header">
-            <h1 class="welcome-title">Welcome to</h1>
-            <span class="app-logo">SUMN.</span>
+<!-- Loading Screen - Shows for both startup and browsing setup -->
+<AppLoadingScreen 
+  show={showLoading} 
+  message={globalLoading ? $cloneSetupStore.message : setupMessage} 
+  progress={globalLoading ? $cloneSetupStore.progress : setupProgress} 
+/>
+
+{#if connected && cloneSystemReady}
+<div class="flex-scrollable-parent">
+  <div class="flex-scrollable-container">
+    <!-- SlideOutCart moved outside all other elements to appear at the root level -->
+    <SlideOutCart
+      isOpen={$isCartOpenStore}
+      onClose={() => ($isCartOpenStore = false)}
+    />
+
+    <!-- SidebarMenu at root level (no profile props needed) -->
+    <SidebarMenu />
+
+    <div class="app">
+      <div class="wrapper">
+        <!-- Add CategorySidebar here, outside the global scroll container -->
+        {#if $currentViewStore === "active"}
+          <div class="sidebar-container">
+            <CategorySidebar on:categorySelect={handleCategorySelect} />
           </div>
-          <p class="welcome-subtitle">
-            Please create your profile to continue.
-          </p>
-          <div class="profile-creator">
-            <create-profile on:profile-created={handleProfileCreated}
-            ></create-profile>
+        {/if}
+
+        <!-- Conditional rendering for the main content -->
+        {#if $currentViewStore === "active"}
+          <!-- The global scroll container with header and shop view -->
+          <div class="global-scroll-container scroll-container">
+            <HeaderContainer cartTotalValue={$cartTotal || 0} />
+            <div class="workspace">
+              <ShopView bind:this={shopViewComponent} />
+            </div>
           </div>
-        </div>
+        {:else}
+          <!-- Checked Out Carts View gets its own full container without header -->
+          <div class="global-scroll-container scroll-container full-height">
+            <OrdersView />
+          </div>
+        {/if}
       </div>
-    {:else}
-      <Controller {client} roleName="cart"></Controller>
-    {/if}
-  </profiles-context>
-{:else}
-  <div class="loading-container">
-    <div class="loading-wrapper">
-      <div class="pulse-ring"></div>
-      <div class="loader"></div>
-      <p class="loading-text">Initializing application...</p>
+
+      <div class="background">
+        <div class="background-overlay"></div>
+        <div class="background-image"></div>
+      </div>
     </div>
   </div>
+</div>
 {/if}
 
 <style>
@@ -190,194 +303,112 @@
     color: var(--text-primary, #2f353a);
   }
 
-  /* Loading screen styling */
-  .loading-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    width: 100%;
-    background: linear-gradient(
-      135deg,
-      var(--background, #f7fff7) 0%,
-      var(--surface, #ffffff) 100%
-    );
-  }
-
-  .loading-wrapper {
+  .app {
+    margin: 0;
+    padding-bottom: 10px;
+    background-size: cover;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    min-height: 0;
+    background-color: #fff;
     position: relative;
   }
 
-  .pulse-ring {
+  .background {
     position: absolute;
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      var(--primary, #00cfbb) 0%,
-      transparent 70%
-    );
-    opacity: 0.2;
-    animation: pulse 2s infinite;
+    z-index: 0;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
   }
 
-  .loader {
-    width: 60px;
-    height: 60px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top: 4px solid var(--primary, #00cfbb);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    animation: spin 1.5s linear infinite;
+  .background-overlay {
+    background: linear-gradient(144deg, #fcfcfc 0%, rgb(255, 255, 255) 100%);
+    position: absolute;
     z-index: 2;
-    background: var(--surface, #ffffff);
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    opacity: 0.4;
   }
 
-  .loading-text {
-    margin-top: var(--spacing-lg, 20px);
-    font-size: var(--font-size-md, 16px);
-    color: var(--text-secondary, #5a7a7a);
-    font-weight: var(--font-weight-semibold, 600);
-    text-align: center;
+  .background-image {
+    position: absolute;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background-size: cover;
   }
 
-  /* Welcome screen styling */
-  .welcome-container {
+  :global(:root) {
+    --resizeable-height: 200px;
+    --tab-width: 60px;
+  }
+
+  @media (min-width: 640px) {
+    .app {
+      max-width: none;
+    }
+  }
+
+  .flex-scrollable-parent {
+    position: relative;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: var(--spacing-lg, 20px);
-    background: linear-gradient(
-      135deg,
-      var(--background, #f2fffe) 0%,
-      var(--surface, #ffffff) 100%
-    );
+    flex: 1;
+  }
+  .flex-scrollable-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
-  .welcome-card {
-    background: var(--surface, #ffffff);
-    border-radius: var(--card-border-radius, 12px);
-    box-shadow: var(--shadow-medium, 0 4px 12px rgba(0, 0, 0, 0.15));
-    padding: var(--spacing-xxl, 32px);
-    max-width: 500px;
-    width: 100%;
-    animation: scaleIn var(--transition-normal, 300ms) ease forwards;
+  .wrapper {
+    position: relative;
+    z-index: 10;
+    height: 100%;
   }
 
-  .welcome-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: var(--spacing-xl, 24px);
+  .global-scroll-container {
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    z-index: 0;
   }
 
-  .welcome-title {
-    font-size: 32px;
-    font-weight: var(--font-weight-bold, 700);
-    color: var(--text-primary, #1e3a3a);
-    margin: 0 0 var(--spacing-md, 16px) 0;
-    text-align: center;
+  .global-scroll-container::-webkit-scrollbar {
+    width: 10px;
+    background-color: transparent;
   }
 
-  /* Styled text logo (replacing PNG image) */
-  .app-logo {
-    font-size: 45px;
-    font-weight: var(--font-weight-bold, 700);
-    color: var(--text-primary, #ffffff);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: transform var(--transition-normal, 300ms) ease;
-    display: inline-block;
+  .global-scroll-container::-webkit-scrollbar-thumb {
+    height: 5px;
+    border-radius: 5px;
+    background: rgb(255, 255, 255);
+    opacity: 1;
+    width: 8px;
   }
 
-  .welcome-subtitle {
-    text-align: center;
-    font-size: var(--font-size-md, 16px);
-    color: var(--text-secondary, #5a7a7a);
-    margin-bottom: var(--spacing-xl, 24px);
+  /* Workspace no longer needs padding-top since header scrolls with content */
+  .workspace {
+    padding-top: 0;
   }
 
-  .profile-creator {
-    width: 100%;
+  .sidebar-container {
+    position: fixed;
+    top: var(--component-header-height);
+    left: 0;
+    height: calc(100vh - var(--component-header-height));
+    z-index: var(--z-index-sticky);
   }
 
-  /* Enhanced Shoelace component styling */
-  :global(create-profile) {
-    width: 100%;
-    box-shadow: none;
-
-    /* Input styling */
-    --sl-input-height-medium: var(--btn-height-md, 50px);
-    --sl-input-color: var(--text-primary, #1e3a3a);
-    --sl-input-placeholder-color: var(--text-secondary, #5a7a7a);
-    --sl-input-background-color: var(--surface, #ffffff);
-    --sl-input-border-color: var(--border, #ccf2ee);
-    --sl-input-border-color-hover: var(--primary, #00cfbb);
-    --sl-input-border-color-focus: var(--primary, #00cfbb);
-    --sl-input-border-radius-medium: var(--btn-border-radius, 50px);
-    --sl-focus-ring-color: var(--primary, #00cfbb);
-    --sl-panel-background-color: var(--background, #f2fffe);
-    --sl-font-family: var(--font-family, "Plus Jakarta Sans", sans-serif);
-
-    /* Button styling - correct variable names for Shoelace */
-    --sl-button-font-size-medium: var(--font-size-md, 16px);
-    --sl-button-height-medium: var(--btn-height-md, 50px);
-    --sl-button-border-radius-medium: var(--btn-border-radius, 50px);
-    --sl-button-font-weight-medium: var(--font-weight-semibold, 600);
-
-    /* Primary button styling */
-    --sl-color-primary-500: var(--primary, #00cfbb) !important;
-    --sl-color-primary-600: var(--primary-dark, #00b3a1) !important;
-    --sl-color-primary-950: var(--primary-dark, #00b3a1) !important;
-    --sl-color-primary-text: var(--button-text, #ffffff) !important;
-
-    /* Default button */
-    --sl-color-neutral-0: var(--surface, #ffffff) !important;
-    --sl-color-neutral-400: var(--border, #ccf2ee) !important;
-    --sl-color-neutral-700: var(--text-primary, #1e3a3a) !important;
-  }
-
-  /* Direct styling of Shoelace button parts for gradient and effects */
-  :global(create-profile) ::part(button) {
-    transition: all 0.25s ease !important;
-  }
-
-  @keyframes spin {
-    0% {
-      transform: rotate(0deg);
-    }
-    100% {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes pulse {
-    0% {
-      transform: scale(1);
-      opacity: 0.2;
-    }
-    50% {
-      transform: scale(1.5);
-      opacity: 0.1;
-    }
-    100% {
-      transform: scale(1);
-      opacity: 0.2;
-    }
-  }
-
-  @keyframes scaleIn {
-    from {
-      opacity: 0;
-      transform: scale(0.9);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
+  .full-height {
+    height: 100vh;
   }
 </style>

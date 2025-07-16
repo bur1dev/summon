@@ -3,12 +3,9 @@
   import { ArrowLeft, MapPin, Clock } from "lucide-svelte";
   import OrderProductList from "./OrderProductList.svelte";
   
-  // Import agent-avatar component
-  import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
 
   // Props
   export let item: any;
-  export let agentPubKey: string | undefined;
 
   // Event dispatcher
   const dispatch = createEventDispatcher();
@@ -53,14 +50,6 @@
       </div>
     </div>
 
-    <div class="agent-avatar-container">
-      <agent-avatar
-        size="40"
-        agent-pub-key={agentPubKey}
-        disable-tooltip={true}
-        disable-copy={true}
-      ></agent-avatar>
-    </div>
   </div>
 
   {#if item.deliveryAddress || item.deliveryTime}
@@ -185,19 +174,6 @@
     margin-top: 4px;
   }
 
-  .agent-avatar-container {
-    margin-left: var(--spacing-md);
-    padding: 2px;
-    border-radius: 50%;
-    border: var(--border-width) solid var(--primary);
-    box-shadow: var(--shadow-subtle);
-    transition: var(--btn-transition);
-  }
-
-  .agent-avatar-container:hover {
-    transform: scale(var(--hover-scale));
-    box-shadow: var(--shadow-medium);
-  }
 
   .status-processing {
     color: var(--warning);

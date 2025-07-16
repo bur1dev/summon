@@ -6,7 +6,7 @@
     "tests"
   ],
   "scripts": {
-    "start": "AGENTS=2 BOOTSTRAP_PORT=$(get-port) SIGNAL_PORT=$(get-port) npm run network",
+    "start": "AGENTS=1 BOOTSTRAP_PORT=$(get-port) SIGNAL_PORT=$(get-port) npm run network",
     "dev": "VITE_ADMIN_PORT=$(get-port) VITE_APP_PORT=$(get-port) SIGNAL_PORT=$(get-port) BOOTSTRAP_PORT=$(get-port) UI_PORT=8888 npm run x",
     "x": "hc s clean && npm run build:happ && UI_PORT=8888 concurrently \"npm start -w ui\" \"npm run start:happ\" \"hc playground\"",
     "network": "hc s clean && npm run build:happ && UI_PORT=8888 concurrently \"npm start -w ui\" \"npm run launch:happ\"",

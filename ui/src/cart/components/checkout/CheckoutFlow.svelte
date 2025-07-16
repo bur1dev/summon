@@ -9,18 +9,13 @@
     import { ChevronLeft } from "lucide-svelte";
     import { AnimationService } from "../../../services/AnimationService";
 
-    // Import agent-avatar component
-    import "@holochain-open-dev/profiles/dist/elements/agent-avatar.js";
 
     // Props
     export let cartItems: any[] = [];
     export let onClose: () => void;
     export let isClosingCart = false;
 
-    // Get the store for the client
-    const storeContext =
-        getContext<import("../../../store").StoreContext>("store");
-    const store = storeContext.getStore();
+    // Store context removed - direct service access used
 
     // Event dispatcher
     const dispatch = createEventDispatcher();
@@ -288,14 +283,6 @@
                       ? 'slide-out-right'
                       : ''}"
             >
-                <div class="avatar-container">
-                    <agent-avatar
-                        size="40"
-                        agent-pub-key={store?.myAgentPubKeyB64}
-                        disable-tooltip={true}
-                        disable-copy={true}
-                    ></agent-avatar>
-                </div>
             </div>
 
             <AddressSelector
@@ -329,14 +316,6 @@
                       ? 'slide-out-right'
                       : ''}"
             >
-                <div class="avatar-container">
-                    <agent-avatar
-                        size="40"
-                        agent-pub-key={store?.myAgentPubKeyB64}
-                        disable-tooltip={true}
-                        disable-copy={true}
-                    ></agent-avatar>
-                </div>
             </div>
 
             <DeliveryTimeSelector
@@ -372,14 +351,6 @@
                           ? 'slide-out-right'
                           : ''}"
                 >
-                    <div class="avatar-container">
-                        <agent-avatar
-                            size="40"
-                            agent-pub-key={store?.myAgentPubKeyB64}
-                            disable-tooltip={true}
-                            disable-copy={true}
-                        ></agent-avatar>
-                    </div>
                 </div>
 
                 <CheckoutSummary
@@ -483,21 +454,6 @@
         display: flex;
     }
 
-    .avatar-container {
-        border: var(--border-width) solid var(--primary);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--background);
-        box-shadow: var(--shadow-subtle);
-        transition: var(--btn-transition);
-    }
-
-    .avatar-container:hover {
-        transform: scale(var(--hover-scale));
-        box-shadow: var(--shadow-medium);
-    }
 
     .checkout-content {
         flex: 1;

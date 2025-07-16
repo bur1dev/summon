@@ -2,9 +2,7 @@
 
 import { writable, get } from "svelte/store";
 import type { Writable } from "svelte/store";
-import type { AgentPubKeyB64 } from "@holochain/client";
 import { decode } from "@msgpack/msgpack";
-import type { ShopStore } from "../store";
 import { StockService } from "./StockService";
 import { createAndActivateClone, disableClone } from "../products/utils/cloneHelpers";
 // No complex clone manager needed
@@ -55,7 +53,7 @@ function normalizePromoPrice(promoPrice: number | null | undefined, regularPrice
 
 export class ProductStore {
   private state: Writable<StoreState>;
-  private store: ShopStore;
+  private store: any;
   private selectedLocationId: string = "70300168";
   // These properties are kept as they were present in the original file provided
   public products: any[] = [];
@@ -65,8 +63,7 @@ export class ProductStore {
 
   constructor(
     public client: any, // Made public
-    private myAgentKey: AgentPubKeyB64,
-    store: ShopStore
+    store: any // Simplified store interface
   ) {
     this.store = store;
     this.selectedLocationId = "70300168";
@@ -206,7 +203,7 @@ export class ProductStore {
         while (!success && attempts < 3) {
           try {
             attempts++;
-            const records = await this.store.service.client.callZome({
+            const records = await this.client.callZome({
               cell_id: clonedCell.cell_id,
               zome_name: "product_catalog",
               fn_name: "create_product_batch",
@@ -226,6 +223,7 @@ export class ProductStore {
 
           } catch (batchError: unknown) {
             const errorMessage = batchError instanceof Error ? batchError.message : String(batchError);
+            console.error(`❌ Upload batch failed (attempt ${attempts}/3):`, batchError);
             if (attempts >= 3) {
               console.warn(`Skipping product type after 3 failed attempts`);
               break;

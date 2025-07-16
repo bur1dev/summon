@@ -31,7 +31,6 @@
         generateExpandedQueriesForAmbiguity,
     } from "./query-utils";
 
-    export let store;
 
     const dispatch = createEventDispatcher();
 
@@ -102,15 +101,15 @@
                 console.log("[SearchBar] Initializing...");
                 isLoading = true;
 
-                apiClient = new SearchApiClient(store);
+                apiClient = new SearchApiClient(null);
 
                 await initializeEmbeddingService();
 
                 console.log(
                     "[SearchBar] Fetching product index from SearchCacheService...",
                 );
-                const productsFromCache =
-                    await SearchCacheService.getSearchIndex(store, false);
+                // Skip cache loading since store is removed
+                const productsFromCache: any[] = [];
                 initializeProductIndex(productsFromCache);
 
                 if (productIndex && productIndex.length > 0) {

@@ -1,8 +1,6 @@
 <script lang="ts">
   import { getContext, onMount } from "svelte";
-  import type { StoreContext } from "../../store";
   import { cartTotal, uniqueItemCount, isCheckoutSession } from "../../cart/services/CartBusinessService";
-  import { encodeHashToBase64 } from "@holochain/client";
   import { ShoppingCart, Menu } from "lucide-svelte";
   import SearchBar from "../../search/SearchBar.svelte";
   import SidebarMenu from "./SidebarMenu.svelte";
@@ -21,22 +19,13 @@
 
   // Import NavigationStore for search functionality
   import { navigationStore } from "../../stores/NavigationStore";
-  // Get the store for UI props
-  const { getStore } = getContext<StoreContext>("store");
-  const store = getStore();
 
   // Cart service is now store-based, no context needed
 
-  // Get profiles store from context
-  const profilesStore = getContext("profiles-store");
 
   // These now come from the UiStateStore
   export let cartTotalValue = 0; // This prop is passed from Controller, but we'll use the cart service value
 
-  // Get current agent pubkey and encode it
-  let myAgentPubKey;
-  let myAgentPubKeyB64;
-  let avatarLoaded = false;
 
   // Direct reactive access to cart stores
   $: cartTotalValue = $cartTotal;
@@ -46,17 +35,7 @@
   $: displayTotalValue = $isCheckoutSession ? 0 : cartTotalValue;
   $: displayItemCount = $isCheckoutSession ? 0 : uniqueItemCountValue;
 
-  onMount(() => {
-    // Agent pubkey logic
-    if (store && store.myAgentPubKey) {
-      myAgentPubKey = store.myAgentPubKey;
-      myAgentPubKeyB64 = encodeHashToBase64(myAgentPubKey);
-      avatarLoaded = true;
-      console.log("Agent pubkey loaded:", myAgentPubKeyB64);
-    }
-  });
 
-  $: uiProps = store ? store.uiProps : {};
 
   function toggleCart() {
     $isCartOpenStore = !$isCartOpenStore;
@@ -85,7 +64,6 @@
   <div class="center-section">
     <div class="search-container">
       <SearchBar
-        {store}
         on:select={({ detail }) => {
           // Enter search mode and set UI-only search result data
           navigationStore.search(detail.originalQuery);

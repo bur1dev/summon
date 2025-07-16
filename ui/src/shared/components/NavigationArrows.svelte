@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { ChevronsLeft, ChevronsRight } from "lucide-svelte";
-    import type { DataManager } from "../../services/DataManager";
+    import { navigate } from "../../products/services/ProductDataService";
 
     export let direction: "left" | "right";
     export let disabled: boolean = false;
@@ -14,7 +14,6 @@
     export let isProductType = false;
     export let hasMore = true;
     export let containerCapacity: number;
-    export let dataManager: DataManager; // STEP 2: Use DataManager instead of ProductDataService
 
     const dispatch = createEventDispatcher();
     let isNavigating = false;
@@ -31,7 +30,7 @@
             dispatch("loading", { identifier, loading: true });
 
             // Let the service handle all navigation logic
-            const result = await dataManager.navigate(direction, {
+            const result = await navigate(direction, {
                 category: selectedCategory,
                 identifier,
                 isProductType,

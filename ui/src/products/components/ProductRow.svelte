@@ -3,7 +3,6 @@
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import { ChevronRight } from "lucide-svelte";
-    import type { DataManager } from "../../services/DataManager";
     import { navigationStore } from "../../stores/NavigationStore";
     import { clickable } from "../../shared/actions/clickable";
 
@@ -13,7 +12,6 @@
     export let products: any[] = [];
     export let currentRanges: Record<string, any>;
     export let totalProducts: Record<string, any> = {};
-    export let dataManager: DataManager;
     export let selectedCategory: string;
     export let selectedSubcategory: string;
     export let mainGridContainer: HTMLElement;
@@ -64,7 +62,6 @@
             {mainGridContainer}
             {containerCapacity}
             {isProductType}
-            {dataManager}
             on:dataLoaded
             on:boundariesInitialized
         />
@@ -93,7 +90,6 @@
             {mainGridContainer}
             {containerCapacity}
             {isProductType}
-            {dataManager}
             on:dataLoaded
             on:boundariesInitialized
         />

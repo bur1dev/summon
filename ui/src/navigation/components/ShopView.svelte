@@ -1,6 +1,5 @@
 <script lang="ts">
   import { getContext } from "svelte";
-  import type { DataManager } from "../../services/DataManager";
   import SearchResults from "../../search/SearchResults.svelte";
   import ReportCategoryDialog from "../../reports/components/ReportCategoryDialog.svelte";
   import ProductBrowserData from "../../products/components/ProductBrowserData.svelte";
@@ -20,10 +19,8 @@
 
   // Import from data trigger store (keeping sort/filter stores for now)
   // Note: searchMode and searchQuery now come from DataManager navigationState
-  
-  // Get DataManager from context
-  const dataManagerStore = getContext("dataManager");
-  $: dataManager = $dataManagerStore;
+
+  // No longer need DataManager context - using direct imports
 
   // Import NavigationStore and category utilities
   import { navigationStore } from "../../stores/NavigationStore";
@@ -31,13 +28,11 @@
 
   // Store context removed - using direct service access
 
-
   export function selectCategory(category: any, subcategory: any) {
     handleCategorySelect({ detail: { category, subcategory } });
   }
 
   // UIProps removed - using direct store access
-
 
   function handleCategorySelect({
     detail: { category, subcategory },
@@ -46,7 +41,6 @@
   }) {
     navigationStore.navigate(category, subcategory);
   }
-
 
   async function handleReportSubmit(event: CustomEvent) {
     try {
@@ -77,83 +71,93 @@
   $: {
     const category = $navigationStore.category || "";
     const subcategory = $navigationStore.subcategory || "";
-    const categoryConfig = mainCategories.find(c => c.name === category);
-    const subcategoryConfig = categoryConfig?.subcategories.find(s => s.name === subcategory);
-    showProductTypeNavigation = !!(subcategoryConfig?.productTypes && subcategoryConfig.productTypes.length > 1 && !subcategoryConfig.gridOnly);
-    filteredProductTypes = subcategoryConfig?.productTypes?.filter(pt => pt !== "All") || [];
+    const categoryConfig = mainCategories.find((c) => c.name === category);
+    const subcategoryConfig = categoryConfig?.subcategories.find(
+      (s) => s.name === subcategory,
+    );
+    showProductTypeNavigation = !!(
+      subcategoryConfig?.productTypes &&
+      subcategoryConfig.productTypes.length > 1 &&
+      !subcategoryConfig.gridOnly
+    );
+    filteredProductTypes =
+      subcategoryConfig?.productTypes?.filter((pt) => pt !== "All") || [];
   }
-  
+
   let showProductTypeNavigation = false;
   let filteredProductTypes: string[] = [];
 </script>
 
 <div class="root-container" class:no-sidebar={$currentViewStore !== "active"}>
   <div class="main-content">
-    {#if dataManager}
-      <div class="content-wrapper">
-        {#if $navigationStore.category && $navigationStore.subcategory && !$navigationStore.searchMode}
-            {#if showProductTypeNavigation}
-              <div class="product-type-nav">
-                <div class="product-type-container">
-                  <button
-                    class="product-type-btn btn btn-toggle {($navigationStore.productType || 'All') ===
-                    'All'
-                      ? 'active'
-                      : ''}"
-                    on:click={() =>
-                      navigationStore.navigate($navigationStore.category, $navigationStore.subcategory, null)}
-                  >
-                    All
-                  </button>
-                  {#each filteredProductTypes as productType}
-                    <button
-                      class="product-type-btn btn btn-toggle {$navigationStore.productType ===
-                      productType
-                        ? 'active'
-                        : ''}"
-                      on:click={() =>
-                        navigationStore.navigate($navigationStore.category, $navigationStore.subcategory, productType)}
-                    >
-                      {productType}
-                    </button>
-                  {/each}
-                </div>
-              </div>
-            {/if}
+    <div class="content-wrapper">
+      {#if $navigationStore.category && $navigationStore.subcategory && !$navigationStore.searchMode}
+        {#if showProductTypeNavigation}
+          <div class="product-type-nav">
+            <div class="product-type-container">
+              <button
+                class="product-type-btn btn btn-toggle {($navigationStore.productType ||
+                  'All') === 'All'
+                  ? 'active'
+                  : ''}"
+                on:click={() =>
+                  navigationStore.navigate(
+                    $navigationStore.category,
+                    $navigationStore.subcategory,
+                    null,
+                  )}
+              >
+                All
+              </button>
+              {#each filteredProductTypes as productType}
+                <button
+                  class="product-type-btn btn btn-toggle {$navigationStore.productType ===
+                  productType
+                    ? 'active'
+                    : ''}"
+                  on:click={() =>
+                    navigationStore.navigate(
+                      $navigationStore.category,
+                      $navigationStore.subcategory,
+                      productType,
+                    )}
+                >
+                  {productType}
+                </button>
+              {/each}
+            </div>
+          </div>
         {/if}
+      {/if}
 
-        <div class="product-sections">
-          {#if $navigationStore.searchMode}
-            <SearchResults
-              query={$navigationStore.searchQuery}
-              selectedProductHash={$selectedProductHashStore}
-              productName={$productNameStore}
-              searchResults={$searchResultsStore}
-              searchMethod={$searchMethodStore}
-              on:reportCategory={(event) => {
-                $reportedProductStore = event.detail;
-                $showReportDialogStore = true;
-              }}
-              on:productTypeSelect={(event) => {
-                const { productType, category, subcategory } = event.detail;
-                navigationStore.navigate(category, subcategory, productType);
-              }}
-            />
-          {:else}
-            <ProductBrowserData
-              {dataManager}
-              {featuredSubcategories}
-              on:reportCategory={(event) => {
-                $reportedProductStore = event.detail;
-                $showReportDialogStore = true;
-              }}
-            />
-          {/if}
-        </div>
+      <div class="product-sections">
+        {#if $navigationStore.searchMode}
+          <SearchResults
+            query={$navigationStore.searchQuery}
+            selectedProductHash={$selectedProductHashStore}
+            productName={$productNameStore}
+            searchResults={$searchResultsStore}
+            searchMethod={$searchMethodStore}
+            on:reportCategory={(event) => {
+              $reportedProductStore = event.detail;
+              $showReportDialogStore = true;
+            }}
+            on:productTypeSelect={(event) => {
+              const { productType, category, subcategory } = event.detail;
+              navigationStore.navigate(category, subcategory, productType);
+            }}
+          />
+        {:else}
+          <ProductBrowserData
+            {featuredSubcategories}
+            on:reportCategory={(event) => {
+              $reportedProductStore = event.detail;
+              $showReportDialogStore = true;
+            }}
+          />
+        {/if}
       </div>
-    {:else}
-      <div>Loading store...</div>
-    {/if}
+    </div>
   </div>
 </div>
 {#if $reportedProductStore && $showReportDialogStore}

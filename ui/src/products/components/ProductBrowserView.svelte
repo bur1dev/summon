@@ -2,7 +2,6 @@
     import { createEventDispatcher } from "svelte";
     import AllProductsGrid from "./AllProductsGrid.svelte";
     import ProductRow from "./ProductRow.svelte";
-    import type { DataManager } from "../../services/DataManager";
     import { mainCategories } from "../utils/categoryData";
 
     // Props passed from data component
@@ -15,7 +14,6 @@
     export let currentRanges: Record<string, { start: number; end: number }>;
     export let totalProducts: Record<string, number>;
     export let hasMore: Record<string, boolean>;
-    export let dataManager: DataManager;
     export let containerCapacity: number;
     export let rowCapacities: Record<string, number>;
     export let action: any;
@@ -69,7 +67,6 @@
                     {currentRanges}
                     {totalProducts}
                     {hasMore}
-                    {dataManager}
                     selectedCategory={rowCategory || ""}
                     selectedSubcategory={rowSubcategory}
                     {mainGridContainer}
@@ -95,7 +92,6 @@
                     {currentRanges}
                     {totalProducts}
                     {hasMore}
-                    {dataManager}
                     {selectedCategory}
                     selectedSubcategory={identifier}
                     {mainGridContainer}
@@ -140,7 +136,6 @@
                         {currentRanges}
                         {totalProducts}
                         {hasMore}
-                        {dataManager}
                         {selectedCategory}
                         {selectedSubcategory}
                         {mainGridContainer}

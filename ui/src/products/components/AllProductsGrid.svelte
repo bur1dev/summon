@@ -3,7 +3,7 @@
     import ProductCard from "./ProductCard.svelte";
     import { createEventDispatcher } from "svelte";
     import SortFilterDropdown from "../../shared/components/SortFilterDropdown.svelte";
-    import type { DataManager } from "../../services/DataManager";
+    import { filterState, getSortedFilteredProducts, setSortBy, setSelectedBrands, setSelectedOrganic } from "../../stores/SortingStore";
 
 
     import { mainCategories } from "../utils/categoryData";
@@ -15,9 +15,7 @@
     export let selectedProductType: string | null = null;
     export let products: any[] = [];
 
-    const dataManagerStore = getContext("dataManager");
-    $: dataManager = $dataManagerStore;
-    $: filterState = dataManager?.filterState;
+    // No longer need DataManager context - using direct store import
     const dispatch = createEventDispatcher();
 
     let productsGridRef: HTMLElement;
@@ -61,7 +59,7 @@
 
     // Apply sorting and filtering to products using DataManager
     $: sortedFilteredProducts = (() => {
-        const filtered = dataManager.getSortedFilteredProducts(products, $filterState.sortBy, $filterState.selectedBrands, $filterState.selectedOrganic);
+        const filtered = getSortedFilteredProducts(products, $filterState.sortBy, $filterState.selectedBrands, $filterState.selectedOrganic);
 
         // Detect if array order changed (not just data changes)
         const currentSortState = {
@@ -137,17 +135,17 @@
 
     // Event handlers for dropdowns
     function handleSortChange(event: CustomEvent<any>) {
-        dataManager.setSortBy(event.detail);
+        setSortBy(event.detail);
         sortDropdownOpen = false;
     }
 
     function handleBrandsChange(event: CustomEvent<any>) {
-        dataManager.setSelectedBrands(event.detail);
+        setSelectedBrands(event.detail);
         brandsDropdownOpen = false;
     }
 
     function handleOrganicChange(event: CustomEvent<any>) {
-        dataManager.setSelectedOrganic(event.detail);
+        setSelectedOrganic(event.detail);
         organicDropdownOpen = false;
     }
 

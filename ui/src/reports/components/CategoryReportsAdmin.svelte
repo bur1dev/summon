@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from "svelte";
     import { mainCategories } from "../../products/utils/categoryData";
     import { getContext } from "svelte";
-    import type { DataManager } from "../../services/DataManager";
+    import { extractProductsFromGroups } from "../../products/services/ProductDataService";
     import {
         X,
         Check,
@@ -13,13 +13,11 @@
     } from "lucide-svelte";
     import { clickable } from "../../shared/actions/clickable";
 
-    // Store context removed - using direct service access
-    const dataManagerStore = getContext("dataManager");
-    $: dataManager = $dataManagerStore;
+    // No longer need DataManager context - using direct imports
     
-    // Get ProductStore for admin operations
-    const productStoreStore = getContext("productStore");
-    $: productStore = $productStoreStore;
+    // Get UploadService for admin operations
+    const uploadServiceContext = getContext("uploadService");
+    $: uploadService = (uploadServiceContext as any)?.getService();
 
     export let onClose = () => {};
 
@@ -682,8 +680,9 @@
         syncStatusModalOpen = true;
 
         try {
-            if (dataManager?.productService?.storeInstance?.productStore) {
-                await dataManager.productService.storeInstance.productStore.syncDht();
+            if (uploadService) {
+                // Note: syncDht method removed - using simple upload now
+                await uploadService.loadFromSavedData();
             }
         } catch (error) {
             console.error("Error during DHT sync:", error);
@@ -691,7 +690,7 @@
     }
 
     // Get sync status from the store (MOVED FROM SIDEBAR)
-    $: syncStatus = dataManager?.productService?.storeInstance?.productStore?.getState()?.syncStatus || {
+    $: syncStatus = uploadService?.getState ? uploadService.getState()?.syncStatus : {
         inProgress: false,
         message: "",
         progress: 0,
@@ -724,7 +723,7 @@
         <div class="data-admin-buttons">
             <button
                 class="data-admin-btn"
-                on:click={() => productStore?.loadFromSavedData()}
+                on:click={() => uploadService?.loadFromSavedData()}
             >
                 <span class="btn-icon">
                     <Database size={18} />

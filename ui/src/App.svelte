@@ -1,11 +1,11 @@
 <script lang="ts">
+  
   import ShopView from "./navigation/components/ShopView.svelte";
   import HeaderContainer from "./navigation/components/HeaderContainer.svelte";
   import { ProductDataService } from "./products/services/ProductDataService";
   import { ProductRowCacheService } from "./products/services/ProductRowCacheService";
   import { SimpleCloneCache } from "./products/utils/SimpleCloneCache";
   import { BackgroundCloneManager } from "./products/utils/BackgroundCloneManager";
-  import { DataManager } from "./services/DataManager";
   import AppLoadingScreen from "./components/AppLoadingScreen.svelte";
   import { cloneSetupStore } from "./stores/LoadingStore";
   import { setContext, onMount } from "svelte";
@@ -31,12 +31,11 @@
   import { currentViewStore, isCartOpenStore } from "./stores/UiOnlyStore";
 
   import SidebarMenu from "./navigation/components/SidebarMenu.svelte";
-  import { setDataManager, cartTotal } from "./cart/services/CartBusinessService";
-  import { setNavigationDataManager } from "./stores/NavigationStore";
+  import { cartTotal } from "./cart/services/CartBusinessService";
+  import { setProductDataService } from "./products/services/ProductDataService";
 
   // App connection constants
   const appId = import.meta.env.VITE_APP_ID ? import.meta.env.VITE_APP_ID : "summon";
-  const roleName = "cart";
   const appPort = import.meta.env.VITE_APP_PORT ? import.meta.env.VITE_APP_PORT : 8888;
   const adminPort = import.meta.env.VITE_ADMIN_PORT;
   const url = `ws://127.0.0.1:${appPort}`;
@@ -66,7 +65,7 @@
   let cloneCache: SimpleCloneCache;
   let backgroundCloneManager: BackgroundCloneManager;
   let productDataService: ProductDataService;
-  let dataManager: DataManager;
+  let uploadService: any;
 
   // Handle category selection from sidebar
   function handleCategorySelect(event: CustomEvent) {
@@ -139,46 +138,24 @@
     // Connect cache to background manager for daily checks
     cloneCache.setBackgroundManager(backgroundCloneManager);
     
-    // Create a minimal store-like object for compatibility
-    const storeCompat = {
-      client,
-      uiProps: {
-        subscribe: () => {},
-        update: () => {},
-      },
-      setUIprops: () => {},
-      productStore: null as any, // Will be set after creation
-    };
+    // Create services synchronously after client is ready (talking-stickies pattern)
+    const { ProductsUploadService } = await import('./services/DHTSyncService');
+    uploadService = new ProductsUploadService(client, { client });
     
-    // Create ProductStore with simplified interface
-    const { ProductStore } = await import('./services/DHTSyncService');
-    const productStore = new ProductStore(client, storeCompat);
-    storeCompat.productStore = productStore;
+    productDataService = new ProductDataService({ client }, cacheService, cloneCache);
     
-    productDataService = new ProductDataService(storeCompat, cacheService, cloneCache);
-
-    // Create centralized DataManager
-    dataManager = new DataManager(productDataService);
+    // Initialize ProductDataService for functional exports
+    setProductDataService(productDataService);
     
-    // Update reactive contexts
-    dataManagerStore.set(dataManager);
-    productDataServiceStore.set(productDataService);
-    productStoreStore.set(productStore);
+    // Make upload service available globally for debugging/manual upload
+    (window as any).uploadService = uploadService;
 
     connected = true;
   }
 
-
-  // Create reactive stores for contexts
-  import { writable } from 'svelte/store';
-  const dataManagerStore = writable(null);
-  const productDataServiceStore = writable(null);
-  const productStoreStore = writable(null);
-  
-  // Set reactive contexts
-  setContext("dataManager", dataManagerStore);
-  setContext("productDataService", productDataServiceStore);
-  setContext("productStore", productStoreStore);
+  // Set contexts directly (talking-stickies pattern)
+  setContext("productDataService", { getService: () => productDataService });
+  setContext("uploadService", { getService: () => uploadService });
   
   onMount(async () => {
     await initialize();
@@ -214,11 +191,7 @@
       cloneSystemReady = true;
     }
 
-    // Inject DataManager into cart service
-    setDataManager(dataManager);
-    
-    // Inject DataManager into navigation store
-    setNavigationDataManager(dataManager);
+    // DataManager no longer needed - using direct imports
     
     // Let components load their own data when they need it - no premature loading
   });

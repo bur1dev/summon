@@ -34,9 +34,6 @@ export function setCartServices(holoClient: any): void {
     // Don't automatically load cart - will be called explicitly after client is ready
 }
 
-export function setDataManager(_dataManager: any): void {
-    // No-op: DataManager no longer needed for cart calculations
-}
 
 // Load cart from backend and aggregate by productId
 export async function loadCart(): Promise<void> {
